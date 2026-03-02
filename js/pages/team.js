@@ -339,26 +339,25 @@ const Team = {
     if (!emp) {
       panel.innerHTML =
         '<div class="team-detail-empty">' +
-          '<div style="font-size:48px;margin-bottom:12px;opacity:0.3">&#x1F465;</div>' +
-          '<div style="color:var(--fury-text-muted)">Select an employee from the list</div>' +
+          '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="opacity:0.15;margin-bottom:16px">' +
+            '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>' +
+            '<path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' +
+          '</svg>' +
+          '<div style="color:var(--fury-text-secondary);font-size:14px;font-weight:500">Select an employee</div>' +
+          '<div style="color:var(--fury-text-muted);font-size:12px;margin-top:4px">Click on a name in the list to view details</div>' +
         '</div>';
       return;
     }
-
-    // Find team
-    var teamName = '—';
-    for (var ti = 0; ti < self.teams.length; ti++) {
-      // Check team_members in allTimesheets context — simplified: just show first team
-      teamName = self.teams.length > 0 ? '' : '—';
-    }
-    // TODO: could query team_members to find which team this employee belongs to
-    teamName = '';
 
     // Rate info
     var rate = parseFloat(emp.rate_usd) || 0;
     var contractType = emp.contract_type || 'Contractor';
     var ctBadge = contractType === 'Full-Time' ? 'FT'
       : contractType === 'Part-Time' ? 'PT' : 'CTR';
+    var isHourly = emp.employee_type === 'Hourly Contractor';
+    var rateStr = isHourly
+      ? '$' + rate.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '/hr'
+      : '$' + rate.toLocaleString('en-US', { minimumFractionDigits: 0 }) + '/mo';
 
     // Calculate regular hours
     var regularHours = self.calculateRegularHours();
@@ -369,195 +368,207 @@ const Team = {
     var totalHours = 0;
     for (var t = 0; t < self.timesheets.length; t++) {
       var ts = self.timesheets[t];
-      var projId = ts.project_id;
-      var hours = parseFloat(ts.hours) || 0;
-      totalHours += hours;
-      projectHoursMap[projId] = (projectHoursMap[projId] || 0) + hours;
+      totalHours += parseFloat(ts.hours) || 0;
+      projectHoursMap[ts.project_id] = (projectHoursMap[ts.project_id] || 0) + (parseFloat(ts.hours) || 0);
     }
 
     var diff = totalHours - regularHours;
     var diffClass = diff > 0 ? 'team-diff-over' : diff < 0 ? 'team-diff-under' : 'team-diff-zero';
     var diffStr = diff > 0 ? '+' + diff.toFixed(0) + 'h' : diff < 0 ? diff.toFixed(0) + 'h' : '0h';
+    var hoursPercent = regularHours > 0 ? Math.min(Math.round((totalHours / regularHours) * 100), 150) : 0;
+    var progressClass = hoursPercent >= 100 ? 'team-progress-full' : hoursPercent >= 75 ? 'team-progress-good' : 'team-progress-low';
 
     // Invoice for this employee
-    var invoice = null;
-    for (var inv = 0; inv < self.invoices.length; inv++) {
-      if (self.invoices[inv].employee_id === emp.id) {
-        invoice = self.invoices[inv];
-        break;
-      }
-    }
-
+    var invoice = self.getEmployeeInvoice(emp.id);
     var isAdmin = App.role === 'admin';
     var isAdminOrLead = App.role === 'admin' || App.role === 'lead';
+
+    // Avatar initials
+    var nameParts = (emp.name || '').split(/[\s,]+/).filter(Boolean);
+    var initials = nameParts.length >= 2
+      ? (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase()
+      : (nameParts[0] || 'U').charAt(0).toUpperCase();
 
     // ── Build HTML ──
     var html = '';
 
-    // Header
+    // ═══ HEADER ═══
     html +=
-      '<div class="team-detail-header">' +
-        '<div>' +
-          '<h2 class="team-detail-name">' + self.escapeHtml(emp.name) + '</h2>' +
-          '<div class="team-detail-meta">' +
-            '<span class="team-badge team-badge-' + ctBadge.toLowerCase() + '">' + ctBadge + '</span>' +
-            '<span class="team-detail-rate">' +
-              (emp.employee_type === 'FTE' || emp.employee_type !== 'Hourly Contractor'
-                ? '$' + rate.toLocaleString('en-US', { minimumFractionDigits: 0 }) + '/mo'
-                : '$' + rate.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '/hr') +
-            '</span>' +
-            (teamName ? '<span class="team-detail-team">Team: ' + self.escapeHtml(teamName) + '</span>' : '') +
+      '<div class="td-header">' +
+        '<div class="td-header-left">' +
+          '<div class="td-avatar">' + initials + '</div>' +
+          '<div class="td-header-info">' +
+            '<h2 class="td-name">' + self.escapeHtml(emp.name) + '</h2>' +
+            '<div class="td-meta">' +
+              '<span class="team-badge team-badge-' + ctBadge.toLowerCase() + '">' + ctBadge + '</span>' +
+              '<span class="td-rate">' + rateStr + '</span>' +
+            '</div>' +
           '</div>' +
         '</div>' +
         (isAdmin
-          ? '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-edit">Edit</button>'
+          ? '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-edit">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+              ' Edit' +
+            '</button>'
           : '') +
       '</div>';
 
-    // Contact section
+    // ═══ CONTACT & DOCUMENTS ═══
     html +=
-      '<div class="team-detail-section">' +
-        '<div class="team-detail-section-title">Contact</div>' +
-        '<div class="team-detail-grid">' +
-          '<div class="team-detail-field">' +
-            '<span class="team-detail-label">Email</span>' +
-            '<span class="team-detail-value">' +
-              (emp.work_email ? self.escapeHtml(emp.work_email) : '<span class="team-muted">Not assigned</span>') +
-            '</span>' +
+      '<div class="td-section">' +
+        '<div class="td-section-title">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>' +
+          ' Contact & Documents' +
+        '</div>' +
+        '<div class="td-contact-grid">' +
+          // Email
+          '<div class="td-contact-item">' +
+            '<div class="td-contact-label">Email</div>' +
+            (emp.work_email
+              ? '<a href="mailto:' + self.escapeHtml(emp.work_email) + '" class="td-contact-link">' + self.escapeHtml(emp.work_email) + '</a>'
+              : '<span class="td-contact-empty">Not assigned</span>') +
           '</div>' +
-          '<div class="team-detail-field">' +
-            '<span class="team-detail-label">Phone</span>' +
-            '<span class="team-detail-value">' +
-              (emp.phone ? self.escapeHtml(emp.phone) : '<span class="team-muted">—</span>') +
-            '</span>' +
+          // Phone
+          '<div class="td-contact-item">' +
+            '<div class="td-contact-label">Phone</div>' +
+            (emp.phone
+              ? '<a href="tel:' + self.escapeHtml(emp.phone) + '" class="td-contact-link">' + self.escapeHtml(emp.phone) + '</a>'
+              : '<span class="td-contact-empty">&#8212;</span>') +
           '</div>' +
         '</div>' +
-        '<div class="team-detail-docs">' +
-          (emp.contract_uploaded_at
-            ? '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-contract">Download Contract</button>'
-            : (isAdmin
-                ? '<label class="fury-btn fury-btn-secondary fury-btn-sm team-upload-doc">' +
-                    'Upload Contract <input type="file" accept=".pdf" id="team-file-contract" style="display:none" />' +
-                  '</label>'
-                : '<span class="team-muted" style="font-size:12px">No contract uploaded</span>')) +
-          (emp.nda_uploaded_at
-            ? '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-nda">Download NDA</button>'
-            : (isAdmin
-                ? '<label class="fury-btn fury-btn-secondary fury-btn-sm team-upload-doc">' +
-                    'Upload NDA <input type="file" accept=".pdf" id="team-file-nda" style="display:none" />' +
-                  '</label>'
-                : '<span class="team-muted" style="font-size:12px">No NDA uploaded</span>')) +
+        // Documents row
+        '<div class="td-docs-row">' +
+          self._renderDocCard('Contract', emp.contract_uploaded_at, 'team-btn-contract', 'team-file-contract', isAdmin) +
+          self._renderDocCard('NDA', emp.nda_uploaded_at, 'team-btn-nda', 'team-file-nda', isAdmin) +
         '</div>' +
       '</div>';
 
-    // Working Hours section
-    console.log('[Team] renderDetail — role:', App.role, 'isAdminOrLead:', isAdminOrLead, 'projects:', self.projects.length);
-
+    // ═══ WORKING HOURS ═══
     html +=
-      '<div class="team-detail-section">' +
-        '<div class="team-detail-section-title">' +
-          'Working Hours — ' + self.MONTH_NAMES[self.month - 1] + ' ' + self.year +
-          ' <span class="team-auto-calc">(auto: ' + regularDays + ' days &times; 8h = ' + regularHours + 'h)</span>' +
+      '<div class="td-section">' +
+        '<div class="td-section-title">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
+          ' Working Hours' +
+          '<span class="td-period-label">' + self.MONTH_NAMES[self.month - 1] + ' ' + self.year + '</span>' +
+        '</div>' +
+        // Hours summary bar
+        '<div class="td-hours-summary">' +
+          '<div class="td-hours-stats">' +
+            '<span class="td-hours-logged" id="team-total-hours">' + totalHours.toFixed(0) + 'h</span>' +
+            '<span class="td-hours-separator">/</span>' +
+            '<span class="td-hours-standard">' + regularHours + 'h</span>' +
+            '<span class="td-hours-info">(' + regularDays + ' days)</span>' +
+            '<span class="' + diffClass + '" id="team-diff-hours" style="margin-left:auto;font-weight:600;font-size:13px">' + diffStr + '</span>' +
+          '</div>' +
+          '<div class="td-progress">' +
+            '<div class="td-progress-bar ' + progressClass + '" style="width:' + Math.min(hoursPercent, 100) + '%" id="team-progress-bar"></div>' +
+          '</div>' +
         '</div>';
 
     if (self.projects.length === 0) {
       html +=
-        '<div style="padding:12px 0;color:var(--fury-text-muted);font-size:13px">' +
-          'No projects configured. Add projects in Settings to enable hours tracking.' +
+        '<div class="td-hours-empty">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.4"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+          ' No projects configured' +
         '</div>';
     } else {
-      html +=
-        (!isAdminOrLead
-          ? '<div style="padding:6px 0 8px;font-size:12px;color:var(--fury-text-muted);opacity:0.7">' +
-              'Read-only — only Admin or Lead can edit hours' +
-            '</div>'
-          : '') +
-        '<div class="team-hours-table">' +
-          '<table class="fury-table fury-table-compact">' +
-            '<thead><tr><th>Project</th><th style="width:100px;text-align:right">Hours</th></tr></thead>' +
-            '<tbody>';
+      if (!isAdminOrLead) {
+        html +=
+          '<div class="td-readonly-hint">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
+            ' View only' +
+          '</div>';
+      }
 
+      html += '<div class="td-hours-grid">';
       for (var p = 0; p < self.projects.length; p++) {
         var proj = self.projects[p];
         var projHours = projectHoursMap[proj.id] || 0;
-
         html +=
-          '<tr>' +
-            '<td>' + self.escapeHtml(proj.code) + '</td>' +
-            '<td style="text-align:right">' +
-              '<input type="number" class="fury-input fury-input-sm team-hours-input" ' +
-                'data-project-id="' + proj.id + '" ' +
-                'value="' + (projHours > 0 ? projHours : '') + '" ' +
-                'min="0" max="999" step="0.5" placeholder="0" ' +
-                (isAdminOrLead ? '' : 'disabled') + ' />' +
-            '</td>' +
-          '</tr>';
+          '<div class="td-hours-row">' +
+            '<span class="td-hours-project">' + self.escapeHtml(proj.code) + '</span>' +
+            '<input type="number" class="td-hours-input team-hours-input" ' +
+              'data-project-id="' + proj.id + '" ' +
+              'value="' + (projHours > 0 ? projHours : '') + '" ' +
+              'min="0" max="999" step="0.5" placeholder="0" ' +
+              (isAdminOrLead ? '' : 'disabled') + ' />' +
+          '</div>';
       }
+      html += '</div>';
 
-      html +=
-              '<tr class="team-hours-total">' +
-                '<td style="font-weight:700;color:var(--fury-text)">Total</td>' +
-                '<td style="text-align:right;font-weight:700" id="team-total-hours">' + totalHours.toFixed(0) + 'h</td>' +
-              '</tr>' +
-              '<tr>' +
-                '<td style="color:var(--fury-text-secondary)">Diff</td>' +
-                '<td style="text-align:right;font-weight:600" id="team-diff-hours">' +
-                  '<span class="' + diffClass + '">' + diffStr + '</span>' +
-                '</td>' +
-              '</tr>' +
-            '</tbody></table>' +
-          '</div>' +
-          (isAdminOrLead
-            ? '<button class="fury-btn fury-btn-secondary fury-btn-sm fury-mt-2" id="team-btn-save-hours">Save Hours</button>'
-            : '');
+      if (isAdminOrLead) {
+        html +=
+          '<button class="fury-btn fury-btn-primary fury-btn-sm td-save-btn" id="team-btn-save-hours">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>' +
+            ' Save Hours' +
+          '</button>';
+      }
     }
 
     html += '</div>';
 
-    // Invoice section
+    // ═══ INVOICE ═══
     html +=
-      '<div class="team-detail-section">' +
-        '<div class="team-detail-section-title">' +
-          'Invoice — ' + self.MONTH_NAMES[self.month - 1] + ' ' + self.year +
+      '<div class="td-section td-section-last">' +
+        '<div class="td-section-title">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>' +
+          ' Invoice' +
+          '<span class="td-period-label">' + self.MONTH_NAMES[self.month - 1] + ' ' + self.year + '</span>' +
         '</div>';
 
     if (invoice) {
       var invStatus = invoice.status || 'draft';
       var invTotal = parseFloat(invoice.total_usd) || 0;
       var statusBadge = self._statusBadge(invStatus);
+      var invNumber = invoice.invoice_number || '';
 
       html +=
-        '<div class="team-invoice-card">' +
-          '<div class="team-invoice-info">' +
-            '<div>' +
-              '<span class="team-invoice-amount">$' + invTotal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</span>' +
-              ' ' + statusBadge +
-            '</div>' +
-            '<div class="team-invoice-hours">' +
-              totalHours.toFixed(0) + 'h ' +
-              (emp.employee_type === 'Hourly Contractor'
-                ? '&times; $' + rate.toFixed(2) + '/hr'
-                : '(monthly rate)') +
-            '</div>' +
+        '<div class="td-invoice-card td-invoice-' + invStatus + '">' +
+          '<div class="td-invoice-top">' +
+            '<div class="td-invoice-amount">$' + invTotal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</div>' +
+            statusBadge +
           '</div>' +
-          '<div class="team-invoice-actions">' +
-            '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-preview">Preview</button>' +
-            '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-download">Download DOCX</button>' +
+          '<div class="td-invoice-detail">' +
+            (invNumber ? '<span class="td-invoice-num">#' + self.escapeHtml(String(invNumber)) + '</span>' : '') +
+            '<span class="td-invoice-calc">' +
+              totalHours.toFixed(0) + 'h' +
+              (isHourly ? ' &times; $' + rate.toFixed(2) + '/hr' : ' (monthly rate)') +
+            '</span>' +
+          '</div>' +
+          '<div class="td-invoice-actions">' +
+            '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-preview" data-fury-tooltip="Preview invoice">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
+              ' Preview' +
+            '</button>' +
+            '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-download" data-fury-tooltip="Download DOCX">' +
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
+              ' DOCX' +
+            '</button>' +
             (invStatus === 'draft' || invStatus === 'generated'
-              ? '<button class="fury-btn fury-btn-accent fury-btn-sm" id="team-btn-mark-sent">Mark Sent</button>'
+              ? '<button class="fury-btn fury-btn-primary fury-btn-sm" id="team-btn-mark-sent">' +
+                  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>' +
+                  ' Mark Sent' +
+                '</button>'
               : '') +
             (invStatus === 'sent'
-              ? '<button class="fury-btn fury-btn-success fury-btn-sm" id="team-btn-mark-paid">Mark Paid</button>'
+              ? '<button class="fury-btn fury-btn-success fury-btn-sm" id="team-btn-mark-paid">' +
+                  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+                  ' Mark Paid' +
+                '</button>'
               : '') +
           '</div>' +
         '</div>';
     } else {
       html +=
-        '<div class="team-invoice-empty">' +
-          '<div style="margin-bottom:8px;color:var(--fury-text-muted)">No invoice for this period</div>' +
+        '<div class="td-invoice-empty">' +
+          '<div class="td-invoice-empty-icon">' +
+            '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' +
+          '</div>' +
+          '<div class="td-invoice-empty-text">No invoice for this period</div>' +
           (isAdminOrLead
-            ? '<button class="fury-btn fury-btn-accent" id="team-btn-generate">' +
-                'Generate Invoice' +
+            ? '<button class="fury-btn fury-btn-primary td-generate-btn" id="team-btn-generate">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
+                ' Generate Invoice' +
               '</button>'
             : '') +
         '</div>';
@@ -566,9 +577,52 @@ const Team = {
     html += '</div>';
 
     panel.innerHTML = html;
-
-    // Bind detail events
     self.bindDetailEvents(container);
+  },
+
+  /* ── Helper: render document card ── */
+  _renderDocCard(label, uploadedAt, btnId, fileId, isAdmin) {
+    if (uploadedAt) {
+      return (
+        '<div class="td-doc-card td-doc-ok">' +
+          '<div class="td-doc-icon">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+          '</div>' +
+          '<div class="td-doc-info">' +
+            '<span class="td-doc-label">' + label + '</span>' +
+            '<span class="td-doc-status">Uploaded</span>' +
+          '</div>' +
+          '<button class="td-doc-action" id="' + btnId + '" data-fury-tooltip="Download ' + label + '">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
+          '</button>' +
+        '</div>'
+      );
+    }
+    if (isAdmin) {
+      return (
+        '<label class="td-doc-card td-doc-missing td-doc-upload">' +
+          '<div class="td-doc-icon">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' +
+          '</div>' +
+          '<div class="td-doc-info">' +
+            '<span class="td-doc-label">' + label + '</span>' +
+            '<span class="td-doc-status td-doc-status-missing">Upload PDF</span>' +
+          '</div>' +
+          '<input type="file" accept=".pdf" id="' + fileId + '" style="display:none" />' +
+        '</label>'
+      );
+    }
+    return (
+      '<div class="td-doc-card td-doc-missing">' +
+        '<div class="td-doc-icon">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' +
+        '</div>' +
+        '<div class="td-doc-info">' +
+          '<span class="td-doc-label">' + label + '</span>' +
+          '<span class="td-doc-status td-doc-status-missing">Not uploaded</span>' +
+        '</div>' +
+      '</div>'
+    );
   },
 
   /* ═══════════════════════════════════════════════════════
@@ -816,6 +870,15 @@ const Team = {
     var diffEl = container.querySelector('#team-diff-hours');
     if (totalEl) totalEl.textContent = total.toFixed(0) + 'h';
     if (diffEl) diffEl.innerHTML = '<span class="' + diffClass + '">' + diffStr + '</span>';
+
+    // Update progress bar
+    var progressBar = container.querySelector('#team-progress-bar');
+    if (progressBar && regularHours > 0) {
+      var pct = Math.min(Math.round((total / regularHours) * 100), 100);
+      progressBar.style.width = pct + '%';
+      progressBar.className = 'td-progress-bar ' +
+        (pct >= 100 ? 'team-progress-full' : pct >= 75 ? 'team-progress-good' : 'team-progress-low');
+    }
   },
 
   /* ── Save hours ── */
