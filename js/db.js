@@ -34,11 +34,15 @@ const DB = {
         .from('profiles')
         .select('role')
         .eq('email', email)
-        .single();
+        .maybeSingle();
+
+      console.log('[DB] getUserRole:', email, '→ data:', data, 'error:', error);
 
       if (error) return { data: null, error };
+      if (!data) return { data: null, error: { message: 'No profile found for ' + email } };
       return { data: data.role, error: null };
     } catch (err) {
+      console.error('[DB] getUserRole exception:', err);
       return { data: null, error: { message: err.message } };
     }
   },
