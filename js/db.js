@@ -431,41 +431,27 @@ const DB = {
    */
   async createInvoice(invoiceData, items = []) {
     try {
-      // Insert the invoice
-      const { data: invoice, error: invoiceError } = await this.client
-        .from('invoices')
-        .insert(invoiceData)
-        .select()
-        .single();
-
-      if (invoiceError) return { data: null, error: invoiceError };
-
-      // Insert invoice items if any
-      if (items.length > 0) {
-        const itemsWithInvoiceId = items.map((item, index) => ({
-          invoice_id: invoice.id,
+      // Use the newly created atomic RPC function
+      const { data: invoiceId, error: rpcError } = await this.client.rpc('create_invoice_atomic', {
+        p_employee_id: invoiceData.employee_id,
+        p_invoice_number: invoiceData.invoice_number,
+        p_invoice_date: invoiceData.invoice_date,
+        p_month: invoiceData.month,
+        p_year: invoiceData.year,
+        p_format_type: invoiceData.format_type,
+        p_subtotal_usd: invoiceData.subtotal_usd,
+        p_total_usd: invoiceData.total_usd,
+        p_status: invoiceData.status || 'draft',
+        p_items: items.map((item, index) => ({
           item_order: item.item_order || index + 1,
           description: item.description,
           price_usd: item.price_usd,
           qty: item.qty || 1,
           total_usd: item.total_usd
-        }));
-
-        const { error: itemsError } = await this.client
-          .from('invoice_items')
-          .insert(itemsWithInvoiceId);
-
-        if (itemsError) {
-          // Rollback: delete the invoice if items fail
-          await this.client.from('invoices').delete().eq('id', invoice.id);
-          return { data: null, error: itemsError };
-        }
-      }
-
-      // Increment the employee's next invoice number
-      await this.client.rpc('increment_invoice_number', {
-        emp_id: invoiceData.employee_id
+        }))
       });
+
+      if (rpcError) return { data: null, error: rpcError };
 
       // Return the full invoice with items
       const { data: fullInvoice, error: fetchError } = await this.client
@@ -475,10 +461,10 @@ const DB = {
           employees ( id, name, full_name_lat, invoice_prefix ),
           invoice_items ( id, item_order, description, price_usd, qty, total_usd )
         `)
-        .eq('id', invoice.id)
+        .eq('id', invoiceId)
         .single();
 
-      if (fetchError) return { data: invoice, error: null };
+      if (fetchError) return { data: null, error: fetchError };
       return { data: fullInvoice, error: null };
     } catch (err) {
       return { data: null, error: { message: err.message } };
@@ -634,10 +620,10 @@ const DB = {
         .from('settings')
         .select('value')
         .eq('key', key)
-        .single();
+        .maybeSingle();
 
       if (error) return { data: null, error };
-      return { data: data.value, error: null };
+      return { data: data ? data.value : null, error: null };
     } catch (err) {
       return { data: null, error: { message: err.message } };
     }
