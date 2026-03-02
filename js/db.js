@@ -1,0 +1,876 @@
+// ============================================================
+// OMD Finance Platform — Supabase Database Client
+// db.js — All CRUD operations for the invoice platform
+// ============================================================
+
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+const DB = {
+  client: null,
+
+  /**
+   * Initialize the Supabase client.
+   * Call this once on app load.
+   * @param {string} [url] - Supabase project URL
+   * @param {string} [key] - Supabase anon/public key
+   */
+  init(url, key) {
+    const supabaseUrl = url || SUPABASE_URL;
+    const supabaseKey = key || SUPABASE_ANON_KEY;
+    this.client = supabase.createClient(supabaseUrl, supabaseKey);
+  },
+
+  // ----------------------------------------------------------
+  // AUTH / PROFILE HELPERS
+  // ----------------------------------------------------------
+
+  /**
+   * Get the role for a given email from the profiles table.
+   * @param {string} email
+   * @returns {Promise<{data: string|null, error: object|null}>}
+   */
+  async getUserRole(email) {
+    try {
+      const { data, error } = await this.client
+        .from('profiles')
+        .select('role')
+        .eq('email', email)
+        .single();
+
+      if (error) return { data: null, error };
+      return { data: data.role, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get the full profile for a user by their auth user ID.
+   * @param {string} userId - UUID from auth.users
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async getProfile(userId) {
+    try {
+      const { data, error } = await this.client
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  // ----------------------------------------------------------
+  // EMPLOYEES
+  // ----------------------------------------------------------
+
+  /**
+   * Get all active employees, ordered by name.
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getEmployees() {
+    try {
+      const { data, error } = await this.client
+        .from('employees')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get a single employee by ID.
+   * @param {string} id - Employee UUID
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async getEmployee(id) {
+    try {
+      const { data, error } = await this.client
+        .from('employees')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Create or update an employee. If data.id is provided, updates; otherwise inserts.
+   * @param {object} employeeData
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async upsertEmployee(employeeData) {
+    try {
+      const { data, error } = await this.client
+        .from('employees')
+        .upsert(employeeData, { onConflict: 'id' })
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get all employees that belong to a lead's team.
+   * @param {string} leadEmail - The team lead's email
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getTeamEmployees(leadEmail) {
+    try {
+      // First, find the team for this lead
+      const { data: team, error: teamError } = await this.client
+        .from('teams')
+        .select('id')
+        .eq('lead_email', leadEmail)
+        .single();
+
+      if (teamError) return { data: [], error: teamError };
+
+      // Get employee IDs from team_members
+      const { data: members, error: membersError } = await this.client
+        .from('team_members')
+        .select('employee_id')
+        .eq('team_id', team.id);
+
+      if (membersError) return { data: [], error: membersError };
+
+      if (!members || members.length === 0) {
+        return { data: [], error: null };
+      }
+
+      const employeeIds = members.map(m => m.employee_id);
+
+      // Fetch the actual employee records
+      const { data, error } = await this.client
+        .from('employees')
+        .select('*')
+        .in('id', employeeIds)
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  // ----------------------------------------------------------
+  // TEAMS
+  // ----------------------------------------------------------
+
+  /**
+   * Get all teams with their lead info.
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getTeams() {
+    try {
+      const { data, error } = await this.client
+        .from('teams')
+        .select('*')
+        .order('name', { ascending: true });
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get the team where the given email is the lead.
+   * @param {string} leadEmail
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async getTeam(leadEmail) {
+    try {
+      const { data, error } = await this.client
+        .from('teams')
+        .select('*')
+        .eq('lead_email', leadEmail)
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get all members of a team (with employee details).
+   * @param {string} teamId - Team UUID
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getTeamMembers(teamId) {
+    try {
+      const { data, error } = await this.client
+        .from('team_members')
+        .select(`
+          id,
+          employee_id,
+          employees (
+            id, pin, name, full_name_lat, rate_usd,
+            employee_type, invoice_format, is_active
+          )
+        `)
+        .eq('team_id', teamId);
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  // ----------------------------------------------------------
+  // PROJECTS
+  // ----------------------------------------------------------
+
+  /**
+   * Get all active projects, ordered by name.
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getProjects() {
+    try {
+      const { data, error } = await this.client
+        .from('projects')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  // ----------------------------------------------------------
+  // TIMESHEETS
+  // ----------------------------------------------------------
+
+  /**
+   * Get timesheets for a given month/year, optionally filtered by employee IDs.
+   * Includes project info via join.
+   * @param {number} month - 1-12
+   * @param {number} year - e.g. 2026
+   * @param {string[]} [employeeIds] - Optional array of employee UUIDs
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getTimesheets(month, year, employeeIds) {
+    try {
+      let query = this.client
+        .from('timesheets')
+        .select(`
+          id, employee_id, project_id, month, year, hours, created_by, created_at,
+          employees ( id, pin, name ),
+          projects ( id, name, code, company )
+        `)
+        .eq('month', month)
+        .eq('year', year);
+
+      if (employeeIds && employeeIds.length > 0) {
+        query = query.in('employee_id', employeeIds);
+      }
+
+      query = query.order('employee_id', { ascending: true });
+
+      const { data, error } = await query;
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Insert or update a timesheet row. Uses the unique constraint
+   * (employee_id, project_id, month, year) for conflict resolution.
+   * @param {object} timesheetData - { employee_id, project_id, month, year, hours, created_by }
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async upsertTimesheet(timesheetData) {
+    try {
+      const { data, error } = await this.client
+        .from('timesheets')
+        .upsert(timesheetData, {
+          onConflict: 'employee_id,project_id,month,year'
+        })
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get aggregated timesheet summary for a month/year, grouped by employee.
+   * Returns total hours per employee across all projects.
+   * @param {number} month
+   * @param {number} year
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getTimesheetSummary(month, year) {
+    try {
+      const { data, error } = await this.client
+        .from('timesheets')
+        .select(`
+          employee_id,
+          hours,
+          employees ( id, pin, name, rate_usd, employee_type )
+        `)
+        .eq('month', month)
+        .eq('year', year);
+
+      if (error) return { data: [], error };
+
+      // Aggregate hours by employee in JS
+      const summaryMap = {};
+      for (const row of (data || [])) {
+        const empId = row.employee_id;
+        if (!summaryMap[empId]) {
+          summaryMap[empId] = {
+            employee_id: empId,
+            employee: row.employees,
+            total_hours: 0,
+            entries: []
+          };
+        }
+        summaryMap[empId].total_hours += parseFloat(row.hours) || 0;
+        summaryMap[empId].entries.push(row);
+      }
+
+      const summary = Object.values(summaryMap).sort((a, b) =>
+        (a.employee?.name || '').localeCompare(b.employee?.name || '')
+      );
+
+      return { data: summary, error: null };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  // ----------------------------------------------------------
+  // INVOICES
+  // ----------------------------------------------------------
+
+  /**
+   * Get invoices with optional filters. Includes employee and items.
+   * @param {object} [filters] - { month, year, employee_id, status, format_type }
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getInvoices(filters = {}) {
+    try {
+      let query = this.client
+        .from('invoices')
+        .select(`
+          *,
+          employees ( id, pin, name, full_name_lat, invoice_prefix ),
+          invoice_items ( id, item_order, description, price_usd, qty, total_usd )
+        `);
+
+      if (filters.month !== undefined) {
+        query = query.eq('month', filters.month);
+      }
+      if (filters.year !== undefined) {
+        query = query.eq('year', filters.year);
+      }
+      if (filters.employee_id) {
+        query = query.eq('employee_id', filters.employee_id);
+      }
+      if (filters.status) {
+        query = query.eq('status', filters.status);
+      }
+      if (filters.format_type) {
+        query = query.eq('format_type', filters.format_type);
+      }
+
+      query = query.order('created_at', { ascending: false });
+
+      const { data, error } = await query;
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Create a new invoice along with its line items in a single transaction-like flow.
+   * Also increments the employee's next_invoice_number.
+   * @param {object} invoiceData - Invoice fields (without id)
+   * @param {Array} items - Array of { description, price_usd, qty, total_usd, item_order }
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async createInvoice(invoiceData, items = []) {
+    try {
+      // Insert the invoice
+      const { data: invoice, error: invoiceError } = await this.client
+        .from('invoices')
+        .insert(invoiceData)
+        .select()
+        .single();
+
+      if (invoiceError) return { data: null, error: invoiceError };
+
+      // Insert invoice items if any
+      if (items.length > 0) {
+        const itemsWithInvoiceId = items.map((item, index) => ({
+          invoice_id: invoice.id,
+          item_order: item.item_order || index + 1,
+          description: item.description,
+          price_usd: item.price_usd,
+          qty: item.qty || 1,
+          total_usd: item.total_usd
+        }));
+
+        const { error: itemsError } = await this.client
+          .from('invoice_items')
+          .insert(itemsWithInvoiceId);
+
+        if (itemsError) {
+          // Rollback: delete the invoice if items fail
+          await this.client.from('invoices').delete().eq('id', invoice.id);
+          return { data: null, error: itemsError };
+        }
+      }
+
+      // Increment the employee's next invoice number
+      await this.client.rpc('increment_invoice_number', {
+        emp_id: invoiceData.employee_id
+      });
+
+      // Return the full invoice with items
+      const { data: fullInvoice, error: fetchError } = await this.client
+        .from('invoices')
+        .select(`
+          *,
+          employees ( id, name, full_name_lat, invoice_prefix ),
+          invoice_items ( id, item_order, description, price_usd, qty, total_usd )
+        `)
+        .eq('id', invoice.id)
+        .single();
+
+      if (fetchError) return { data: invoice, error: null };
+      return { data: fullInvoice, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Update the status of an invoice.
+   * @param {string} id - Invoice UUID
+   * @param {string} status - 'draft' | 'generated' | 'sent' | 'paid'
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async updateInvoiceStatus(id, status) {
+    try {
+      const { data, error } = await this.client
+        .from('invoices')
+        .update({ status })
+        .eq('id', id)
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get the next invoice number for an employee.
+   * Reads from employees.next_invoice_number.
+   * @param {string} employeeId - Employee UUID
+   * @param {string} [formatType] - Not used for number lookup but kept for API consistency
+   * @returns {Promise<{data: number|null, error: object|null}>}
+   */
+  async getNextInvoiceNumber(employeeId, formatType) {
+    try {
+      const { data, error } = await this.client
+        .from('employees')
+        .select('next_invoice_number, invoice_prefix')
+        .eq('id', employeeId)
+        .single();
+
+      if (error) return { data: null, error };
+      return {
+        data: {
+          number: data.next_invoice_number,
+          prefix: data.invoice_prefix
+        },
+        error: null
+      };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  // ----------------------------------------------------------
+  // INVOICE ITEMS
+  // ----------------------------------------------------------
+
+  /**
+   * Get all line items for a specific invoice, ordered by item_order.
+   * @param {string} invoiceId - Invoice UUID
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getInvoiceItems(invoiceId) {
+    try {
+      const { data, error } = await this.client
+        .from('invoice_items')
+        .select('*')
+        .eq('invoice_id', invoiceId)
+        .order('item_order', { ascending: true });
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  // ----------------------------------------------------------
+  // EXPENSES
+  // ----------------------------------------------------------
+
+  /**
+   * Get all expenses for a specific invoice.
+   * @param {string} invoiceId - Invoice UUID
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getExpenses(invoiceId) {
+    try {
+      const { data, error } = await this.client
+        .from('expenses')
+        .select('*')
+        .eq('invoice_id', invoiceId)
+        .order('created_at', { ascending: true });
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Create or update an expense. If data.id is provided, updates; otherwise inserts.
+   * @param {object} expenseData
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async upsertExpense(expenseData) {
+    try {
+      const { data, error } = await this.client
+        .from('expenses')
+        .upsert(expenseData, { onConflict: 'id' })
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Delete an expense by ID.
+   * @param {string} id - Expense UUID
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async deleteExpense(id) {
+    try {
+      const { data, error } = await this.client
+        .from('expenses')
+        .delete()
+        .eq('id', id)
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  // ----------------------------------------------------------
+  // SETTINGS
+  // ----------------------------------------------------------
+
+  /**
+   * Get a setting value by its key.
+   * @param {string} key - Setting key (e.g. 'billed_to', 'uah_usd_rate')
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async getSetting(key) {
+    try {
+      const { data, error } = await this.client
+        .from('settings')
+        .select('value')
+        .eq('key', key)
+        .single();
+
+      if (error) return { data: null, error };
+      return { data: data.value, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Set (upsert) a setting value.
+   * @param {string} key
+   * @param {object} value - JSONB value
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async setSetting(key, value) {
+    try {
+      const { data, error } = await this.client
+        .from('settings')
+        .upsert(
+          { key, value, updated_at: new Date().toISOString() },
+          { onConflict: 'key' }
+        )
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  // ----------------------------------------------------------
+  // MONTH LOCKS
+  // ----------------------------------------------------------
+
+  /**
+   * Check if a given month/year is locked.
+   * @param {number} month
+   * @param {number} year
+   * @returns {Promise<{data: boolean, error: object|null}>}
+   */
+  async isMonthLocked(month, year) {
+    try {
+      const { data, error } = await this.client
+        .from('month_locks')
+        .select('month, year')
+        .eq('month', month)
+        .eq('year', year)
+        .maybeSingle();
+
+      if (error) return { data: false, error };
+      return { data: !!data, error: null };
+    } catch (err) {
+      return { data: false, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Lock a month (admin only). Inserts a row into month_locks.
+   * @param {number} month
+   * @param {number} year
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async lockMonth(month, year) {
+    try {
+      const { data: session } = await this.client.auth.getSession();
+      const userId = session?.session?.user?.id;
+
+      const { data, error } = await this.client
+        .from('month_locks')
+        .insert({ month, year, locked_by: userId })
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Unlock a month (admin only). Deletes the row from month_locks.
+   * @param {number} month
+   * @param {number} year
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async unlockMonth(month, year) {
+    try {
+      const { data, error } = await this.client
+        .from('month_locks')
+        .delete()
+        .eq('month', month)
+        .eq('year', year)
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  // ----------------------------------------------------------
+  // CONVENIENCE METHODS (used by page modules)
+  // ----------------------------------------------------------
+
+  /**
+   * Get team members by lead email. Returns array of { employee_id, ... }.
+   * @param {string} leadEmail
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getTeamMembersByLead(leadEmail) {
+    try {
+      const { data: team, error: teamError } = await this.client
+        .from('teams')
+        .select('id')
+        .eq('lead_email', leadEmail)
+        .maybeSingle();
+
+      if (teamError) return { data: [], error: teamError };
+      if (!team) return { data: [], error: null };
+
+      const { data, error } = await this.client
+        .from('team_members')
+        .select('employee_id')
+        .eq('team_id', team.id);
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Batch upsert timesheets. Accepts array of timesheet rows.
+   * @param {Array} rows - Array of { employee_id, project_id, month, year, hours, created_by }
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async upsertTimesheets(rows) {
+    try {
+      if (!rows || rows.length === 0) return { data: [], error: null };
+
+      const { data, error } = await this.client
+        .from('timesheets')
+        .upsert(rows, {
+          onConflict: 'employee_id,project_id,month,year'
+        })
+        .select();
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Generate an invoice for an employee based on their timesheet data.
+   * Creates invoice + line items from timesheet hours.
+   * @param {string} employeeId
+   * @param {number} month
+   * @param {number} year
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async generateInvoice(employeeId, month, year) {
+    try {
+      // Get employee details
+      const { data: emp, error: empErr } = await this.client
+        .from('employees')
+        .select('*')
+        .eq('id', employeeId)
+        .single();
+
+      if (empErr || !emp) return { data: null, error: empErr || { message: 'Employee not found' } };
+
+      // Get timesheet entries for this employee + period
+      const { data: timesheets, error: tsErr } = await this.client
+        .from('timesheets')
+        .select('*, projects ( id, name, code )')
+        .eq('employee_id', employeeId)
+        .eq('month', month)
+        .eq('year', year);
+
+      if (tsErr) return { data: null, error: tsErr };
+
+      // Calculate total hours and build line items
+      var totalHours = 0;
+      var items = [];
+      var order = 1;
+
+      for (var i = 0; i < (timesheets || []).length; i++) {
+        var ts = timesheets[i];
+        var hours = parseFloat(ts.hours) || 0;
+        if (hours <= 0) continue;
+
+        totalHours += hours;
+        var projectName = ts.projects ? ts.projects.name : ('Project ' + ts.project_id);
+        items.push({
+          item_order: order++,
+          description: projectName + ' — ' + hours + ' hours',
+          price_usd: parseFloat(emp.rate_usd) || 0,
+          qty: hours,
+          total_usd: hours * (parseFloat(emp.rate_usd) || 0)
+        });
+      }
+
+      // Get next invoice number
+      var nextNum = emp.next_invoice_number || 1;
+      var invoiceNumber = (emp.invoice_prefix || 'INV') + '-' + String(nextNum).padStart(3, '0');
+
+      var totalUsd = items.reduce(function (sum, it) { return sum + it.total_usd; }, 0);
+
+      var invoiceData = {
+        employee_id: employeeId,
+        invoice_number: invoiceNumber,
+        month: month,
+        year: year,
+        format_type: emp.invoice_format || 'WS',
+        total_hours: totalHours,
+        total_usd: totalUsd,
+        rate_usd: parseFloat(emp.rate_usd) || 0,
+        status: 'draft',
+        issue_date: new Date().toISOString().split('T')[0]
+      };
+
+      return await this.createInvoice(invoiceData, items);
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Upload parsed timesheet data (from TimesheetParser) to DB.
+   * @param {object} parsedData - { timesheets, employees, metadata } from TimesheetParser.parse()
+   * @param {number} month
+   * @param {number} year
+   * @returns {Promise<{data: object, error: object|null}>}
+   */
+  async uploadTimesheets(parsedData, month, year) {
+    try {
+      if (typeof TimesheetParser !== 'undefined' && typeof TimesheetParser.importToDb === 'function') {
+        var { data: session } = await this.client.auth.getSession();
+        var userId = session?.session?.user?.id || null;
+        var result = await TimesheetParser.importToDb(parsedData.timesheets, month, year, userId);
+        return { data: result, error: null };
+      }
+
+      // Fallback: manual import
+      return { data: { imported: 0, skipped: 0, errors: ['TimesheetParser not available'] }, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  }
+};
+
