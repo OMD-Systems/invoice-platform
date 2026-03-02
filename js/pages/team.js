@@ -4,6 +4,24 @@
    Replaces: Dashboard, Timesheet, Employees
    ============================================================= */
 
+/* ── Ensure showToast is available ── */
+if (typeof showToast === 'undefined') {
+  function showToast(message, type) {
+    type = type || 'success';
+    var existing = document.querySelectorAll('.fury-toast');
+    for (var i = 0; i < existing.length; i++) existing[i].remove();
+    var toast = document.createElement('div');
+    toast.className = 'fury-toast fury-toast-' + type;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(function () { toast.classList.add('fury-toast-visible'); }, 10);
+    setTimeout(function () {
+      toast.classList.remove('fury-toast-visible');
+      setTimeout(function () { toast.remove(); }, 300);
+    }, 3000);
+  }
+}
+
 const Team = {
   title: 'Team',
   month: new Date().getMonth() + 1,
@@ -164,9 +182,14 @@ const Team = {
       var teamsResult = await DB.getTeams();
       self.teams = (teamsResult && teamsResult.data) || [];
 
-      // Load working hours config
-      var whResult = await DB.getWorkingHoursConfig(self.month, self.year);
-      self.hoursConfig = (whResult && whResult.data) || null;
+      // Load working hours config (table may not exist yet)
+      try {
+        var whResult = await DB.getWorkingHoursConfig(self.month, self.year);
+        self.hoursConfig = (whResult && whResult.data) || null;
+      } catch (whErr) {
+        console.warn('[Team] working_hours_config not available:', whErr.message);
+        self.hoursConfig = null;
+      }
 
       // Load billed_to
       var btResult = await DB.getSetting('billed_to');
@@ -180,6 +203,12 @@ const Team = {
         var ptData = typeof ptResult.data === 'string' ? JSON.parse(ptResult.data) : ptResult.data;
         self.defaultTerms = ptData.text || '';
       }
+
+      console.log('[Team] loadData done — employees:', self.allEmployees.length,
+        'projects:', self.projects.length,
+        'timesheets:', self.allTimesheets.length,
+        'invoices:', self.invoices.length,
+        'role:', ctx.role);
 
     } catch (err) {
       console.error('[Team] loadData error:', err);
@@ -422,51 +451,68 @@ const Team = {
       '</div>';
 
     // Working Hours section
+    console.log('[Team] renderDetail — role:', App.role, 'isAdminOrLead:', isAdminOrLead, 'projects:', self.projects.length);
+
     html +=
       '<div class="team-detail-section">' +
         '<div class="team-detail-section-title">' +
           'Working Hours — ' + self.MONTH_NAMES[self.month - 1] + ' ' + self.year +
           ' <span class="team-auto-calc">(auto: ' + regularDays + ' days &times; 8h = ' + regularHours + 'h)</span>' +
-        '</div>' +
+        '</div>';
+
+    if (self.projects.length === 0) {
+      html +=
+        '<div style="padding:12px 0;color:var(--fury-text-muted);font-size:13px">' +
+          'No projects configured. Add projects in Settings to enable hours tracking.' +
+        '</div>';
+    } else {
+      html +=
+        (!isAdminOrLead
+          ? '<div style="padding:6px 0 8px;font-size:12px;color:var(--fury-text-muted);opacity:0.7">' +
+              'Read-only — only Admin or Lead can edit hours' +
+            '</div>'
+          : '') +
         '<div class="team-hours-table">' +
           '<table class="fury-table fury-table-compact">' +
             '<thead><tr><th>Project</th><th style="width:100px;text-align:right">Hours</th></tr></thead>' +
             '<tbody>';
 
-    for (var p = 0; p < self.projects.length; p++) {
-      var proj = self.projects[p];
-      var projHours = projectHoursMap[proj.id] || 0;
+      for (var p = 0; p < self.projects.length; p++) {
+        var proj = self.projects[p];
+        var projHours = projectHoursMap[proj.id] || 0;
+
+        html +=
+          '<tr>' +
+            '<td>' + self.escapeHtml(proj.code) + '</td>' +
+            '<td style="text-align:right">' +
+              '<input type="number" class="fury-input fury-input-sm team-hours-input" ' +
+                'data-project-id="' + proj.id + '" ' +
+                'value="' + (projHours > 0 ? projHours : '') + '" ' +
+                'min="0" max="999" step="0.5" placeholder="0" ' +
+                (isAdminOrLead ? '' : 'disabled') + ' />' +
+            '</td>' +
+          '</tr>';
+      }
 
       html +=
-        '<tr>' +
-          '<td>' + self.escapeHtml(proj.code) + '</td>' +
-          '<td style="text-align:right">' +
-            '<input type="number" class="fury-input fury-input-sm team-hours-input" ' +
-              'data-project-id="' + proj.id + '" ' +
-              'value="' + (projHours > 0 ? projHours : '') + '" ' +
-              'min="0" max="999" step="0.5" placeholder="0" ' +
-              (isAdminOrLead ? '' : 'disabled') + ' />' +
-          '</td>' +
-        '</tr>';
+              '<tr class="team-hours-total">' +
+                '<td style="font-weight:700;color:var(--fury-text)">Total</td>' +
+                '<td style="text-align:right;font-weight:700" id="team-total-hours">' + totalHours.toFixed(0) + 'h</td>' +
+              '</tr>' +
+              '<tr>' +
+                '<td style="color:var(--fury-text-secondary)">Diff</td>' +
+                '<td style="text-align:right;font-weight:600" id="team-diff-hours">' +
+                  '<span class="' + diffClass + '">' + diffStr + '</span>' +
+                '</td>' +
+              '</tr>' +
+            '</tbody></table>' +
+          '</div>' +
+          (isAdminOrLead
+            ? '<button class="fury-btn fury-btn-secondary fury-btn-sm fury-mt-2" id="team-btn-save-hours">Save Hours</button>'
+            : '');
     }
 
-    html +=
-            '<tr class="team-hours-total">' +
-              '<td style="font-weight:700;color:var(--fury-text)">Total</td>' +
-              '<td style="text-align:right;font-weight:700" id="team-total-hours">' + totalHours.toFixed(0) + 'h</td>' +
-            '</tr>' +
-            '<tr>' +
-              '<td style="color:var(--fury-text-secondary)">Diff</td>' +
-              '<td style="text-align:right;font-weight:600" id="team-diff-hours">' +
-                '<span class="' + diffClass + '">' + diffStr + '</span>' +
-              '</td>' +
-            '</tr>' +
-          '</tbody></table>' +
-        '</div>' +
-        (isAdminOrLead
-          ? '<button class="fury-btn fury-btn-secondary fury-btn-sm fury-mt-2" id="team-btn-save-hours">Save Hours</button>'
-          : '') +
-      '</div>';
+    html += '</div>';
 
     // Invoice section
     html +=
