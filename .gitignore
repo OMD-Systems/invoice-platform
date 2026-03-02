@@ -6,8 +6,8 @@ desktop.ini
 *.log
 .github/workflows/
 
-# Security: keep API keys out of version control
-js/config.js
+# Note: js/config.js is committed because GitHub Pages is static (no build step).
+# If you switch to Cloudflare Pages, add js/config.js to gitignore and use env vars.
 
 # Supabase local
 supabase/.temp/
