@@ -56,85 +56,85 @@ const Invoices = {
     return (
       '<div class="invoices-page">' +
 
-        /* ── Tabs ── */
-        '<div class="fury-tabs fury-mb-3">' +
-          '<button class="fury-tab' + (this.activeTab === 'invoices' ? ' active' : '') + '" data-inv-tab="invoices">All Invoices</button>' +
-          '<button class="fury-tab' + (this.activeTab === 'summary' ? ' active' : '') + '" data-inv-tab="summary">Monthly Summary</button>' +
-          '<button class="fury-tab' + (this.activeTab === 'settlements' ? ' active' : '') + '" data-inv-tab="settlements">Settlements</button>' +
-        '</div>' +
+      /* ── Tabs ── */
+      '<div class="fury-tabs fury-mb-3">' +
+      '<button class="fury-tab' + (this.activeTab === 'invoices' ? ' active' : '') + '" data-inv-tab="invoices">All Invoices</button>' +
+      '<button class="fury-tab' + (this.activeTab === 'summary' ? ' active' : '') + '" data-inv-tab="summary">Monthly Summary</button>' +
+      '<button class="fury-tab' + (this.activeTab === 'settlements' ? ' active' : '') + '" data-inv-tab="settlements">Settlements</button>' +
+      '</div>' +
 
-        /* ── Tab Content Container ── */
-        '<div id="inv-tab-content">' +
+      /* ── Tab Content Container ── */
+      '<div id="inv-tab-content">' +
 
-        /* ── Filters Row ── */
-        '<div class="fury-flex-between fury-mb-3" style="flex-wrap: wrap; gap: 12px;">' +
-          '<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">' +
-            '<label class="fury-text-sm" style="color: var(--fury-text-secondary); font-weight: 500;">Period:</label>' +
-            '<select class="fury-select" id="inv-month" style="width: 140px;">' + monthOptions + '</select>' +
-            '<select class="fury-select" id="inv-year" style="width: 100px;">' + yearOptions + '</select>' +
-            '<select class="fury-select" id="inv-status" style="width: 130px;">' +
-              '<option value="all"' + (this.statusFilter === 'all' ? ' selected' : '') + '>All Status</option>' +
-              '<option value="draft"' + (this.statusFilter === 'draft' ? ' selected' : '') + '>Draft</option>' +
-              '<option value="generated"' + (this.statusFilter === 'generated' ? ' selected' : '') + '>Generated</option>' +
-              '<option value="sent"' + (this.statusFilter === 'sent' ? ' selected' : '') + '>Sent</option>' +
-              '<option value="paid"' + (this.statusFilter === 'paid' ? ' selected' : '') + '>Paid</option>' +
-            '</select>' +
-            '<select class="fury-select" id="inv-employee" style="width: 170px;">' +
-              '<option value="all">All Employees</option>' +
-            '</select>' +
-          '</div>' +
-          '<div style="display: flex; align-items: center; gap: 8px;">' +
-            '<button class="fury-btn fury-btn-primary fury-btn-sm" id="btn-generate-selected" disabled>' +
-              'Generate Selected' +
-            '</button>' +
-            '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-batch-download" disabled>' +
-              'Download All DOCX' +
-            '</button>' +
-          '</div>' +
-        '</div>' +
+      /* ── Filters Row ── */
+      '<div class="fury-flex-between fury-mb-3" style="flex-wrap: wrap; gap: 12px;">' +
+      '<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">' +
+      '<label class="fury-text-sm" style="color: var(--fury-text-secondary); font-weight: 500;">Period:</label>' +
+      '<select class="fury-select" id="inv-month" style="width: 140px;">' + monthOptions + '</select>' +
+      '<select class="fury-select" id="inv-year" style="width: 100px;">' + yearOptions + '</select>' +
+      '<select class="fury-select" id="inv-status" style="width: 130px;">' +
+      '<option value="all"' + (this.statusFilter === 'all' ? ' selected' : '') + '>All Status</option>' +
+      '<option value="draft"' + (this.statusFilter === 'draft' ? ' selected' : '') + '>Draft</option>' +
+      '<option value="generated"' + (this.statusFilter === 'generated' ? ' selected' : '') + '>Generated</option>' +
+      '<option value="sent"' + (this.statusFilter === 'sent' ? ' selected' : '') + '>Sent</option>' +
+      '<option value="paid"' + (this.statusFilter === 'paid' ? ' selected' : '') + '>Paid</option>' +
+      '</select>' +
+      '<select class="fury-select" id="inv-employee" style="width: 170px;">' +
+      '<option value="all">All Employees</option>' +
+      '</select>' +
+      '</div>' +
+      '<div style="display: flex; align-items: center; gap: 8px;">' +
+      '<button class="fury-btn fury-btn-primary fury-btn-sm" id="btn-generate-selected" disabled>' +
+      'Generate Selected' +
+      '</button>' +
+      '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-batch-download" disabled>' +
+      'Download All DOCX' +
+      '</button>' +
+      '</div>' +
+      '</div>' +
 
-        /* ── Invoice Table ── */
-        '<div class="fury-card" style="padding: 0; overflow-x: auto;">' +
-          '<table class="fury-table" id="inv-table">' +
-            '<thead>' +
-              '<tr>' +
-                '<th style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all" title="Select all"></th>' +
-                '<th>Employee</th>' +
-                '<th>Invoice #</th>' +
-                '<th>Date</th>' +
-                '<th style="text-align: center;">Items</th>' +
-                '<th style="text-align: right;">Total</th>' +
-                '<th style="text-align: center;">Status</th>' +
-                '<th style="text-align: center;">Actions</th>' +
-              '</tr>' +
-            '</thead>' +
-            '<tbody id="inv-tbody">' +
-              '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--fury-text-muted);">Loading invoices...</td></tr>' +
-            '</tbody>' +
-          '</table>' +
-        '</div>' +
+      /* ── Invoice Table ── */
+      '<div class="fury-card" style="padding: 0; overflow-x: auto;">' +
+      '<table class="fury-table" id="inv-table">' +
+      '<thead>' +
+      '<tr>' +
+      '<th style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all" title="Select all"></th>' +
+      '<th>Employee</th>' +
+      '<th>Invoice #</th>' +
+      '<th>Date</th>' +
+      '<th style="text-align: center;">Items</th>' +
+      '<th style="text-align: right;">Total</th>' +
+      '<th style="text-align: center;">Status</th>' +
+      '<th style="text-align: center;">Actions</th>' +
+      '</tr>' +
+      '</thead>' +
+      '<tbody id="inv-tbody">' +
+      '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--fury-text-muted);">Loading invoices...</td></tr>' +
+      '</tbody>' +
+      '</table>' +
+      '</div>' +
 
-        /* ── Pending Section ── */
-        '<div id="inv-pending-section" class="fury-mt-3" style="display: none;">' +
-          '<h3 style="color: var(--fury-text-secondary); font-size: 14px; font-weight: 600; margin-bottom: 12px;">' +
-            'Pending (no invoice this month)' +
-          '</h3>' +
-          '<div class="fury-card" style="padding: 0; overflow-x: auto;">' +
-            '<table class="fury-table">' +
-              '<thead>' +
-                '<tr>' +
-                  '<th style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all-pending" title="Select all pending"></th>' +
-                  '<th>Employee</th>' +
-                  '<th style="text-align: right;">Hours</th>' +
-                  '<th style="text-align: right;">Rate (USD)</th>' +
-                  '<th style="text-align: right;">Est. Amount</th>' +
-                  '<th style="text-align: center;">Action</th>' +
-                '</tr>' +
-              '</thead>' +
-              '<tbody id="inv-pending-tbody"></tbody>' +
-            '</table>' +
-          '</div>' +
-        '</div>' +
+      /* ── Pending Section ── */
+      '<div id="inv-pending-section" class="fury-mt-3" style="display: none;">' +
+      '<h3 style="color: var(--fury-text-secondary); font-size: 14px; font-weight: 600; margin-bottom: 12px;">' +
+      'Pending (no invoice this month)' +
+      '</h3>' +
+      '<div class="fury-card" style="padding: 0; overflow-x: auto;">' +
+      '<table class="fury-table">' +
+      '<thead>' +
+      '<tr>' +
+      '<th style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all-pending" title="Select all pending"></th>' +
+      '<th>Employee</th>' +
+      '<th style="text-align: right;">Hours</th>' +
+      '<th style="text-align: right;">Rate (USD)</th>' +
+      '<th style="text-align: right;">Est. Amount</th>' +
+      '<th style="text-align: center;">Action</th>' +
+      '</tr>' +
+      '</thead>' +
+      '<tbody id="inv-pending-tbody"></tbody>' +
+      '</table>' +
+      '</div>' +
+      '</div>' +
 
       '</div>' + /* inv-tab-content */
 
@@ -209,6 +209,21 @@ const Invoices = {
         }
       } catch (e) { /* default 0 */ }
 
+      // Working hours config for the month
+      try {
+        var whResult = await DB.getWorkingHoursConfig(this.month, this.year);
+        if (whResult && whResult.data) {
+          this.workingDays = whResult.data.working_days || 21;
+          this.hoursPerDay = whResult.data.hours_per_day || 8;
+        } else {
+          this.workingDays = 21;
+          this.hoursPerDay = 8;
+        }
+      } catch (e) {
+        this.workingDays = 21;
+        this.hoursPerDay = 8;
+      }
+
     } catch (err) {
       console.error('[Invoices] loadData error:', err);
       this.employees = [];
@@ -269,32 +284,32 @@ const Invoices = {
 
     var kpiHtml =
       '<div class="fury-grid-4 fury-mb-3">' +
-        self._kpiCard('Total Invoiced', self._formatCurrency(totalInvoiced), 'fury-kpi-accent') +
-        self._kpiCard('Avg per Person', self._formatCurrency(avgPerPerson), '') +
-        self._kpiCard('Highest Invoice', self._formatCurrency(highest), '') +
-        self._kpiCard('Lowest Invoice', self._formatCurrency(lowest), '') +
+      self._kpiCard('Total Invoiced', self._formatCurrency(totalInvoiced), 'fury-kpi-accent') +
+      self._kpiCard('Avg per Person', self._formatCurrency(avgPerPerson), '') +
+      self._kpiCard('Highest Invoice', self._formatCurrency(highest), '') +
+      self._kpiCard('Lowest Invoice', self._formatCurrency(lowest), '') +
       '</div>';
 
     var statusHtml =
       '<div class="fury-flex fury-gap-3 fury-mb-3">' +
-        '<span class="fury-badge fury-badge-neutral">' + statusCounts.draft + ' Draft</span>' +
-        '<span class="fury-badge fury-badge-info">' + statusCounts.generated + ' Generated</span>' +
-        '<span class="fury-badge fury-badge-warning">' + statusCounts.sent + ' Sent</span>' +
-        '<span class="fury-badge fury-badge-success">' + statusCounts.paid + ' Paid</span>' +
+      '<span class="fury-badge fury-badge-neutral">' + statusCounts.draft + ' Draft</span>' +
+      '<span class="fury-badge fury-badge-info">' + statusCounts.generated + ' Generated</span>' +
+      '<span class="fury-badge fury-badge-warning">' + statusCounts.sent + ' Sent</span>' +
+      '<span class="fury-badge fury-badge-success">' + statusCounts.paid + ' Paid</span>' +
       '</div>';
 
     // Summary table
     var tableHtml =
       '<div class="fury-card" style="padding:0;overflow:hidden">' +
-        '<div class="fury-card-header" style="padding:16px 24px;margin-bottom:0">' +
-          '<h3 style="font-size:14px;font-weight:600;color:var(--fury-text)">Invoice Summary</h3>' +
-          '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-export-summary">Export .xlsx</button>' +
-        '</div>' +
-        '<div style="overflow-x:auto"><table class="fury-table"><thead><tr>' +
-          '<th style="width:40px">#</th><th>Employee</th><th>Invoice #</th><th>Date</th>' +
-          '<th style="text-align:right">Subtotal ($)</th><th style="text-align:right">Discount ($)</th>' +
-          '<th style="text-align:right">Total ($)</th><th style="text-align:center">Status</th>' +
-        '</tr></thead><tbody>';
+      '<div class="fury-card-header" style="padding:16px 24px;margin-bottom:0">' +
+      '<h3 style="font-size:14px;font-weight:600;color:var(--fury-text)">Invoice Summary</h3>' +
+      '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-export-summary">Export .xlsx</button>' +
+      '</div>' +
+      '<div style="overflow-x:auto"><table class="fury-table"><thead><tr>' +
+      '<th style="width:40px">#</th><th>Employee</th><th>Invoice #</th><th>Date</th>' +
+      '<th style="text-align:right">Subtotal ($)</th><th style="text-align:right">Discount ($)</th>' +
+      '<th style="text-align:right">Total ($)</th><th style="text-align:center">Status</th>' +
+      '</tr></thead><tbody>';
 
     if (invoices.length === 0) {
       tableHtml += '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--fury-text-muted)">No invoices for this period.</td></tr>';
@@ -326,11 +341,11 @@ const Invoices = {
         '<tr style="background:var(--fury-bg);border-top:2px solid var(--fury-accent)">' +
         '<td colspan="4" style="font-weight:700;color:var(--fury-accent)">GRAND TOTAL</td>' +
         '<td style="text-align:right;font-weight:600">' +
-          self._formatCurrency(invoices.reduce(function (s, inv) { return s + (parseFloat(inv.subtotal_usd) || 0); }, 0)) + '</td>' +
+        self._formatCurrency(invoices.reduce(function (s, inv) { return s + (parseFloat(inv.subtotal_usd) || 0); }, 0)) + '</td>' +
         '<td style="text-align:right;color:var(--fury-text-secondary)">-' +
-          self._formatCurrency(invoices.reduce(function (s, inv) { return s + (parseFloat(inv.discount_usd) || 0); }, 0)) + '</td>' +
+        self._formatCurrency(invoices.reduce(function (s, inv) { return s + (parseFloat(inv.discount_usd) || 0); }, 0)) + '</td>' +
         '<td style="text-align:right;font-weight:700;color:var(--fury-accent);font-size:15px">' +
-          self._formatCurrency(totalInvoiced) + '</td><td></td></tr>';
+        self._formatCurrency(totalInvoiced) + '</td><td></td></tr>';
     }
     tableHtml += '</tbody></table></div></div>';
 
@@ -358,8 +373,9 @@ const Invoices = {
         return;
       }
 
+      var expectedHours = (self.workingDays || 21) * (self.hoursPerDay || 8);
       var settlementData = await Settlements.calculate(
-        self.month, self.year, self.employees, self.timesheets, self.invoices
+        self.month, self.year, self.employees, self.timesheets, self.invoices, expectedHours
       );
 
       var activeProjectCodes = Settlements.getActiveProjectCodes(settlementData);
@@ -396,12 +412,12 @@ const Invoices = {
       var tableHtml =
         '<div class="fury-card" style="padding:0;overflow:hidden">' +
         '<div class="fury-card-header" style="padding:16px 24px;margin-bottom:0">' +
-          '<h3 style="font-size:14px;font-weight:600">Cost Allocation</h3>' +
-          '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-export-settlements">Export .xlsx</button>' +
+        '<h3 style="font-size:14px;font-weight:600">Cost Allocation</h3>' +
+        '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-export-settlements">Export .xlsx</button>' +
         '</div>' +
         '<div style="overflow-x:auto"><table class="fury-table" style="font-size:13px"><thead><tr>' +
-          '<th>Employee</th><th style="text-align:right">Total Paid</th><th style="text-align:right">Hours</th>' +
-          projHeaders + compHeaders +
+        '<th>Employee</th><th style="text-align:right">Total Paid</th><th style="text-align:right">Hours</th>' +
+        projHeaders + compHeaders +
         '</tr></thead><tbody>';
 
       if (rows.length === 0) {
@@ -518,7 +534,7 @@ const Invoices = {
         var inv = sorted[i];
         var t = parseFloat(inv.total_usd) || 0; gt += t;
         wsData.push([i + 1, (inv.employees && inv.employees.name) || '', ((inv.employees && inv.employees.invoice_prefix) || '') + '-' + inv.invoice_number,
-          inv.invoice_date || '', parseFloat(inv.subtotal_usd) || 0, parseFloat(inv.discount_usd) || 0, t, (inv.status || 'draft')]);
+        inv.invoice_date || '', parseFloat(inv.subtotal_usd) || 0, parseFloat(inv.discount_usd) || 0, t, (inv.status || 'draft')]);
       }
       wsData.push([]); wsData.push(['', 'GRAND TOTAL', '', '', '', '', gt, '']);
       var wb = XLSX.utils.book_new();
@@ -596,37 +612,37 @@ const Invoices = {
 
       html +=
         '<tr data-invoice-id="' + inv.id + '">' +
-          '<td style="text-align: center;">' +
-            '<input type="checkbox" class="inv-row-check" data-invoice-id="' + inv.id + '">' +
-          '</td>' +
-          '<td>' + this._escapeHtml(empName) + '</td>' +
-          '<td style="font-variant-numeric: tabular-nums;">' + this._escapeHtml(invNumber) + '</td>' +
-          '<td>' + invDate + '</td>' +
-          '<td style="text-align: center;">' + itemCount + '</td>' +
-          '<td style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">' +
-            this._formatCurrency(total) +
-          '</td>' +
-          '<td style="text-align: center;">' + this._statusBadge(status) + '</td>' +
-          '<td style="text-align: center; white-space: nowrap;">' +
-            '<div style="display: inline-flex; gap: 4px;">' +
-              '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-preview" ' +
-                'data-invoice-id="' + inv.id + '" title="Preview">' +
-                '&#x1F441;' +
-              '</button>' +
-              '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-download" ' +
-                'data-invoice-id="' + inv.id + '" title="Download DOCX">' +
-                '&#x2B07;' +
-              '</button>' +
-              '<select class="fury-select inv-act-status" ' +
-                'data-invoice-id="' + inv.id + '" ' +
-                'style="width: 110px; height: 31px; font-size: 12px;">' +
-                '<option value="draft"' + (status === 'draft' ? ' selected' : '') + '>Draft</option>' +
-                '<option value="generated"' + (status === 'generated' ? ' selected' : '') + '>Generated</option>' +
-                '<option value="sent"' + (status === 'sent' ? ' selected' : '') + '>Sent</option>' +
-                '<option value="paid"' + (status === 'paid' ? ' selected' : '') + '>Paid</option>' +
-              '</select>' +
-            '</div>' +
-          '</td>' +
+        '<td style="text-align: center;">' +
+        '<input type="checkbox" class="inv-row-check" data-invoice-id="' + inv.id + '">' +
+        '</td>' +
+        '<td>' + this._escapeHtml(empName) + '</td>' +
+        '<td style="font-variant-numeric: tabular-nums;">' + this._escapeHtml(invNumber) + '</td>' +
+        '<td>' + invDate + '</td>' +
+        '<td style="text-align: center;">' + itemCount + '</td>' +
+        '<td style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">' +
+        this._formatCurrency(total) +
+        '</td>' +
+        '<td style="text-align: center;">' + this._statusBadge(status) + '</td>' +
+        '<td style="text-align: center; white-space: nowrap;">' +
+        '<div style="display: inline-flex; gap: 4px;">' +
+        '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-preview" ' +
+        'data-invoice-id="' + inv.id + '" title="Preview">' +
+        '&#x1F441;' +
+        '</button>' +
+        '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-download" ' +
+        'data-invoice-id="' + inv.id + '" title="Download DOCX">' +
+        '&#x2B07;' +
+        '</button>' +
+        '<select class="fury-select inv-act-status" ' +
+        'data-invoice-id="' + inv.id + '" ' +
+        'style="width: 110px; height: 31px; font-size: 12px;">' +
+        '<option value="draft"' + (status === 'draft' ? ' selected' : '') + '>Draft</option>' +
+        '<option value="generated"' + (status === 'generated' ? ' selected' : '') + '>Generated</option>' +
+        '<option value="sent"' + (status === 'sent' ? ' selected' : '') + '>Sent</option>' +
+        '<option value="paid"' + (status === 'paid' ? ' selected' : '') + '>Paid</option>' +
+        '</select>' +
+        '</div>' +
+        '</td>' +
         '</tr>';
     }
 
@@ -671,22 +687,22 @@ const Invoices = {
 
       html +=
         '<tr data-employee-id="' + pe.id + '">' +
-          '<td style="text-align: center;">' +
-            '<input type="checkbox" class="inv-pending-check" data-employee-id="' + pe.id + '">' +
-          '</td>' +
-          '<td>' + this._escapeHtml(name) + '</td>' +
-          '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + hours.toFixed(1) + '</td>' +
-          '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + this._formatCurrency(rate) + '</td>' +
-          '<td style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">' +
-            this._formatCurrency(estAmount) +
-          '</td>' +
-          '<td style="text-align: center;">' +
-            '<button class="fury-btn fury-btn-primary fury-btn-sm inv-act-generate" ' +
-              'data-employee-id="' + pe.id + '" ' +
-              'data-employee-name="' + this._escapeAttr(name) + '">' +
-              'Generate' +
-            '</button>' +
-          '</td>' +
+        '<td style="text-align: center;">' +
+        '<input type="checkbox" class="inv-pending-check" data-employee-id="' + pe.id + '">' +
+        '</td>' +
+        '<td>' + this._escapeHtml(name) + '</td>' +
+        '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + hours.toFixed(1) + '</td>' +
+        '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + this._formatCurrency(rate) + '</td>' +
+        '<td style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">' +
+        this._formatCurrency(estAmount) +
+        '</td>' +
+        '<td style="text-align: center;">' +
+        '<button class="fury-btn fury-btn-primary fury-btn-sm inv-act-generate" ' +
+        'data-employee-id="' + pe.id + '" ' +
+        'data-employee-name="' + this._escapeAttr(name) + '">' +
+        'Generate' +
+        '</button>' +
+        '</td>' +
         '</tr>';
     }
 
@@ -998,7 +1014,20 @@ const Invoices = {
     var hours = ts ? ts.total_hours : 0;
     var serviceDesc = employee.service_description || employee.position || 'Software Development Services';
     var empType = employee.employee_type || 'monthly';
-    var estimatedAmount = empType === 'hourly' ? (rate * hours) : rate;
+
+    // Prorate math dynamically
+    var estimatedAmount = 0;
+    if (empType === 'hourly') {
+      estimatedAmount = rate * hours;
+    } else {
+      var expectedHours = (this.workingDays || 21) * (this.hoursPerDay || 8);
+      if (ts && expectedHours > 0) {
+        estimatedAmount = rate * (hours / expectedHours);
+      } else {
+        estimatedAmount = rate;
+      }
+    }
+
     var prefix = employee.invoice_prefix || '';
     var nextNum = employee.next_invoice_number || 1;
     var invoiceNumber = Numbering.formatNumber(prefix, nextNum);
@@ -1017,81 +1046,81 @@ const Invoices = {
 
     overlay.innerHTML =
       '<div class="fury-modal" style="max-width: 680px; max-height: 92vh;">' +
-        '<div class="fury-modal-header">' +
-          '<span class="fury-modal-title">Generate Invoice</span>' +
-          '<button class="fury-modal-close" id="gen-close" title="Close">&times;</button>' +
-        '</div>' +
-        '<div class="fury-modal-body" style="overflow-y: auto;">' +
+      '<div class="fury-modal-header">' +
+      '<span class="fury-modal-title">Generate Invoice</span>' +
+      '<button class="fury-modal-close" id="gen-close" title="Close">&times;</button>' +
+      '</div>' +
+      '<div class="fury-modal-body" style="overflow-y: auto;">' +
 
-          /* Employee info (read-only) */
-          '<div class="fury-form-group">' +
-            '<label class="fury-label">Employee</label>' +
-            '<input class="fury-input" type="text" value="' + this._escapeAttr(empName) + '" readonly style="opacity: 0.7;">' +
-          '</div>' +
+      /* Employee info (read-only) */
+      '<div class="fury-form-group">' +
+      '<label class="fury-label">Employee</label>' +
+      '<input class="fury-input" type="text" value="' + this._escapeAttr(empName) + '" readonly style="opacity: 0.7;">' +
+      '</div>' +
 
-          /* Invoice Number & Date */
-          '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">' +
-            '<div class="fury-form-group">' +
-              '<label class="fury-label">Invoice Number</label>' +
-              '<input class="fury-input" type="text" id="gen-inv-number" value="' + this._escapeAttr(invoiceNumber) + '">' +
-            '</div>' +
-            '<div class="fury-form-group">' +
-              '<label class="fury-label">Invoice Date</label>' +
-              '<input class="fury-input" type="date" id="gen-inv-date" value="' + invDateStr + '">' +
-            '</div>' +
-          '</div>' +
+      /* Invoice Number & Date */
+      '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label">Invoice Number</label>' +
+      '<input class="fury-input" type="text" id="gen-inv-number" value="' + this._escapeAttr(invoiceNumber) + '">' +
+      '</div>' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label">Invoice Date</label>' +
+      '<input class="fury-input" type="date" id="gen-inv-date" value="' + invDateStr + '">' +
+      '</div>' +
+      '</div>' +
 
-          /* Line Items */
-          '<div class="fury-form-group">' +
-            '<label class="fury-label">Line Items</label>' +
-            '<div id="gen-line-items">' +
-              '<div class="gen-line-item" style="display: grid; grid-template-columns: 1fr 100px 60px 100px 32px; gap: 8px; align-items: center; margin-bottom: 8px;">' +
-                '<input class="fury-input gen-li-desc" type="text" placeholder="Description" value="' + this._escapeAttr(serviceDesc) + '">' +
-                '<input class="fury-input gen-li-price" type="number" step="0.01" placeholder="Price" value="' + estimatedAmount.toFixed(2) + '">' +
-                '<input class="fury-input gen-li-qty" type="number" step="1" min="1" placeholder="QTY" value="1">' +
-                '<input class="fury-input gen-li-total" type="text" readonly value="' + estimatedAmount.toFixed(2) + '" style="text-align: right; opacity: 0.7;">' +
-                '<span></span>' +
-              '</div>' +
-            '</div>' +
-            '<button class="fury-btn fury-btn-ghost fury-btn-sm" id="gen-add-item" style="margin-top: 4px;">+ Add Line Item</button>' +
-          '</div>' +
+      /* Line Items */
+      '<div class="fury-form-group">' +
+      '<label class="fury-label">Line Items</label>' +
+      '<div id="gen-line-items">' +
+      '<div class="gen-line-item" style="display: grid; grid-template-columns: 1fr 100px 60px 100px 32px; gap: 8px; align-items: center; margin-bottom: 8px;">' +
+      '<input class="fury-input gen-li-desc" type="text" placeholder="Description" value="' + this._escapeAttr(serviceDesc) + '">' +
+      '<input class="fury-input gen-li-price" type="number" step="0.01" placeholder="Price" value="' + estimatedAmount.toFixed(2) + '">' +
+      '<input class="fury-input gen-li-qty" type="number" step="1" min="1" placeholder="QTY" value="1">' +
+      '<input class="fury-input gen-li-total" type="text" readonly value="' + estimatedAmount.toFixed(2) + '" style="text-align: right; opacity: 0.7;">' +
+      '<span></span>' +
+      '</div>' +
+      '</div>' +
+      '<button class="fury-btn fury-btn-ghost fury-btn-sm" id="gen-add-item" style="margin-top: 4px;">+ Add Line Item</button>' +
+      '</div>' +
 
-          /* Expenses */
-          '<div class="fury-form-group">' +
-            '<label class="fury-label">Additional Expenses</label>' +
-            '<div id="gen-expenses"></div>' +
-            '<button class="fury-btn fury-btn-ghost fury-btn-sm" id="gen-add-expense" style="margin-top: 4px;">+ Add Expense</button>' +
-          '</div>' +
+      /* Expenses */
+      '<div class="fury-form-group">' +
+      '<label class="fury-label">Additional Expenses</label>' +
+      '<div id="gen-expenses"></div>' +
+      '<button class="fury-btn fury-btn-ghost fury-btn-sm" id="gen-add-expense" style="margin-top: 4px;">+ Add Expense</button>' +
+      '</div>' +
 
-          /* Totals */
-          '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 8px;">' +
-            '<div class="fury-form-group">' +
-              '<label class="fury-label">Subtotal</label>' +
-              '<input class="fury-input" type="text" id="gen-subtotal" readonly value="' + estimatedAmount.toFixed(2) + '" style="text-align: right; opacity: 0.7;">' +
-            '</div>' +
-            '<div class="fury-form-group">' +
-              '<label class="fury-label">Discount</label>' +
-              '<input class="fury-input" type="number" step="0.01" id="gen-discount" value="0">' +
-            '</div>' +
-            '<div class="fury-form-group">' +
-              '<label class="fury-label">Tax</label>' +
-              '<input class="fury-input" type="number" step="0.01" id="gen-tax" value="0">' +
-            '</div>' +
-          '</div>' +
-          '<div class="fury-form-group">' +
-            '<label class="fury-label" style="font-size: 14px; color: var(--fury-text);">Total</label>' +
-            '<input class="fury-input" type="text" id="gen-total" readonly ' +
-              'value="$' + estimatedAmount.toFixed(2) + '" ' +
-              'style="text-align: right; font-size: 18px; font-weight: 700; color: var(--fury-accent); opacity: 1;">' +
-          '</div>' +
+      /* Totals */
+      '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 8px;">' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label">Subtotal</label>' +
+      '<input class="fury-input" type="text" id="gen-subtotal" readonly value="' + estimatedAmount.toFixed(2) + '" style="text-align: right; opacity: 0.7;">' +
+      '</div>' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label">Discount</label>' +
+      '<input class="fury-input" type="number" step="0.01" id="gen-discount" value="0">' +
+      '</div>' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label">Tax</label>' +
+      '<input class="fury-input" type="number" step="0.01" id="gen-tax" value="0">' +
+      '</div>' +
+      '</div>' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label" style="font-size: 14px; color: var(--fury-text);">Total</label>' +
+      '<input class="fury-input" type="text" id="gen-total" readonly ' +
+      'value="$' + estimatedAmount.toFixed(2) + '" ' +
+      'style="text-align: right; font-size: 18px; font-weight: 700; color: var(--fury-accent); opacity: 1;">' +
+      '</div>' +
 
-        '</div>' + // end modal body
-        '<div class="fury-modal-footer">' +
-          '<button class="fury-btn fury-btn-ghost" id="gen-cancel">Cancel</button>' +
-          '<button class="fury-btn fury-btn-secondary" id="gen-preview">Preview</button>' +
-          '<button class="fury-btn fury-btn-secondary" id="gen-save-draft">Save Draft</button>' +
-          '<button class="fury-btn fury-btn-primary" id="gen-download">Generate &amp; Download DOCX</button>' +
-        '</div>' +
+      '</div>' + // end modal body
+      '<div class="fury-modal-footer">' +
+      '<button class="fury-btn fury-btn-ghost" id="gen-cancel">Cancel</button>' +
+      '<button class="fury-btn fury-btn-secondary" id="gen-preview">Preview</button>' +
+      '<button class="fury-btn fury-btn-secondary" id="gen-save-draft">Save Draft</button>' +
+      '<button class="fury-btn fury-btn-primary" id="gen-download">Generate &amp; Download DOCX</button>' +
+      '</div>' +
       '</div>';
 
     document.body.appendChild(overlay);
@@ -1139,7 +1168,7 @@ const Invoices = {
         '<input class="fury-input gen-li-qty" type="number" step="1" min="1" placeholder="QTY" value="1">' +
         '<input class="fury-input gen-li-total" type="text" readonly value="0.00" style="text-align: right; opacity: 0.7;">' +
         '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon gen-remove-item" ' +
-          'style="color: var(--fury-danger); font-size: 16px;" title="Remove">&times;</button>';
+        'style="color: var(--fury-danger); font-size: 16px;" title="Remove">&times;</button>';
       itemsContainer.appendChild(newItem);
     });
 
@@ -1159,18 +1188,18 @@ const Invoices = {
       newExp.style.cssText = 'display: grid; grid-template-columns: 120px 1fr 80px 80px 80px 32px; gap: 8px; align-items: center; margin-bottom: 8px;';
       newExp.innerHTML =
         '<select class="fury-select gen-exp-cat" style="height: 36px;">' +
-          '<option value="travel">Travel</option>' +
-          '<option value="software">Software</option>' +
-          '<option value="hardware">Hardware</option>' +
-          '<option value="office">Office</option>' +
-          '<option value="other">Other</option>' +
+        '<option value="travel">Travel</option>' +
+        '<option value="software">Software</option>' +
+        '<option value="hardware">Hardware</option>' +
+        '<option value="office">Office</option>' +
+        '<option value="other">Other</option>' +
         '</select>' +
         '<input class="fury-input gen-exp-desc" type="text" placeholder="Description">' +
         '<input class="fury-input gen-exp-uah" type="number" step="0.01" placeholder="UAH" value="0">' +
         '<input class="fury-input gen-exp-rate" type="number" step="0.0001" placeholder="Rate" value="41.50">' +
         '<input class="fury-input gen-exp-usd" type="text" readonly value="0.00" style="text-align: right; opacity: 0.7;">' +
         '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon gen-remove-expense" ' +
-          'style="color: var(--fury-danger); font-size: 16px;" title="Remove">&times;</button>';
+        'style="color: var(--fury-danger); font-size: 16px;" title="Remove">&times;</button>';
       expContainer.appendChild(newExp);
     });
 
@@ -1580,11 +1609,11 @@ const Invoices = {
   /* ── Status badge HTML ── */
   _statusBadge: function (status) {
     var map = {
-      'draft':     { cls: 'fury-badge fury-badge-neutral',  label: 'Draft' },
-      'generated': { cls: 'fury-badge fury-badge-info',     label: 'Generated' },
-      'sent':      { cls: 'fury-badge fury-badge-warning',  label: 'Sent' },
-      'paid':      { cls: 'fury-badge fury-badge-success',  label: 'Paid' },
-      'overdue':   { cls: 'fury-badge fury-badge-danger',   label: 'Overdue' }
+      'draft': { cls: 'fury-badge fury-badge-neutral', label: 'Draft' },
+      'generated': { cls: 'fury-badge fury-badge-info', label: 'Generated' },
+      'sent': { cls: 'fury-badge fury-badge-warning', label: 'Sent' },
+      'paid': { cls: 'fury-badge fury-badge-success', label: 'Paid' },
+      'overdue': { cls: 'fury-badge fury-badge-danger', label: 'Overdue' }
     };
     var info = map[status] || map['draft'];
     return '<span class="' + info.cls + '">' + info.label + '</span>';

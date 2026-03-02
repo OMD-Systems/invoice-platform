@@ -14,9 +14,9 @@ const Settlements = {
 
   /* ── Company display labels ── */
   COMPANY_LABELS: {
-    'WS':           'Woodenshark',
-    'OMD':          'OMD Systems',
-    'OM_ENERGY':    'OM Energy',
+    'WS': 'Woodenshark',
+    'OMD': 'OMD Systems',
+    'OM_ENERGY': 'OM Energy',
     'OM_ENERGY_UA': 'OM Energy UA',
   },
 
@@ -58,9 +58,10 @@ const Settlements = {
    * @param {Array}  employees - Array of employee objects
    * @param {Array}  timesheets - Array of timesheet rows with project join data
    * @param {Array}  invoices - Array of invoice objects for the month
+   * @param {number} expectedHours - Configured working hours for the month (e.g. 168)
    * @returns {{ results: Array, totals: object, grandTotal: number }}
    */
-  async calculate(month, year, employees, timesheets, invoices) {
+  async calculate(month, year, employees, timesheets, invoices, expectedHours = 168) {
     await this.loadMapping();
 
     var self = this;
@@ -99,13 +100,24 @@ const Settlements = {
       if (totalHours === 0) continue;
 
       // Determine total paid amount
-      // Priority: invoice total_usd > rate_usd * totalHours > 0
+      // Priority: invoice total_usd > expected math
       var invoice = invoiceMap[emp.id] || null;
       var totalPaid = 0;
+      var empType = emp.employee_type || 'monthly';
+      var rate = parseFloat(emp.rate_usd) || 0;
+
       if (invoice && invoice.total_usd != null) {
         totalPaid = parseFloat(invoice.total_usd) || 0;
-      } else if (emp.rate_usd) {
-        totalPaid = (parseFloat(emp.rate_usd) || 0) * totalHours;
+      } else if (empType === 'hourly') {
+        totalPaid = rate * totalHours;
+      } else {
+        // Monthly - prorated
+        var expectedHrs = expectedHours || 168; // 21 days * 8 hrs default
+        if (expectedHrs > 0) {
+          totalPaid = rate * (totalHours / expectedHrs);
+        } else {
+          totalPaid = rate;
+        }
       }
 
       // Calculate hours per project
