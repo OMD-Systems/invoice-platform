@@ -304,8 +304,10 @@ const Timesheet = {
     var adjustment = 0;
     try {
       var adjSetting = await DB.getSetting('working_hours_adjustment');
-      if (adjSetting && adjSetting.value && adjSetting.value.subtract_hours) {
-        adjustment = adjSetting.value.subtract_hours;
+      var adjData = (adjSetting && adjSetting.data) ? adjSetting.data : null;
+      if (adjData && typeof adjData === 'string') adjData = JSON.parse(adjData);
+      if (adjData && adjData.subtract_hours) {
+        adjustment = adjData.subtract_hours;
       }
     } catch (e) {
       // default: no adjustment
@@ -490,23 +492,43 @@ const Timesheet = {
 
       showToast('Parsing spreadsheet...', 'info');
 
-      var parsed = await TimesheetParser.parse(file, {
-        month: self.month,
-        year: self.year,
-        employees: self.employees,
-        projects: self.projects
-      });
+      var parsed = await TimesheetParser.parse(file);
 
-      if (!parsed || !parsed.data || Object.keys(parsed.data).length === 0) {
-        showToast('No matching data found in the uploaded file.', 'error');
+      if (!parsed || !parsed.timesheets || parsed.timesheets.length === 0) {
+        showToast('No data found in the uploaded file.', 'error');
+        return;
+      }
+
+      // Match parsed employees to DB employees
+      var matched = await TimesheetParser.matchEmployees(parsed.timesheets);
+
+      // Build grid data: { employeeId: { projectCode: hours } }
+      var gridData = {};
+      var warnings = [];
+
+      for (var m = 0; m < matched.length; m++) {
+        var row = matched[m];
+        if (!row.matched) {
+          warnings.push('No match: ' + row.employeeName + ' (PIN: ' + (row.pin || 'none') + ')');
+          continue;
+        }
+        if (!gridData[row.employeeId]) gridData[row.employeeId] = {};
+        for (var code in row.projects) {
+          if (!row.projects.hasOwnProperty(code)) continue;
+          gridData[row.employeeId][code] = (gridData[row.employeeId][code] || 0) + row.projects[code];
+        }
+      }
+
+      if (Object.keys(gridData).length === 0) {
+        showToast('No matching employees found in the uploaded file.', 'error');
         return;
       }
 
       // Populate the grid inputs with parsed data
       var populated = 0;
-      for (var empId in parsed.data) {
-        if (!parsed.data.hasOwnProperty(empId)) continue;
-        var empRow = parsed.data[empId];
+      for (var empId in gridData) {
+        if (!gridData.hasOwnProperty(empId)) continue;
+        var empRow = gridData[empId];
 
         for (var projCode in empRow) {
           if (!empRow.hasOwnProperty(projCode)) continue;
@@ -527,11 +549,11 @@ const Timesheet = {
       }
 
       // Update internal data reference
-      self.data = parsed.data;
+      self.data = gridData;
 
-      if (parsed.warnings && parsed.warnings.length > 0) {
-        showToast('Imported ' + populated + ' cells. ' + parsed.warnings.length + ' warning(s) — check console.', 'info');
-        console.warn('[Timesheet] Upload warnings:', parsed.warnings);
+      if (warnings.length > 0) {
+        showToast('Imported ' + populated + ' cells. ' + warnings.length + ' unmatched — check console.', 'info');
+        console.warn('[Timesheet] Upload warnings:', warnings);
       } else {
         showToast('Imported ' + populated + ' cells from spreadsheet. Review and save.', 'success');
       }

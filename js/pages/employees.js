@@ -682,11 +682,13 @@ const Employees = {
       if (existingEmployee) {
         // Update existing
         data.id = existingEmployee.id;
-        await DB.upsertEmployee(data);
+        var upResult = await DB.upsertEmployee(data);
+        if (upResult && upResult.error) throw new Error(upResult.error.message || 'Failed to update');
         showToast('Employee updated successfully!', 'success');
       } else {
         // Insert new
-        await DB.upsertEmployee(data);
+        var insResult = await DB.upsertEmployee(data);
+        if (insResult && insResult.error) throw new Error(insResult.error.message || 'Failed to add');
         showToast('Employee added successfully!', 'success');
       }
 

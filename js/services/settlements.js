@@ -88,7 +88,7 @@ const Settlements = {
       if (invoice && invoice.total_usd != null) {
         totalPaid = parseFloat(invoice.total_usd) || 0;
       } else if (emp.rate_usd) {
-        totalPaid = parseFloat(emp.rate_usd) || 0;
+        totalPaid = (parseFloat(emp.rate_usd) || 0) * totalHours;
       }
 
       // Calculate hours per project

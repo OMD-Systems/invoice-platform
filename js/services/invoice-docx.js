@@ -206,7 +206,7 @@ const InvoiceDocx = {
             { alignment: AlignmentType.RIGHT }
           ),
           this._para(
-            this._text(String(invoiceData.dueDays != null ? invoiceData.dueDays : 7), { size: this.SIZE_BASE }),
+            this._text(this._calcDueDate(invoiceData.invoiceDate, invoiceData.dueDays), { size: this.SIZE_BASE }),
             { alignment: AlignmentType.RIGHT }
           ),
         ], { width: 3600 }),
@@ -477,11 +477,13 @@ const InvoiceDocx = {
     var employee = invoiceData.employee || {};
     var terms = invoiceData.terms || 'Thank you for your business! Please make the payment within 14 days. There will be a 4% interest charge per month on late invoices.';
 
-    // Spacer paragraph between tables
-    var spacer = new Paragraph({
-      children: [new TextRun({ text: '', size: this.SIZE_BASE })],
-      spacing: { after: 200, before: 200 },
-    });
+    // Helper to create spacer paragraphs (each must be unique instance)
+    var makeSpacer = function () {
+      return new Paragraph({
+        children: [new TextRun({ text: '', size: this.SIZE_BASE })],
+        spacing: { after: 200, before: 200 },
+      });
+    }.bind(this);
 
     // Build all 5 tables
     var headerTable    = this._buildHeaderTable(employee);
@@ -496,8 +498,8 @@ const InvoiceDocx = {
         properties: {
           page: {
             size: {
-              width: 12240,   // A4 width in twentieths of a point (8.5 inches)
-              height: 15840,  // A4 height (11 inches — letter; use 16838 for true A4)
+              width: 12240,   // US Letter width in twips (8.5")
+              height: 15840,  // US Letter height (11")
             },
             margin: {
               top: 1440,     // 1 inch
@@ -509,14 +511,14 @@ const InvoiceDocx = {
         },
         children: [
           headerTable,
-          spacer,
+          makeSpacer(),
           billingTable,
-          spacer,
+          makeSpacer(),
           lineItemsTable,
-          spacer,
+          makeSpacer(),
           totalsTable,
-          spacer,
-          spacer,
+          makeSpacer(),
+          makeSpacer(),
           footerTable,
         ],
       }],
@@ -528,6 +530,14 @@ const InvoiceDocx = {
   },
 
   /* ── Format currency as "$1,234.56" ── */
+  /* ── Calculate due date from invoice date + days ── */
+  _calcDueDate(invoiceDate, dueDays) {
+    var days = parseInt(dueDays) || 7;
+    var base = invoiceDate ? new Date(invoiceDate) : new Date();
+    base.setDate(base.getDate() + days);
+    return this.formatDate(base.toISOString().split('T')[0]);
+  },
+
   formatCurrency(amount) {
     return '$' + Number(amount).toLocaleString('en-US', {
       minimumFractionDigits: 2,

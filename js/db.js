@@ -808,6 +808,7 @@ const DB = {
       var totalHours = 0;
       var items = [];
       var order = 1;
+      var rate = parseFloat(emp.rate_usd) || 0;
 
       for (var i = 0; i < (timesheets || []).length; i++) {
         var ts = timesheets[i];
@@ -819,29 +820,29 @@ const DB = {
         items.push({
           item_order: order++,
           description: projectName + ' — ' + hours + ' hours',
-          price_usd: parseFloat(emp.rate_usd) || 0,
-          qty: hours,
-          total_usd: hours * (parseFloat(emp.rate_usd) || 0)
+          price_usd: rate,
+          qty: 1,
+          total_usd: Math.round(hours * rate * 100) / 100
         });
       }
 
-      // Get next invoice number
+      // Get next invoice number (INTEGER in DB)
       var nextNum = emp.next_invoice_number || 1;
-      var invoiceNumber = (emp.invoice_prefix || 'INV') + '-' + String(nextNum).padStart(3, '0');
 
-      var totalUsd = items.reduce(function (sum, it) { return sum + it.total_usd; }, 0);
+      var subtotalUsd = items.reduce(function (sum, it) { return sum + it.total_usd; }, 0);
+      subtotalUsd = Math.round(subtotalUsd * 100) / 100;
+      var today = new Date().toISOString().split('T')[0];
 
       var invoiceData = {
         employee_id: employeeId,
-        invoice_number: invoiceNumber,
+        invoice_number: nextNum,
         month: month,
         year: year,
         format_type: emp.invoice_format || 'WS',
-        total_hours: totalHours,
-        total_usd: totalUsd,
-        rate_usd: parseFloat(emp.rate_usd) || 0,
+        subtotal_usd: subtotalUsd,
+        total_usd: subtotalUsd,
         status: 'draft',
-        issue_date: new Date().toISOString().split('T')[0]
+        invoice_date: today
       };
 
       return await this.createInvoice(invoiceData, items);

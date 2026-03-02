@@ -742,6 +742,6 @@ INSERT INTO projects (name, code, company) VALUES
 -- ============================================================
 INSERT INTO settings (key, value) VALUES
   ('billed_to', '{"name":"Woodenshark LLC","address":"3411 Silverside Road, Suite 104, Rodney Building, Wilmington, Delaware 19810, USA"}'::jsonb),
-  ('payment_terms', '{"text":"Thank you for your business! Please make the payment within 14 days. There will be a 4% interest charge per month on late invoices.","due_days":7}'::jsonb),
+  ('payment_terms', '{"text":"Thank you for your business! Please make the payment within 14 days. There will be a 4% interest charge per month on late invoices.","due_days":14}'::jsonb),
   ('uah_usd_rate', '{"rate":42.16,"updated":"2026-03-01"}'::jsonb),
   ('working_hours_adjustment', '{"subtract_hours":8}'::jsonb);
