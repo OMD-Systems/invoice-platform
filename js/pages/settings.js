@@ -995,6 +995,10 @@ const Settings = {
         showToast('Team name is required.', 'error');
         return;
       }
+      if (leadEmail && (leadEmail.indexOf('@') === -1 || leadEmail.indexOf('.') === -1)) {
+        showToast('Please enter a valid lead email.', 'error');
+        return;
+      }
 
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
@@ -1256,6 +1260,10 @@ const Settings = {
         showToast('Email is required.', 'error');
         return;
       }
+      if (email.indexOf('@') === -1 || email.indexOf('.') === -1) {
+        showToast('Please enter a valid email address.', 'error');
+        return;
+      }
 
       saveBtn.disabled = true;
       saveBtn.textContent = 'Creating...';
@@ -1513,6 +1521,8 @@ const Settings = {
         DB.updateEmailRequest(id, { status: 'approved', admin_note: note }).then(function () {
           showToast('Request approved', 'success');
           self._bindEmailRequestEvents(container);
+        }).catch(function (err) {
+          showToast('Error: ' + (err.message || 'Failed to approve'), 'error');
         });
       });
     }
@@ -1525,6 +1535,8 @@ const Settings = {
         DB.updateEmailRequest(id, { status: 'rejected' }).then(function () {
           showToast('Request rejected', 'success');
           self._bindEmailRequestEvents(container);
+        }).catch(function (err) {
+          showToast('Error: ' + (err.message || 'Failed to reject'), 'error');
         });
       });
     }
@@ -1543,6 +1555,8 @@ const Settings = {
         DB.updateEmailRequest(id, { status: 'created', admin_note: note }).then(function () {
           showToast('Email created and synced!', 'success');
           self._bindEmailRequestEvents(container);
+        }).catch(function (err) {
+          showToast('Error: ' + (err.message || 'Failed to update'), 'error');
         });
       });
     }

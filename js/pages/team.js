@@ -14,9 +14,9 @@ if (typeof showToast === 'undefined') {
     toast.className = 'fury-toast fury-toast-' + type;
     toast.textContent = message;
     document.body.appendChild(toast);
-    setTimeout(function () { toast.classList.add('fury-toast-visible'); }, 10);
+    setTimeout(function () { toast.classList.add('show'); }, 10);
     setTimeout(function () {
-      toast.classList.remove('fury-toast-visible');
+      toast.classList.remove('show');
       setTimeout(function () { toast.remove(); }, 300);
     }, 3000);
   }
@@ -123,7 +123,7 @@ const Team = {
       '</div>' +
 
       /* ── Modal ── */
-      '<div class="fury-modal-overlay" id="team-modal-overlay" style="display:none">' +
+      '<div class="fury-modal-overlay" id="team-modal-overlay">' +
         '<div class="fury-modal" id="team-modal"></div>' +
       '</div>';
   },
@@ -652,14 +652,20 @@ const Team = {
     var yearSelect = container.querySelector('#team-year');
     if (monthSelect) {
       monthSelect.addEventListener('change', function () {
-        self.month = parseInt(this.value, 10);
-        self.onPeriodChange(container, ctx);
+        var select = this;
+        self._autoSaveDirtyHours(container).then(function () {
+          self.month = parseInt(select.value, 10);
+          self.onPeriodChange(container, ctx);
+        });
       });
     }
     if (yearSelect) {
       yearSelect.addEventListener('change', function () {
-        self.year = parseInt(this.value, 10);
-        self.onPeriodChange(container, ctx);
+        var select = this;
+        self._autoSaveDirtyHours(container).then(function () {
+          self.year = parseInt(select.value, 10);
+          self.onPeriodChange(container, ctx);
+        });
       });
     }
 
@@ -671,10 +677,12 @@ const Team = {
         if (!item) return;
         var empId = item.getAttribute('data-id');
         if (empId && empId !== self.selectedId) {
-          self.selectedId = empId;
-          self.highlightSelected(container);
-          self.loadEmployeeDetails(empId).then(function () {
-            self.renderDetail(container);
+          self._autoSaveDirtyHours(container).then(function () {
+            self.selectedId = empId;
+            self.highlightSelected(container);
+            self.loadEmployeeDetails(empId).then(function () {
+              self.renderDetail(container);
+            });
           });
         }
       });
@@ -696,7 +704,7 @@ const Team = {
     if (overlay) {
       overlay.addEventListener('click', function (e) {
         if (e.target === overlay) {
-          overlay.style.display = 'none';
+          overlay.classList.remove('active');
         }
       });
     }
@@ -705,7 +713,7 @@ const Team = {
     self._escHandler = function (e) {
       if (e.key === 'Escape') {
         var ol = container.querySelector('#team-modal-overlay');
-        if (ol) ol.style.display = 'none';
+        if (ol) ol.classList.remove('active');
       }
     };
     document.addEventListener('keydown', self._escHandler);
@@ -987,7 +995,7 @@ const Team = {
             '</div>' +
             '<div id="team-preview-content" style="padding:20px"></div>' +
           '</div>';
-        overlay.style.display = 'flex';
+        overlay.classList.add('active');
 
         var previewContainer = modal.querySelector('#team-preview-content');
         InvoicePreview.render(previewContainer, invoice, emp, self.billedTo, self.defaultTerms);
@@ -995,7 +1003,7 @@ const Team = {
         var closeBtn = modal.querySelector('#team-preview-close');
         if (closeBtn) {
           closeBtn.addEventListener('click', function () {
-            overlay.style.display = 'none';
+            overlay.classList.remove('active');
           });
         }
       }
@@ -1005,15 +1013,37 @@ const Team = {
   },
 
   /* ── Download DOCX ── */
-  handleDownloadInvoice() {
+  async handleDownloadInvoice() {
     var self = this;
     var emp = self.findEmployee(self.selectedId);
     var invoice = self.getEmployeeInvoice(emp.id);
     if (!invoice || !emp) return;
 
-    if (typeof InvoiceDocx !== 'undefined' && typeof InvoiceDocx.generate === 'function') {
+    if (typeof InvoiceDocx !== 'undefined' && typeof InvoiceDocx.downloadInvoice === 'function') {
       try {
-        InvoiceDocx.generate(invoice, emp, self.billedTo, self.defaultTerms);
+        var items = (invoice.invoice_items || []).map(function (it) {
+          return {
+            description: it.description || '',
+            price: it.price_usd || 0,
+            qty: it.qty || 1,
+            total: it.total_usd || 0,
+          };
+        });
+        var invoiceData = {
+          employee: emp,
+          invoiceNumber: invoice.invoice_number || '',
+          invoiceDate: invoice.invoice_date || '',
+          dueDays: 15,
+          items: items,
+          subtotal: invoice.subtotal_usd || 0,
+          discount: invoice.discount_usd || 0,
+          tax: invoice.tax_usd || 0,
+          taxRate: invoice.tax_rate || 0,
+          total: invoice.total_usd || 0,
+          billedTo: self.billedTo || {},
+          terms: self.defaultTerms || '',
+        };
+        await InvoiceDocx.downloadInvoice(invoiceData);
         showToast('DOCX downloaded!', 'success');
       } catch (err) {
         showToast('Download failed: ' + (err.message || 'Unknown'), 'error');
@@ -1077,6 +1107,41 @@ const Team = {
     } catch (err) {
       console.error('[Team] upload error:', err);
       showToast('Upload failed: ' + (err.message || 'Unknown error'), 'error');
+    }
+  },
+
+  /* ── Dirty hours check + auto-save ── */
+  _hasDirtyHours(container) {
+    var inputs = container.querySelectorAll('.team-hours-input');
+    for (var i = 0; i < inputs.length; i++) {
+      var projectId = inputs[i].getAttribute('data-project-id');
+      var inputVal = parseFloat(inputs[i].value) || 0;
+      var savedVal = 0;
+      for (var t = 0; t < this.timesheets.length; t++) {
+        if (this.timesheets[t].project_id === projectId) {
+          savedVal = parseFloat(this.timesheets[t].hours) || 0;
+          break;
+        }
+      }
+      if (Math.abs(inputVal - savedVal) > 0.001) return true;
+    }
+    return false;
+  },
+
+  async _autoSaveDirtyHours(container) {
+    if (!this._hasDirtyHours(container)) return;
+    try {
+      await this.handleSaveHours(container);
+    } catch (err) {
+      console.error('[Team] auto-save failed:', err);
+    }
+  },
+
+  /* ── Cleanup on page leave ── */
+  destroy() {
+    if (this._escHandler) {
+      document.removeEventListener('keydown', this._escHandler);
+      this._escHandler = null;
     }
   },
 
@@ -1228,11 +1293,11 @@ const Team = {
         '<button class="fury-btn-primary" id="team-modal-save">' + (isNew ? 'Add' : 'Save') + '</button>' +
       '</div>';
 
-    overlay.style.display = 'flex';
+    overlay.classList.add('active');
 
     // Bind modal buttons
-    modal.querySelector('#team-modal-close').addEventListener('click', function () { overlay.style.display = 'none'; });
-    modal.querySelector('#team-modal-cancel').addEventListener('click', function () { overlay.style.display = 'none'; });
+    modal.querySelector('#team-modal-close').addEventListener('click', function () { overlay.classList.remove('active'); });
+    modal.querySelector('#team-modal-cancel').addEventListener('click', function () { overlay.classList.remove('active'); });
     modal.querySelector('#team-modal-save').addEventListener('click', function () {
       self.handleEditSave(employee, container);
     });
@@ -1278,7 +1343,7 @@ const Team = {
       if (result && result.error) throw new Error(result.error.message);
 
       showToast(existingEmployee ? 'Employee updated' : 'Employee added', 'success');
-      overlay.style.display = 'none';
+      overlay.classList.remove('active');
 
       // Update cache
       if (result && result.data) {

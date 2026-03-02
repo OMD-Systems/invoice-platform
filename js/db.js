@@ -819,6 +819,21 @@ const DB = {
 
       if (tsErr) return { data: null, error: tsErr };
 
+      // Check for existing invoice (UNIQUE constraint: employee_id, month, year, format_type)
+      var formatType = emp.invoice_format || 'WS';
+      var { data: existingInv } = await this.client
+        .from('invoices')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .eq('month', month)
+        .eq('year', year)
+        .eq('format_type', formatType)
+        .maybeSingle();
+
+      if (existingInv) {
+        return { data: null, error: { message: 'Invoice already exists for this employee/period. Delete the existing invoice first or edit it on the Invoices page.' } };
+      }
+
       // Calculate total hours and build line items
       var totalHours = 0;
       var items = [];

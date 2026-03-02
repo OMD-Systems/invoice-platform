@@ -544,17 +544,37 @@ const InvoiceDocx = {
   /* ── Format currency as "$1,234.56" ── */
   /* ── Calculate due date from invoice date + days ── */
   _calcDueDate(invoiceDate, dueDays) {
-    var days = parseInt(dueDays) || 7;
-    var base = invoiceDate ? new Date(invoiceDate) : new Date();
+    var days = typeof dueDays === 'string' ? parseInt(dueDays.replace(/\D/g, '')) || 15 : (parseInt(dueDays) || 15);
+    var base = invoiceDate ? this._parseAnyDate(invoiceDate) : new Date();
+    if (isNaN(base.getTime())) base = new Date();
     base.setDate(base.getDate() + days);
     return this.formatDate(base.toISOString().split('T')[0]);
   },
 
   formatCurrency(amount) {
-    return '$' + Number(amount).toLocaleString('en-US', {
+    var num = Number(amount);
+    if (isNaN(num)) num = 0;
+    return '$' + num.toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
+  },
+
+  /* ── Parse any date format into a Date object ── */
+  _parseAnyDate(dateStr) {
+    if (!dateStr) return new Date();
+    if (dateStr instanceof Date) return dateStr;
+    // ISO: YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return new Date(dateStr);
+    // DD.MM.YY or DD.MM.YYYY
+    var dotMatch = dateStr.match(/^(\d{2})\.(\d{2})\.(\d{2,4})$/);
+    if (dotMatch) {
+      var yr = dotMatch[3].length === 2 ? '20' + dotMatch[3] : dotMatch[3];
+      return new Date(yr + '-' + dotMatch[2] + '-' + dotMatch[1]);
+    }
+    // "January 28, 2026" or "Jan 28, 2026" etc.
+    var d = new Date(dateStr);
+    return isNaN(d.getTime()) ? new Date() : d;
   },
 
   /* ── Ensure DD.MM.YY format ── */
@@ -573,6 +593,14 @@ const InvoiceDocx = {
       var mm = String(d.getMonth() + 1).padStart(2, '0');
       var yy = String(d.getFullYear()).slice(2);
       return dd + '.' + mm + '.' + yy;
+    }
+    // Try parsing any other format (e.g. "January 28, 2026")
+    var parsed = this._parseAnyDate(dateStr);
+    if (!isNaN(parsed.getTime())) {
+      var dd2 = String(parsed.getDate()).padStart(2, '0');
+      var mm2 = String(parsed.getMonth() + 1).padStart(2, '0');
+      var yy2 = String(parsed.getFullYear()).slice(2);
+      return dd2 + '.' + mm2 + '.' + yy2;
     }
     return dateStr;
   },

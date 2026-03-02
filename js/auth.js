@@ -4,6 +4,34 @@
 // ============================================================
 
 const Auth = {
+  // ── OTP Rate Limiting State ──
+  _otpCooldownUntil: 0,
+  _otpAttempts: 0,
+
+  /**
+   * Check if OTP send is currently in cooldown.
+   * @returns {{ inCooldown: boolean, remainingSeconds: number }}
+   */
+  getOtpCooldownStatus() {
+    var now = Date.now();
+    if (now < this._otpCooldownUntil) {
+      return {
+        inCooldown: true,
+        remainingSeconds: Math.ceil((this._otpCooldownUntil - now) / 1000)
+      };
+    }
+    return { inCooldown: false, remainingSeconds: 0 };
+  },
+
+  /**
+   * Start the OTP cooldown timer.
+   */
+  _startOtpCooldown() {
+    var cooldownMs = (CONFIG.OTP_COOLDOWN_SECONDS || 60) * 1000;
+    this._otpCooldownUntil = Date.now() + cooldownMs;
+    this._otpAttempts++;
+  },
+
   /**
    * Get the current session from Supabase.
    * @returns {Promise<{data: {session: object|null}, error: object|null}>}
@@ -19,14 +47,37 @@ const Auth = {
 
   /**
    * Send a one-time password (magic link code) to the given email.
-   * The user will receive a 6-digit code in their inbox.
+   * Includes client-side rate limiting.
    * @param {string} email
    * @returns {Promise<{data: object|null, error: object|null}>}
    */
   async signInWithOTP(email) {
     try {
-      if (!email || !email.includes('@')) {
+      // Input validation
+      if (!email || !Utils.isValidEmail(email)) {
         return { data: null, error: { message: 'Please enter a valid email address.' } };
+      }
+
+      // Client-side rate limiting
+      var cooldown = this.getOtpCooldownStatus();
+      if (cooldown.inCooldown) {
+        return {
+          data: null,
+          error: {
+            message: 'Please wait ' + cooldown.remainingSeconds + ' seconds before requesting a new code.'
+          }
+        };
+      }
+
+      // Check max attempts
+      var maxAttempts = CONFIG.MAX_OTP_ATTEMPTS || 5;
+      if (this._otpAttempts >= maxAttempts) {
+        return {
+          data: null,
+          error: {
+            message: 'Too many OTP requests. Please try again later or contact an administrator.'
+          }
+        };
       }
 
       const { data, error } = await DB.client.auth.signInWithOtp({
@@ -35,6 +86,9 @@ const Auth = {
           shouldCreateUser: false // Only existing users can sign in
         }
       });
+
+      // Start cooldown regardless of success/failure
+      this._startOtpCooldown();
 
       return { data, error };
     } catch (err) {
@@ -59,6 +113,12 @@ const Auth = {
         token: token.trim(),
         type: 'email'
       });
+
+      // Reset attempts on successful verification
+      if (!error) {
+        this._otpAttempts = 0;
+        this._otpCooldownUntil = 0;
+      }
 
       return { data, error };
     } catch (err) {

@@ -796,23 +796,26 @@ const Invoices = {
     var invTbody = container.querySelector('#inv-tbody');
     if (invTbody) {
       invTbody.addEventListener('click', function (e) {
-        var target = e.target;
         // Preview
-        if (target.classList.contains('inv-act-preview')) {
-          var invoiceId = target.getAttribute('data-invoice-id');
+        var previewBtn = e.target.closest('.inv-act-preview');
+        if (previewBtn) {
+          var invoiceId = previewBtn.getAttribute('data-invoice-id');
           self._handlePreview(invoiceId);
+          return;
         }
         // Download DOCX
-        if (target.classList.contains('inv-act-download')) {
-          var invId = target.getAttribute('data-invoice-id');
+        var downloadBtn = e.target.closest('.inv-act-download');
+        if (downloadBtn) {
+          var invId = downloadBtn.getAttribute('data-invoice-id');
           self._handleDownload(invId);
+          return;
         }
       });
 
       // Status change (select)
       invTbody.addEventListener('change', function (e) {
-        var target = e.target;
-        if (target.classList.contains('inv-act-status')) {
+        var target = e.target.closest('.inv-act-status');
+        if (target) {
           var invIdStatus = target.getAttribute('data-invoice-id');
           var newStatus = target.value;
           self._handleStatusChange(invIdStatus, newStatus, container, ctx);
@@ -824,10 +827,10 @@ const Invoices = {
     var pendingTbody = container.querySelector('#inv-pending-tbody');
     if (pendingTbody) {
       pendingTbody.addEventListener('click', function (e) {
-        var target = e.target;
-        if (target.classList.contains('inv-act-generate')) {
-          var empId = target.getAttribute('data-employee-id');
-          var empName = target.getAttribute('data-employee-name');
+        var genBtn = e.target.closest('.inv-act-generate');
+        if (genBtn) {
+          var empId = genBtn.getAttribute('data-employee-id');
+          var empName = genBtn.getAttribute('data-employee-name');
           self._handleGenerate(empId, empName, container, ctx);
         }
       });
@@ -868,7 +871,7 @@ const Invoices = {
   },
 
   /* ── Download DOCX for a single invoice ── */
-  _handleDownload: function (invoiceId) {
+  _handleDownload: async function (invoiceId) {
     var inv = this._findInvoice(invoiceId);
     if (!inv) {
       alert('Invoice not found.');
@@ -876,8 +879,13 @@ const Invoices = {
     }
 
     if (typeof InvoiceDocx !== 'undefined' && InvoiceDocx.downloadInvoice) {
-      var docxData = this._buildPreviewData(inv);
-      InvoiceDocx.downloadInvoice(docxData);
+      try {
+        var docxData = this._buildPreviewData(inv);
+        await InvoiceDocx.downloadInvoice(docxData);
+      } catch (err) {
+        console.error('[Invoices] DOCX download error:', err);
+        alert('Failed to generate DOCX: ' + (err.message || 'Unknown error'));
+      }
     } else {
       alert('DOCX generation service is not available.');
     }
@@ -960,18 +968,22 @@ const Invoices = {
   },
 
   /* ── Batch download ── */
-  _handleBatchDownload: function (container, ctx) {
-    if (typeof InvoiceDocx !== 'undefined' && InvoiceDocx.downloadBatch) {
-      var allData = [];
-      for (var i = 0; i < this.invoices.length; i++) {
-        allData.push(this._buildPreviewData(this.invoices[i]));
+  _handleBatchDownload: async function (container, ctx) {
+    try {
+      if (typeof InvoiceDocx !== 'undefined' && InvoiceDocx.downloadBatch) {
+        var allData = [];
+        for (var i = 0; i < this.invoices.length; i++) {
+          allData.push(this._buildPreviewData(this.invoices[i]));
+        }
+        await InvoiceDocx.downloadBatch(allData);
+      } else {
+        for (var j = 0; j < this.invoices.length; j++) {
+          await this._handleDownload(this.invoices[j].id);
+        }
       }
-      InvoiceDocx.downloadBatch(allData);
-    } else {
-      // Fallback: download individually
-      for (var j = 0; j < this.invoices.length; j++) {
-        this._handleDownload(this.invoices[j].id);
-      }
+    } catch (err) {
+      console.error('[Invoices] batch download error:', err);
+      alert('Batch download failed: ' + (err.message || 'Unknown error'));
     }
   },
 
@@ -1303,7 +1315,7 @@ const Invoices = {
       invoiceNumber: invNumber,
       invoiceDate: dateDisplay,
       invoiceDateISO: invDate,
-      dueDays: 'Net 15',
+      dueDays: 15,
       items: items,
       subtotal: subtotal,
       discount: discount,
@@ -1415,7 +1427,7 @@ const Invoices = {
 
       // Download DOCX
       if (typeof InvoiceDocx !== 'undefined' && InvoiceDocx.downloadInvoice) {
-        InvoiceDocx.downloadInvoice(data);
+        await InvoiceDocx.downloadInvoice(data);
       } else {
         // Fallback: show preview for manual print
         InvoicePreview.show(data);
@@ -1537,7 +1549,7 @@ const Invoices = {
       billedTo: this.billedTo || { name: '', address: '' },
       invoiceNumber: inv.invoice_number || '',
       invoiceDate: inv.invoice_date ? this._formatDate(inv.invoice_date) : '',
-      dueDays: 'Net 15',
+      dueDays: 15,
       items: items,
       subtotal: subtotal,
       discount: discount,
@@ -1625,5 +1637,16 @@ const Invoices = {
       .replace(/&/g, '&amp;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  },
+
+  /* ── Cleanup on page leave ── */
+  destroy() {
+    // Remove any generate modal overlays left in document.body
+    var overlays = document.querySelectorAll('.fury-modal-overlay');
+    for (var i = 0; i < overlays.length; i++) {
+      if (overlays[i].parentNode === document.body) {
+        overlays[i].remove();
+      }
+    }
   }
 };

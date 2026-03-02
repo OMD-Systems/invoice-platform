@@ -54,13 +54,25 @@ var InvoicePreview = {
 
     document.body.appendChild(overlay);
 
-    // Bind close
     var self = this;
+
+    // Shared close function that cleans up escape handler
+    var escHandler;
+    var closeOverlay = function () {
+      if (escHandler) document.removeEventListener('keydown', escHandler);
+      self._closeOverlay(overlay);
+    };
+
+    // Close on Escape
+    escHandler = function (e) {
+      if (e.key === 'Escape') closeOverlay();
+    };
+    document.addEventListener('keydown', escHandler);
+
+    // Bind close button
     var closeBtn = overlay.querySelector('#ipv-btn-close');
     if (closeBtn) {
-      closeBtn.addEventListener('click', function () {
-        self._closeOverlay(overlay);
-      });
+      closeBtn.addEventListener('click', closeOverlay);
     }
 
     // Bind print
@@ -73,19 +85,8 @@ var InvoicePreview = {
 
     // Close on backdrop click
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) {
-        self._closeOverlay(overlay);
-      }
+      if (e.target === overlay) closeOverlay();
     });
-
-    // Close on Escape
-    var escHandler = function (e) {
-      if (e.key === 'Escape') {
-        self._closeOverlay(overlay);
-        document.removeEventListener('keydown', escHandler);
-      }
-    };
-    document.addEventListener('keydown', escHandler);
   },
 
   /**

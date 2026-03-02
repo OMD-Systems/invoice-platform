@@ -308,7 +308,7 @@ const Expenses = {
       var empName = (inv.employees && inv.employees.name) ? inv.employees.name : '';
       var prefix = (inv.employees && inv.employees.invoice_prefix) ? inv.employees.invoice_prefix : '';
       invoiceDisplay =
-        '<span class="fury-badge fury-badge-info" style="cursor:pointer" data-invoice-id="' + inv.id + '">' +
+        '<span class="fury-badge fury-badge-info" style="cursor:pointer" data-invoice-id="' + inv.id + '" title="Go to Invoices page">' +
         self.escapeHtml(prefix + '-' + inv.invoice_number) +
         '</span>';
       if (empName) {
@@ -427,6 +427,13 @@ const Expenses = {
           var deleteId = deleteBtn.getAttribute('data-expense-id');
           var desc = deleteBtn.getAttribute('data-expense-desc');
           self.handleDelete(deleteId, desc, container, ctx);
+          return;
+        }
+
+        // Invoice badge click -> navigate to invoices page
+        var invBadge = target.closest('[data-invoice-id]');
+        if (invBadge) {
+          window.location.hash = '#/invoices';
         }
       });
     }
@@ -593,13 +600,13 @@ const Expenses = {
               '<label class="fury-label">Amount (UAH)</label>' +
               '<input type="number" class="fury-input" id="modal-amount-uah" ' +
                 'step="0.01" min="0" placeholder="0.00" ' +
-                'value="' + (currentUah || '') + '">' +
+                'value="' + (currentUah != null && currentUah !== '' ? currentUah : '') + '">' +
             '</div>' +
             '<div class="fury-form-group">' +
               '<label class="fury-label">Amount (USD)</label>' +
               '<input type="number" class="fury-input" id="modal-amount-usd" ' +
                 'step="0.01" min="0" placeholder="0.00" ' +
-                'value="' + (currentUsd || '') + '">' +
+                'value="' + (currentUsd != null && currentUsd !== '' ? currentUsd : '') + '">' +
             '</div>' +
           '</div>' +
 
@@ -704,22 +711,30 @@ const Expenses = {
     var escHandler = function (e) {
       if (e.key === 'Escape') {
         closeModal();
-        document.removeEventListener('keydown', escHandler);
       }
     };
     document.addEventListener('keydown', escHandler);
+
+    // Store original closeModal and wrap to also remove escHandler
+    var origClose = closeModal;
+    closeModal = function () {
+      document.removeEventListener('keydown', escHandler);
+      origClose();
+    };
+    // Re-bind close buttons to wrapped closeModal
+    overlay.querySelector('#modal-close-btn').addEventListener('click', closeModal);
+    overlay.querySelector('#modal-cancel-btn').addEventListener('click', closeModal);
 
     // ── Save handler ──
     overlay.querySelector('#modal-save-btn').addEventListener('click', function () {
       self.handleSaveExpense(expense, overlay, container, ctx, closeModal);
     });
 
-    // Allow Enter key to save
+    // Allow Enter key to save (but not from number inputs or textarea)
     overlay.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         var active = document.activeElement;
-        // Don't trigger save if in a select element
-        if (active && active.tagName === 'SELECT') return;
+        if (active && (active.tagName === 'SELECT' || active.tagName === 'TEXTAREA' || active.type === 'number')) return;
         self.handleSaveExpense(expense, overlay, container, ctx, closeModal);
       }
     });
@@ -859,6 +874,14 @@ const Expenses = {
       .replace(/&/g, '&amp;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  },
+
+  /* ── Cleanup on page leave ── */
+  destroy() {
+    if (this.modalOverlay && this.modalOverlay.parentNode) {
+      this.modalOverlay.parentNode.removeChild(this.modalOverlay);
+      this.modalOverlay = null;
+    }
   },
 };
 

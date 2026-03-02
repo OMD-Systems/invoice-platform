@@ -4,14 +4,14 @@
    ═══════════════════════════════════════════════════════ */
 
 /* ── Global Error Handlers ── */
-window.addEventListener('unhandledrejection', function(event) {
+window.addEventListener('unhandledrejection', function (event) {
   console.error('[Unhandled Promise]', event.reason);
   if (typeof showToast === 'function') {
     showToast('An unexpected error occurred. Check console.', 'error');
   }
 });
 
-window.addEventListener('error', function(event) {
+window.addEventListener('error', function (event) {
   console.error('[Global Error]', event.error);
 });
 
@@ -53,7 +53,9 @@ const App = {
       if (session && session.user) {
         this.user = session.user;
         var roleResult = await DB.getUserRole(this.user.email);
-        this.role = (roleResult && roleResult.data) || 'viewer';
+        var rawRole = (roleResult && roleResult.data) || 'viewer';
+        // V5: Validate role against allowed values
+        this.role = (['admin', 'lead', 'viewer'].indexOf(rawRole) !== -1) ? rawRole : 'viewer';
         this.showApp();
         this.setupRouter();
         this.navigate(window.location.hash || '#/team');
@@ -128,6 +130,14 @@ const App = {
         errorEl.textContent = 'Please enter your email address.';
         return;
       }
+
+      // V4: Check cooldown before sending
+      var cooldown = Auth.getOtpCooldownStatus();
+      if (cooldown.inCooldown) {
+        errorEl.textContent = 'Please wait ' + cooldown.remainingSeconds + ' seconds before requesting a new code.';
+        return;
+      }
+
       errorEl.textContent = '';
       btnSend.disabled = true;
       btnSend.textContent = 'Sending...';
@@ -137,8 +147,23 @@ const App = {
       } catch (err) {
         errorEl.textContent = (err.message || 'Failed to send code.') + ' — You can still enter a code if you have one.';
       } finally {
-        btnSend.disabled = false;
-        btnSend.textContent = 'Send Code';
+        // V4: Start cooldown countdown timer on button
+        var cooldownSec = CONFIG.OTP_COOLDOWN_SECONDS || 60;
+        var remaining = cooldownSec;
+        btnSend.disabled = true;
+        btnSend.textContent = 'Resend (' + remaining + 's)';
+
+        var cooldownInterval = setInterval(function () {
+          remaining--;
+          if (remaining <= 0) {
+            clearInterval(cooldownInterval);
+            btnSend.disabled = false;
+            btnSend.textContent = 'Resend Code';
+          } else {
+            btnSend.textContent = 'Resend (' + remaining + 's)';
+          }
+        }, 1000);
+
         // Always show OTP step so user can enter code even on rate limit
         document.getElementById('login-step-email').classList.add('hidden');
         document.getElementById('login-step-otp').classList.remove('hidden');
@@ -167,7 +192,9 @@ const App = {
         var session = await Auth.verifyOtp(email, code);
         self.user = session.user;
         var roleRes = await DB.getUserRole(self.user.email);
-        self.role = (roleRes && roleRes.data) || 'viewer';
+        var rawRole = (roleRes && roleRes.data) || 'viewer';
+        // V5: Validate role against allowed values
+        self.role = (['admin', 'lead', 'viewer'].indexOf(rawRole) !== -1) ? rawRole : 'viewer';
         self.showApp();
         self.setupRouter();
         self.navigate(window.location.hash || '#/team');
@@ -194,6 +221,16 @@ const App = {
       } catch (err) {
         console.warn('[App] signOut error:', err);
       }
+      // Cleanup current page
+      if (self.currentPage && typeof self.currentPage.destroy === 'function') {
+        try { self.currentPage.destroy(); } catch (e) {}
+      }
+      // Remove router
+      if (self._hashChangeHandler) {
+        window.removeEventListener('hashchange', self._hashChangeHandler);
+        self._hashChangeHandler = null;
+      }
+      self._routerReady = false;
       self.user = null;
       self.role = null;
       self.currentPage = null;
@@ -204,10 +241,13 @@ const App = {
 
   /* ── Hash Router ── */
   setupRouter() {
+    if (this._routerReady) return;
+    this._routerReady = true;
     var self = this;
-    window.addEventListener('hashchange', function () {
+    this._hashChangeHandler = function () {
       self.navigate(window.location.hash);
-    });
+    };
+    window.addEventListener('hashchange', this._hashChangeHandler);
   },
 
   /* ── Page Navigation ── */
@@ -247,6 +287,11 @@ const App = {
     // Update page title in top bar
     document.getElementById('page-title').textContent = page.title || '';
 
+    // Cleanup previous page
+    if (this.currentPage && typeof this.currentPage.destroy === 'function') {
+      try { this.currentPage.destroy(); } catch (e) { console.warn('[App] page destroy error:', e); }
+    }
+
     // Render page content
     var container = document.getElementById('main-content');
     container.innerHTML = '<div class="loading">Loading...</div>';
@@ -256,15 +301,15 @@ const App = {
         user: this.user,
         role: this.role,
       });
+      this.currentPage = page;
     } catch (err) {
       console.error('[App] Page render error (' + path + '):', err);
       container.innerHTML =
         '<div class="loading" style="color:#EF4444;">' +
         'Error loading page: ' + (err.message || 'Unknown error') +
         '</div>';
+      this.currentPage = null;
     }
-
-    this.currentPage = page;
   },
 };
 

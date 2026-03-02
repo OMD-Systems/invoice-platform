@@ -5,3 +5,9 @@ Thumbs.db
 desktop.ini
 *.log
 .github/workflows/
+
+# Security: keep API keys out of version control
+js/config.js
+
+# Supabase local
+supabase/.temp/

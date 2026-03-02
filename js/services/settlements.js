@@ -66,11 +66,17 @@ const Settlements = {
     var self = this;
     var results = [];
 
-    // Build invoice lookup by employee_id
+    // Build invoice lookup by employee_id (sum totals if multiple invoices per employee)
     var invoiceMap = {};
     for (var iv = 0; iv < invoices.length; iv++) {
       var inv = invoices[iv];
-      invoiceMap[inv.employee_id] = inv;
+      if (invoiceMap[inv.employee_id]) {
+        invoiceMap[inv.employee_id].total_usd =
+          (parseFloat(invoiceMap[inv.employee_id].total_usd) || 0) +
+          (parseFloat(inv.total_usd) || 0);
+      } else {
+        invoiceMap[inv.employee_id] = { total_usd: inv.total_usd, employee_id: inv.employee_id };
+      }
     }
 
     for (var e = 0; e < employees.length; e++) {

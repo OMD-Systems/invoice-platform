@@ -500,14 +500,23 @@
 
 </div>
 
-<!-- ════════ CDN Libraries ════════ -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/docx@9.6.0/dist/index.iife.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"></script>
+<!-- ════════ CDN Libraries (with SRI integrity checks) ════════ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"
+        integrity="sha384-Sm2s7OXxsAMTyJ4iIyRBgVpeGUvMPk2lRQnnZhE78Wej7oggIoolKt+SCt0XJbUB"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx@9.6.0/dist/index.iife.js"
+        integrity="sha384-EnzP2fNDJUs+3si27zZLZyP85ASuHhB5HQqhJZLfMidfEbtNwMuZ/999aXTwlhzB"
+        crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"
+        integrity="sha384-PlRSzpewlarQuj5alIadXwjNUX+2eNMKwr0f07ShWYLy8B6TjEbm7ZlcN/ScSbwy"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"
+        integrity="sha384-Yxd/31fvrDxapTTZD7zXNw4lsxF90Jny5z+BzTNHiZoIJYX2E9iv1hhMyapB6eF3"
+        crossorigin="anonymous"></script>
 
 <!-- ════════ App Modules ════════ -->
 <script src="js/config.js"></script>
+<script src="js/utils.js"></script>
 <script src="js/db.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/services/timesheet-parser.js"></script>
