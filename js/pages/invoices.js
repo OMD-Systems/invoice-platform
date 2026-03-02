@@ -732,9 +732,20 @@ const Invoices = {
     var tabs = container.querySelectorAll('.fury-tab[data-inv-tab]');
     for (var ti = 0; ti < tabs.length; ti++) {
       tabs[ti].addEventListener('click', function () {
+        var clickedTab = this.getAttribute('data-inv-tab');
+        if (self.activeTab === clickedTab) return;
+
+        self.activeTab = clickedTab;
+        if (clickedTab === 'invoices') {
+          // Re-render entire page to restore destroyed DOM template and events
+          container.innerHTML = self.render(ctx);
+          self.bindEvents(container, ctx);
+          self.renderActiveTab(container);
+          return;
+        }
+
         for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove('active');
         this.classList.add('active');
-        self.activeTab = this.getAttribute('data-inv-tab');
         self.renderActiveTab(container);
       });
     }
