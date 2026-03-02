@@ -134,14 +134,15 @@ const App = {
 
       try {
         await Auth.sendOtp(email);
-        document.getElementById('login-step-email').classList.add('hidden');
-        document.getElementById('login-step-otp').classList.remove('hidden');
-        otpInput.focus();
       } catch (err) {
-        errorEl.textContent = err.message || 'Failed to send code.';
+        errorEl.textContent = (err.message || 'Failed to send code.') + ' — You can still enter a code if you have one.';
       } finally {
         btnSend.disabled = false;
         btnSend.textContent = 'Send Code';
+        // Always show OTP step so user can enter code even on rate limit
+        document.getElementById('login-step-email').classList.add('hidden');
+        document.getElementById('login-step-otp').classList.remove('hidden');
+        otpInput.focus();
       }
     });
 
