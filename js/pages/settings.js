@@ -528,17 +528,17 @@ const Settings = {
         .from('projects')
         .select('*')
         .order('name', { ascending: true });
-      self.projects = (projResult.data || []);
+      self.projects = (projResult && projResult.data) ? projResult.data : [];
 
       // Load teams
       var teamResult = await DB.getTeams();
-      self.teams = teamResult.data || [];
+      self.teams = (teamResult && teamResult.data) ? teamResult.data : [];
 
       // Load members for each team
       self.teamMembers = {};
       for (var t = 0; t < self.teams.length; t++) {
         var membersResult = await DB.getTeamMembers(self.teams[t].id);
-        self.teamMembers[self.teams[t].id] = membersResult.data || [];
+        self.teamMembers[self.teams[t].id] = (membersResult && membersResult.data) ? membersResult.data : [];
       }
 
       // Load profiles
@@ -546,7 +546,7 @@ const Settings = {
         .from('profiles')
         .select('*')
         .order('email', { ascending: true });
-      self.profiles = profileResult.data || [];
+      self.profiles = (profileResult && profileResult.data) ? profileResult.data : [];
 
       // Load month locks
       var locksResult = await DB.client
@@ -554,7 +554,7 @@ const Settings = {
         .select('*')
         .order('year', { ascending: false })
         .order('month', { ascending: false });
-      self.monthLocks = locksResult.data || [];
+      self.monthLocks = (locksResult && locksResult.data) ? locksResult.data : [];
 
     } catch (err) {
       console.error('[Settings] loadData error:', err);
@@ -636,14 +636,16 @@ const Settings = {
             name: (container.querySelector('#set-billed-name') || {}).value || '',
             address: (container.querySelector('#set-billed-address') || {}).value || ''
           };
-          await DB.setSetting('billed_to', billedTo);
+          var billedResult = await DB.setSetting('billed_to', billedTo);
+          if (billedResult && billedResult.error) throw new Error(billedResult.error.message);
 
           // Payment Terms
           var terms = {
             text: (container.querySelector('#set-terms-text') || {}).value || '',
             due_days: parseInt((container.querySelector('#set-due-days') || {}).value, 10) || 7
           };
-          await DB.setSetting('payment_terms', terms);
+          var termsResult = await DB.setSetting('payment_terms', terms);
+          if (termsResult && termsResult.error) throw new Error(termsResult.error.message);
 
           // Exchange Rate
           var currentRate = self.settings.exchange_rate || {};
@@ -652,7 +654,8 @@ const Settings = {
             uah_usd: newRate,
             updated_at: newRate !== currentRate.uah_usd ? new Date().toISOString() : (currentRate.updated_at || new Date().toISOString())
           };
-          await DB.setSetting('exchange_rate', exchangeRate);
+          var rateResult = await DB.setSetting('exchange_rate', exchangeRate);
+          if (rateResult && rateResult.error) throw new Error(rateResult.error.message);
 
           // Working Hours
           var subtractHours = parseInt((container.querySelector('#set-subtract-hours') || {}).value, 10);
@@ -660,7 +663,8 @@ const Settings = {
           var workingHours = {
             subtract_hours: subtractHours
           };
-          await DB.setSetting('working_hours_adjustment', workingHours);
+          var hoursResult = await DB.setSetting('working_hours_adjustment', workingHours);
+          if (hoursResult && hoursResult.error) throw new Error(hoursResult.error.message);
 
           // Update cached data
           self.settings.billed_to = billedTo;
@@ -930,7 +934,7 @@ const Settings = {
           .from('projects')
           .select('*')
           .order('name', { ascending: true });
-        self.projects = projResult.data || [];
+        self.projects = (projResult && projResult.data) ? projResult.data : [];
         self.renderActiveTab(container);
 
       } catch (err) {
@@ -1008,7 +1012,7 @@ const Settings = {
 
         // Reload teams
         var teamResult = await DB.getTeams();
-        self.teams = teamResult.data || [];
+        self.teams = (teamResult && teamResult.data) ? teamResult.data : [];
         self.renderActiveTab(container);
 
       } catch (err) {
@@ -1108,7 +1112,7 @@ const Settings = {
 
           // Reload team members
           var membersResult = await DB.getTeamMembers(team.id);
-          self.teamMembers[team.id] = membersResult.data || [];
+          self.teamMembers[team.id] = (membersResult && membersResult.data) ? membersResult.data : [];
           self.renderActiveTab(container);
 
         } catch (err) {
@@ -1150,7 +1154,7 @@ const Settings = {
 
           // Reload team members
           var membersResult = await DB.getTeamMembers(team.id);
-          self.teamMembers[team.id] = membersResult.data || [];
+          self.teamMembers[team.id] = (membersResult && membersResult.data) ? membersResult.data : [];
           self.renderActiveTab(container);
 
         } catch (err) {
@@ -1168,7 +1172,7 @@ const Settings = {
     var self = this;
     try {
       var empResult = await DB.getEmployees();
-      var employees = empResult.data || [];
+      var employees = (empResult && empResult.data) ? empResult.data : [];
       var members = self.teamMembers[team.id] || [];
 
       // Build set of already-assigned employee IDs
@@ -1267,7 +1271,7 @@ const Settings = {
           .from('profiles')
           .select('*')
           .order('email', { ascending: true });
-        self.profiles = profileResult.data || [];
+        self.profiles = (profileResult && profileResult.data) ? profileResult.data : [];
         self.renderActiveTab(container);
 
       } catch (err) {
@@ -1339,7 +1343,7 @@ const Settings = {
         .select('*')
         .order('year', { ascending: false })
         .order('month', { ascending: false });
-      self.monthLocks = locksResult.data || [];
+      self.monthLocks = (locksResult && locksResult.data) ? locksResult.data : [];
       self.renderActiveTab(container);
 
     } catch (err) {
@@ -1371,7 +1375,7 @@ const Settings = {
         .select('*')
         .order('year', { ascending: false })
         .order('month', { ascending: false });
-      self.monthLocks = locksResult.data || [];
+      self.monthLocks = (locksResult && locksResult.data) ? locksResult.data : [];
       self.renderActiveTab(container);
 
     } catch (err) {

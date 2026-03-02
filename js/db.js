@@ -1,10 +1,8 @@
 // ============================================================
 // OMD Finance Platform — Supabase Database Client
 // db.js — All CRUD operations for the invoice platform
+// Requires: config.js (CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY)
 // ============================================================
-
-const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const DB = {
   client: null,
@@ -12,12 +10,12 @@ const DB = {
   /**
    * Initialize the Supabase client.
    * Call this once on app load.
-   * @param {string} [url] - Supabase project URL
-   * @param {string} [key] - Supabase anon/public key
+   * @param {string} [url] - Supabase project URL (defaults to CONFIG.SUPABASE_URL)
+   * @param {string} [key] - Supabase anon/public key (defaults to CONFIG.SUPABASE_ANON_KEY)
    */
   init(url, key) {
-    const supabaseUrl = url || SUPABASE_URL;
-    const supabaseKey = key || SUPABASE_ANON_KEY;
+    const supabaseUrl = url || CONFIG.SUPABASE_URL;
+    const supabaseKey = key || CONFIG.SUPABASE_ANON_KEY;
     this.client = supabase.createClient(supabaseUrl, supabaseKey);
   },
 

@@ -155,6 +155,9 @@ const Expenses = {
         month: self.month,
         year: self.year,
       });
+      if (invoiceResult && invoiceResult.error) {
+        console.warn('[Expenses] Failed to load invoices:', invoiceResult.error.message || invoiceResult.error);
+      }
       self.invoices = (invoiceResult && invoiceResult.data) ? invoiceResult.data : [];
 
       // Load expenses for the month
@@ -166,6 +169,9 @@ const Expenses = {
       for (var i = 0; i < self.invoices.length; i++) {
         var inv = self.invoices[i];
         var expResult = await DB.getExpenses(inv.id);
+        if (expResult && expResult.error) {
+          console.warn('[Expenses] Failed to load expenses for invoice ' + inv.id + ':', expResult.error.message || expResult.error);
+        }
         if (expResult && expResult.data) {
           for (var e = 0; e < expResult.data.length; e++) {
             var exp = expResult.data[e];
@@ -184,6 +190,10 @@ const Expenses = {
           .select('*')
           .is('invoice_id', null)
           .order('created_at', { ascending: true });
+
+        if (unlinkedResult && unlinkedResult.error) {
+          console.warn('[Expenses] Failed to load unlinked expenses:', unlinkedResult.error.message || unlinkedResult.error);
+        }
 
         if (unlinkedResult && unlinkedResult.data) {
           // Filter to match the selected month/year by created_at date
@@ -457,10 +467,14 @@ const Expenses = {
     }
 
     try {
-      await DB.setSetting('uah_usd_rate', {
+      var result = await DB.setSetting('uah_usd_rate', {
         rate: newRate,
         updated: new Date().toISOString().split('T')[0],
       });
+
+      if (result && result.error) {
+        throw new Error(result.error.message || 'Failed to save exchange rate');
+      }
 
       self.exchangeRate = newRate;
 
@@ -847,3 +861,32 @@ const Expenses = {
       .replace(/'/g, '&#39;');
   },
 };
+
+
+/* ── Global Toast Notification (safe re-declaration) ── */
+if (typeof showToast === 'undefined') {
+  function showToast(message, type) {
+    type = type || 'success';
+
+    var existing = document.querySelectorAll('.fury-toast');
+    for (var i = 0; i < existing.length; i++) {
+      existing[i].remove();
+    }
+
+    var toast = document.createElement('div');
+    toast.className = 'fury-toast fury-toast-' + type;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(function () {
+      toast.classList.add('show');
+    }, 10);
+
+    setTimeout(function () {
+      toast.classList.remove('show');
+      setTimeout(function () {
+        if (toast.parentNode) toast.remove();
+      }, 300);
+    }, 3000);
+  }
+}

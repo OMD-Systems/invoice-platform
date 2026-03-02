@@ -71,6 +71,22 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
+-- Prevent users from changing their own role via profile update
+CREATE OR REPLACE FUNCTION prevent_role_self_change()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.role IS DISTINCT FROM NEW.role AND auth.uid() = OLD.id THEN
+    RAISE EXCEPTION 'Cannot change your own role';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER tr_profiles_prevent_role_change
+  BEFORE UPDATE ON profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION prevent_role_self_change();
+
 
 -- ============================================================
 -- 2. EMPLOYEES
@@ -267,7 +283,7 @@ CREATE POLICY "projects_delete_admin" ON projects
 CREATE TABLE timesheets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
-  project_id UUID REFERENCES projects(id),
+  project_id UUID REFERENCES projects(id) ON DELETE SET NULL,
   month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
   year INTEGER NOT NULL CHECK (year BETWEEN 2024 AND 2030),
   hours NUMERIC(6,2) NOT NULL DEFAULT 0,
@@ -708,7 +724,6 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- ============================================================
 -- INDEXES for performance
 -- ============================================================
-CREATE INDEX idx_employees_pin ON employees(pin);
 CREATE INDEX idx_employees_active ON employees(is_active);
 CREATE INDEX idx_timesheets_employee ON timesheets(employee_id);
 CREATE INDEX idx_timesheets_period ON timesheets(month, year);

@@ -164,21 +164,8 @@ const Employees = {
       '.emp-badge-hc { background:rgba(139,92,246,0.15); color:#A78BFA; }' +
       '.emp-badge-format { background:rgba(107,114,128,0.15); color:#9CA3AF; }' +
 
-      /* ── Action Buttons ── */
-      '.fury-btn-sm { background:transparent; border:1px solid #2A2A30; border-radius:4px; color:#9CA3AF; padding:4px 8px; font-size:13px; cursor:pointer; margin-right:4px; transition:border-color 0.2s,color 0.2s; }' +
-      '.fury-btn-sm:hover { border-color:#00E5FF; color:#00E5FF; }' +
-
-      /* ── Buttons (shared with timesheet) ── */
-      '.fury-btn-primary { padding:8px 20px; background:#00E5FF; color:#0D0D0F; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; transition:background 0.2s,opacity 0.2s; }' +
-      '.fury-btn-primary:hover { background:#00D4EC; }' +
-      '.fury-btn-primary:disabled { opacity:0.4; cursor:not-allowed; }' +
-      '.fury-btn-secondary { padding:8px 16px; background:transparent; color:#9CA3AF; border:1px solid #2A2A30; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer; transition:border-color 0.2s,color 0.2s; }' +
-      '.fury-btn-secondary:hover { border-color:#00E5FF; color:#00E5FF; }' +
-      '.fury-card { background:#111114; border:1px solid #1F1F23; border-radius:10px; padding:20px; }' +
-
-      /* ── Modal Overlay ── */
-      '.fury-modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; z-index:5000; }' +
-      '.fury-modal { background:#111114; border:1px solid #1F1F23; border-radius:12px; width:560px; max-width:95vw; max-height:90vh; overflow-y:auto; padding:0; box-shadow:0 20px 60px rgba(0,0,0,0.5); }' +
+      /* ── Action Buttons (page-specific overrides) ── */
+      '.emp-btn-edit, .emp-btn-invoices { margin-right:4px; }' +
 
       /* ── Modal Header ── */
       '.emp-modal-header { display:flex; justify-content:space-between; align-items:center; padding:20px 24px 16px; border-bottom:1px solid #1F1F23; }' +
@@ -192,31 +179,8 @@ const Employees = {
       '.emp-modal-section:last-child { border-bottom:none; padding-bottom:0; }' +
       '.emp-modal-section-title { font-size:11px; font-weight:600; color:#00E5FF; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }' +
 
-      /* ── Form Groups ── */
-      '.fury-form-group { display:flex; flex-direction:column; gap:4px; }' +
-      '.fury-form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }' +
-      '.fury-label { font-size:11px; font-weight:500; color:#9CA3AF; text-transform:uppercase; letter-spacing:0.5px; }' +
-      '.fury-input { padding:8px 12px; background:#1A1A1F; border:1px solid #2A2A30; border-radius:6px; color:#E5E7EB; font-size:13px; outline:none; transition:border-color 0.2s; }' +
-      '.fury-input:focus { border-color:#00E5FF; }' +
-      '.fury-input::placeholder { color:#4B5563; }' +
-      '.fury-input:disabled { opacity:0.5; cursor:not-allowed; }' +
-      '.fury-select { padding:8px 12px; background:#1A1A1F; border:1px solid #2A2A30; border-radius:6px; color:#E5E7EB; font-size:13px; outline:none; transition:border-color 0.2s; appearance:none; -webkit-appearance:none; cursor:pointer; }' +
-      '.fury-select:focus { border-color:#00E5FF; }' +
-      '.fury-textarea { padding:8px 12px; background:#1A1A1F; border:1px solid #2A2A30; border-radius:6px; color:#E5E7EB; font-size:13px; outline:none; transition:border-color 0.2s; resize:vertical; min-height:60px; font-family:inherit; }' +
-      '.fury-textarea:focus { border-color:#00E5FF; }' +
-      '.fury-checkbox-group { display:flex; align-items:center; gap:8px; }' +
-      '.fury-checkbox-group input[type="checkbox"] { accent-color:#00E5FF; width:16px; height:16px; cursor:pointer; }' +
-      '.fury-checkbox-label { font-size:13px; color:#E5E7EB; cursor:pointer; }' +
-
       /* ── Modal Footer ── */
       '.emp-modal-footer { display:flex; justify-content:flex-end; gap:8px; padding:16px 24px 20px; border-top:1px solid #1F1F23; }' +
-
-      /* ── Toast (if not defined by timesheet.js) ── */
-      '.fury-toast { position:fixed; bottom:24px; right:24px; padding:12px 24px; border-radius:8px; font-size:13px; font-weight:500; color:#E5E7EB; z-index:10000; opacity:0; transform:translateY(12px); transition:opacity 0.3s,transform 0.3s; pointer-events:none; }' +
-      '.fury-toast.show { opacity:1; transform:translateY(0); pointer-events:auto; }' +
-      '.fury-toast-success { background:#065F46; border:1px solid #10B981; }' +
-      '.fury-toast-error { background:#7F1D1D; border:1px solid #EF4444; }' +
-      '.fury-toast-info { background:#1E3A5F; border:1px solid #3B82F6; }' +
       '</style>';
   },
 

@@ -483,6 +483,12 @@ img {
   margin-bottom: 16px;
 }
 
+.fury-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 .fury-label {
   display: block;
   font-size: 12px;
@@ -545,12 +551,46 @@ img {
   margin-top: 4px;
 }
 
-/* Textarea */
+/* Textarea (on .fury-input) */
 textarea.fury-input {
   height: auto;
   min-height: 80px;
   padding: 8px 12px;
   resize: vertical;
+}
+
+/* Standalone textarea class (used in employee modals) */
+.fury-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  font-family: var(--fury-font);
+  font-size: 14px;
+  color: var(--fury-text);
+  background: var(--fury-elevated);
+  border: 1px solid var(--fury-border);
+  border-radius: var(--fury-radius);
+  outline: none;
+  transition: border-color var(--fury-transition), box-shadow var(--fury-transition);
+  resize: vertical;
+  min-height: 60px;
+}
+
+.fury-textarea::placeholder {
+  color: var(--fury-text-muted);
+}
+
+.fury-textarea:hover {
+  border-color: #4B5563;
+}
+
+.fury-textarea:focus {
+  border-color: var(--fury-accent);
+  box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+}
+
+.fury-textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Select */
@@ -608,6 +648,27 @@ textarea.fury-input {
   height: 16px;
   accent-color: var(--fury-accent);
   cursor: pointer;
+}
+
+/* Checkbox group (used in modal forms) */
+.fury-checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fury-checkbox-group input[type="checkbox"] {
+  accent-color: var(--fury-accent);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.fury-checkbox-label {
+  font-size: 13px;
+  color: var(--fury-text);
+  cursor: pointer;
+  user-select: none;
 }
 
 /* Search input */
@@ -1205,6 +1266,19 @@ textarea.fury-input {
   color: var(--fury-accent);
 }
 
+.fury-toast-error {
+  background: #7F1D1D;
+  border: 1px solid #EF4444;
+  color: #FCA5A5;
+}
+
+/* Toast visibility state -- used by showToast() in JS */
+.fury-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
 /* ============================================================
    13. EMPTY STATE
    ============================================================ */
@@ -1754,6 +1828,28 @@ textarea.fury-input {
   font-size: 13px;
   color: var(--fury-text-secondary);
   margin: 0 8px;
+}
+
+/* ============================================================
+   LOADING OVERLAY
+   ============================================================ */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 13, 15, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--fury-border);
+  border-top-color: var(--fury-accent);
+  border-radius: 50%;
+  animation: fury-spin 0.7s linear infinite;
 }
 
 /* ============================================================

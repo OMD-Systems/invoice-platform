@@ -17,24 +17,6 @@ const Reports = {
   settings: {},
   exchangeRate: 42.16,
 
-  /* ── Project-to-Company mapping ── */
-  PROJECT_COMPANY_MAP: {
-    'SPECTR':       'OMD',
-    'FURY':         'WS',
-    'KESTREL':      'OMD',
-    'RATO_BOOSTER': 'OMD',
-    'MOTORS':       'WS',
-    'BATTERIES':    'OM_ENERGY_UA',
-    'OTHER':        'WS',
-  },
-
-  COMPANY_LABELS: {
-    'WS':           'Woodenshark',
-    'OMD':          'OMD Systems',
-    'OM_ENERGY':    'OM Energy',
-    'OM_ENERGY_UA': 'OM Energy UA',
-  },
-
   /* ── Main Render ── */
   async render(container, ctx) {
     container.innerHTML = this.template();
@@ -109,14 +91,6 @@ const Reports = {
       var projResult = await DB.getProjects();
       self.projects = (projResult && projResult.data) ? projResult.data : [];
 
-      // Build company map from DB projects (in case it differs from hardcoded)
-      for (var p = 0; p < self.projects.length; p++) {
-        var proj = self.projects[p];
-        if (proj.code && proj.company) {
-          self.PROJECT_COMPANY_MAP[proj.code] = proj.company;
-        }
-      }
-
       // Load timesheets with project info
       var tsResult = await DB.getTimesheets(self.month, self.year);
       self.timesheets = (tsResult && tsResult.data) ? tsResult.data : [];
@@ -161,7 +135,7 @@ const Reports = {
   },
 
   /* ── Render Active Report ── */
-  renderActiveReport(container) {
+  async renderActiveReport(container) {
     var self = this;
     var content = container.querySelector('#report-content');
     if (!content) return;
@@ -171,7 +145,7 @@ const Reports = {
         self.renderSummary(content);
         break;
       case 'settlements':
-        self.renderSettlements(content);
+        await self.renderSettlements(content);
         break;
       case 'utilization':
         self.renderUtilization(content);
@@ -423,141 +397,56 @@ const Reports = {
   /* ════════════════════════════════════════════════════════
      SETTLEMENTS REPORT
      Inter-company cost allocation based on project hours
+     Uses Settlements service for calculation & formatting
      ════════════════════════════════════════════════════════ */
-  renderSettlements(content) {
+  async renderSettlements(content) {
     var self = this;
 
-    // ── Step 1: Build lookup maps ──
-    var projIdToCode = {};
-    for (var p = 0; p < self.projects.length; p++) {
-      projIdToCode[self.projects[p].id] = self.projects[p].code;
-    }
+    // Show loading state
+    content.innerHTML =
+      '<div style="text-align:center;padding:40px;color:var(--fury-text-muted)">Calculating settlements...</div>';
 
-    // Build employee lookup
-    var empById = {};
-    for (var e = 0; e < self.employees.length; e++) {
-      empById[self.employees[e].id] = self.employees[e];
-    }
+    try {
+      // ── Calculate via Settlements service ──
+      var settlementData = await Settlements.calculate(
+        self.month, self.year,
+        self.employees, self.timesheets, self.invoices
+      );
 
-    // Build invoice lookup by employee_id
-    var invoiceByEmpId = {};
-    for (var i = 0; i < self.invoices.length; i++) {
-      invoiceByEmpId[self.invoices[i].employee_id] = self.invoices[i];
-    }
-
-    // ── Step 2: Aggregate hours per employee per project ──
-    // timesheetData[employeeId] = { projectCode: hours }
-    var timesheetData = {};
-    for (var t = 0; t < self.timesheets.length; t++) {
-      var ts = self.timesheets[t];
-      var empId = ts.employee_id;
-      var projCode = projIdToCode[ts.project_id] || 'OTHER';
-      var hours = parseFloat(ts.hours) || 0;
-
-      if (!timesheetData[empId]) {
-        timesheetData[empId] = {};
-      }
-      timesheetData[empId][projCode] = (timesheetData[empId][projCode] || 0) + hours;
-    }
-
-    // ── Step 3: Get unique project codes that appear in timesheets ──
-    var projectOrder = ['SPECTR', 'FURY', 'KESTREL', 'RATO_BOOSTER', 'MOTORS', 'BATTERIES', 'OTHER'];
-    var activeProjectCodes = [];
-    var seenCodes = {};
-    for (var empKey in timesheetData) {
-      if (!timesheetData.hasOwnProperty(empKey)) continue;
-      for (var code in timesheetData[empKey]) {
-        if (!timesheetData[empKey].hasOwnProperty(code)) continue;
-        if (!seenCodes[code]) {
-          seenCodes[code] = true;
-        }
-      }
-    }
-    for (var po = 0; po < projectOrder.length; po++) {
-      if (seenCodes[projectOrder[po]]) {
-        activeProjectCodes.push(projectOrder[po]);
-      }
-    }
-
-    // ── Step 4: Get unique companies ──
-    var companySet = {};
-    for (var pc = 0; pc < activeProjectCodes.length; pc++) {
-      var company = self.PROJECT_COMPANY_MAP[activeProjectCodes[pc]] || 'WS';
-      companySet[company] = true;
-    }
-    var companies = Object.keys(companySet).sort();
-
-    // ── Step 5: Calculate allocations per employee ──
-    // For each employee who has both timesheet data and an invoice (= total_paid)
-    var settlementRows = [];
-    var companyTotals = {};  // { companyCode: totalAllocatedCost }
-    for (var ci = 0; ci < companies.length; ci++) {
-      companyTotals[companies[ci]] = 0;
-    }
-    var grandTotalPaid = 0;
-
-    // Collect employee IDs with timesheet data
-    var empIdsWithData = Object.keys(timesheetData);
-    empIdsWithData.sort(function (a, b) {
-      var nameA = empById[a] ? empById[a].name : '';
-      var nameB = empById[b] ? empById[b].name : '';
-      return nameA.localeCompare(nameB);
-    });
-
-    for (var ei = 0; ei < empIdsWithData.length; ei++) {
-      var employeeId = empIdsWithData[ei];
-      var emp = empById[employeeId];
-      if (!emp) continue;
-
-      var invoice = invoiceByEmpId[employeeId];
-      var totalPaid = invoice ? (parseFloat(invoice.total_usd) || 0) : 0;
-      grandTotalPaid += totalPaid;
-
-      var empProjects = timesheetData[employeeId];
-
-      // Calculate total hours for this employee
-      var totalHours = 0;
-      for (var projKey in empProjects) {
-        if (!empProjects.hasOwnProperty(projKey)) continue;
-        totalHours += empProjects[projKey];
+      // Verify integrity
+      if (!Settlements.verify(settlementData)) {
+        console.warn('[Reports] Settlement integrity check failed — displaying data with warning');
       }
 
-      // Calculate % allocation and cost per project
-      var projectAllocations = {};
-      for (var apci = 0; apci < activeProjectCodes.length; apci++) {
-        var apc = activeProjectCodes[apci];
-        var projHours = empProjects[apc] || 0;
-        var pct = totalHours > 0 ? projHours / totalHours : 0;
-        var cost = totalPaid * pct;
-        projectAllocations[apc] = {
-          hours: projHours,
-          percentage: pct,
-          cost: cost,
-        };
-      }
+      // ── Derive display parameters ──
+      var activeProjectCodes = Settlements.getActiveProjectCodes(settlementData);
+      var companies = Settlements.getActiveCompanies(settlementData);
 
-      // Group by company
-      var companyAllocations = {};
-      for (var cai = 0; cai < companies.length; cai++) {
-        companyAllocations[companies[cai]] = 0;
-      }
-      for (var apc2 = 0; apc2 < activeProjectCodes.length; apc2++) {
-        var code2 = activeProjectCodes[apc2];
-        var comp = self.PROJECT_COMPANY_MAP[code2] || 'WS';
-        companyAllocations[comp] = (companyAllocations[comp] || 0) + projectAllocations[code2].cost;
-        companyTotals[comp] = (companyTotals[comp] || 0) + projectAllocations[code2].cost;
-      }
+      // ── Format for detailed table ──
+      var detailed = Settlements.formatForDetailedTable(settlementData, activeProjectCodes, companies);
 
-      settlementRows.push({
-        employee: emp,
-        totalPaid: totalPaid,
-        totalHours: totalHours,
-        projectAllocations: projectAllocations,
-        companyAllocations: companyAllocations,
-      });
+      // ── Build HTML ──
+      self._renderSettlementsHtml(content, detailed, activeProjectCodes, companies);
+
+    } catch (err) {
+      console.error('[Reports] renderSettlements error:', err);
+      content.innerHTML =
+        '<div class="fury-card" style="padding:24px;text-align:center;color:var(--fury-danger)">' +
+        'Error calculating settlements: ' + self.escapeHtml(err.message || 'Unknown error') +
+        '</div>';
     }
+  },
 
-    // ── Step 6: Build HTML ──
+  /**
+   * Render the settlements HTML from pre-calculated detailed data.
+   * Separated from renderSettlements to keep the async logic clean.
+   */
+  _renderSettlementsHtml(content, detailed, activeProjectCodes, companies) {
+    var self = this;
+    var rows = detailed.rows;
+    var companyTotals = detailed.companyTotals;
+    var grandTotal = detailed.grandTotal;
+
     // Project columns header
     var projHeaders = '';
     for (var phi = 0; phi < activeProjectCodes.length; phi++) {
@@ -567,7 +456,7 @@ const Reports = {
     // Company total columns header
     var compHeaders = '';
     for (var chi = 0; chi < companies.length; chi++) {
-      var compLabel = self.COMPANY_LABELS[companies[chi]] || companies[chi];
+      var compLabel = Settlements.getCompanyLabel(companies[chi]);
       compHeaders +=
         '<th style="text-align:right;font-size:10px;background:rgba(0,212,255,0.05)">' +
         self.escapeHtml(compLabel) +
@@ -600,15 +489,15 @@ const Reports = {
           '</thead>' +
           '<tbody>';
 
-    if (settlementRows.length === 0) {
+    if (rows.length === 0) {
       var totalCols = 3 + activeProjectCodes.length + companies.length;
       tableHtml +=
         '<tr><td colspan="' + totalCols + '" style="text-align:center;padding:40px;color:var(--fury-text-muted)">' +
         'No timesheet data found for this period. Upload timesheets first.' +
         '</td></tr>';
     } else {
-      for (var ri = 0; ri < settlementRows.length; ri++) {
-        var row = settlementRows[ri];
+      for (var ri = 0; ri < rows.length; ri++) {
+        var row = rows[ri];
 
         // Project cost cells
         var projCells = '';
@@ -656,13 +545,9 @@ const Reports = {
       // Totals row
       var projTotalCells = '';
       for (var ptci = 0; ptci < activeProjectCodes.length; ptci++) {
-        var projTotal = 0;
-        for (var sri = 0; sri < settlementRows.length; sri++) {
-          projTotal += settlementRows[sri].projectAllocations[activeProjectCodes[ptci]].cost;
-        }
         projTotalCells +=
           '<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:var(--fury-accent)">' +
-          self.formatCurrency(projTotal) +
+          self.formatCurrency(detailed.projectTotals[activeProjectCodes[ptci]] || 0) +
           '</td>';
       }
 
@@ -678,7 +563,7 @@ const Reports = {
         '<tr style="background:var(--fury-bg);border-top:2px solid var(--fury-accent)">' +
           '<td style="font-weight:700;color:var(--fury-accent)">TOTAL</td>' +
           '<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:var(--fury-accent)">' +
-            self.formatCurrency(grandTotalPaid) +
+            self.formatCurrency(grandTotal) +
           '</td>' +
           '<td></td>' +
           projTotalCells +
@@ -690,15 +575,15 @@ const Reports = {
 
     // ── Settlement Summary Cards ──
     var settlementCardsHtml = '';
-    if (settlementRows.length > 0 && companies.length > 1) {
+    if (rows.length > 0 && companies.length > 1) {
       settlementCardsHtml = '<div class="fury-grid-' + Math.min(companies.length, 4) + ' fury-mt-3">';
 
       for (var sci = 0; sci < companies.length; sci++) {
         var companyCode = companies[sci];
-        var companyLabel = self.COMPANY_LABELS[companyCode] || companyCode;
+        var companyLabel = Settlements.getCompanyLabel(companyCode);
         var companyTotal = companyTotals[companyCode] || 0;
-        var companyPct = grandTotalPaid > 0
-          ? ((companyTotal / grandTotalPaid) * 100).toFixed(1)
+        var companyPct = grandTotal > 0
+          ? ((companyTotal / grandTotal) * 100).toFixed(1)
           : '0.0';
 
         settlementCardsHtml +=
@@ -720,7 +605,6 @@ const Reports = {
 
       // Net settlement calculations
       // If WS pays all employees, other companies need to reimburse WS
-      // Settlement = amount allocated to other companies (OMD, OM_ENERGY_UA)
       settlementCardsHtml +=
         '<div class="fury-card fury-mt-3">' +
           '<h3 style="font-size:14px;font-weight:600;color:var(--fury-text);margin-bottom:12px">' +
@@ -731,7 +615,7 @@ const Reports = {
       for (var nsi = 0; nsi < companies.length; nsi++) {
         if (companies[nsi] === 'WS') continue;
         var netAmount = companyTotals[companies[nsi]] || 0;
-        var netLabel = self.COMPANY_LABELS[companies[nsi]] || companies[nsi];
+        var netLabel = Settlements.getCompanyLabel(companies[nsi]);
 
         settlementCardsHtml +=
           '<div style="padding:16px;border:1px solid var(--fury-border);border-radius:var(--fury-radius);background:var(--fury-elevated)">' +
@@ -753,39 +637,38 @@ const Reports = {
     var exportBtn = content.querySelector('#btn-export-settlements');
     if (exportBtn) {
       exportBtn.addEventListener('click', function () {
-        self.exportSettlementsXlsx(settlementRows, activeProjectCodes, companies, companyTotals, grandTotalPaid);
+        self.exportSettlementsXlsx(detailed, activeProjectCodes, companies);
       });
     }
   },
 
-  /* ── Build mapping chips for settlements ── */
+  /* ── Build mapping chips for settlements (delegates to Settlements service) ── */
   _buildMappingChips() {
     var self = this;
+    var chips = Settlements.getMappingChips();
     var html = '';
-    var codes = Object.keys(self.PROJECT_COMPANY_MAP);
-    for (var i = 0; i < codes.length; i++) {
-      var code = codes[i];
-      var company = self.PROJECT_COMPANY_MAP[code];
-      var compLabel = self.COMPANY_LABELS[company] || company;
-      var bgColor = company === 'WS' ? 'rgba(0,212,255,0.1)'
-        : company === 'OMD' ? 'rgba(245,158,11,0.1)'
+
+    for (var i = 0; i < chips.length; i++) {
+      var chip = chips[i];
+      var bgColor = chip.company === 'WS' ? 'rgba(0,212,255,0.1)'
+        : chip.company === 'OMD' ? 'rgba(245,158,11,0.1)'
         : 'rgba(139,92,246,0.1)';
-      var textColor = company === 'WS' ? 'var(--fury-accent)'
-        : company === 'OMD' ? 'var(--fury-warning)'
+      var textColor = chip.company === 'WS' ? 'var(--fury-accent)'
+        : chip.company === 'OMD' ? 'var(--fury-warning)'
         : '#A78BFA';
 
       html +=
         '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;' +
         'border-radius:var(--fury-radius-full);font-size:12px;font-weight:500;' +
         'background:' + bgColor + ';color:' + textColor + '">' +
-        code + ' &rarr; ' + self.escapeHtml(compLabel) +
+        chip.code + ' &rarr; ' + self.escapeHtml(chip.label) +
         '</span>';
     }
     return html;
   },
 
-  /* ── Export Settlements XLSX ── */
-  exportSettlementsXlsx(rows, projectCodes, companies, companyTotals, grandTotalPaid) {
+  /* ── Export Settlements XLSX (delegates formatting to Settlements service) ── */
+  exportSettlementsXlsx(detailedData, activeProjectCodes, companies) {
     var self = this;
 
     if (typeof XLSX === 'undefined') {
@@ -794,48 +677,14 @@ const Reports = {
     }
 
     try {
-      var header = ['Employee', 'Total Paid ($)', 'Hours'];
-      for (var pi = 0; pi < projectCodes.length; pi++) {
-        header.push(projectCodes[pi] + ' ($)');
-      }
-      for (var ci = 0; ci < companies.length; ci++) {
-        header.push((self.COMPANY_LABELS[companies[ci]] || companies[ci]) + ' ($)');
-      }
+      var exportData = Settlements.formatForExport(detailedData, activeProjectCodes, companies);
 
-      var wsData = [header];
-
-      for (var r = 0; r < rows.length; r++) {
-        var row = rows[r];
-        var dataRow = [
-          row.employee.name,
-          row.totalPaid,
-          row.totalHours,
-        ];
-
-        for (var pci = 0; pci < projectCodes.length; pci++) {
-          dataRow.push(row.projectAllocations[projectCodes[pci]].cost);
-        }
-        for (var cci = 0; cci < companies.length; cci++) {
-          dataRow.push(row.companyAllocations[companies[cci]] || 0);
-        }
-
-        wsData.push(dataRow);
-      }
-
-      // Total row
-      var totalRow = ['TOTAL', grandTotalPaid, ''];
-      for (var ptci = 0; ptci < projectCodes.length; ptci++) {
-        var projTotal = 0;
-        for (var sri = 0; sri < rows.length; sri++) {
-          projTotal += rows[sri].projectAllocations[projectCodes[ptci]].cost;
-        }
-        totalRow.push(projTotal);
-      }
-      for (var ctci = 0; ctci < companies.length; ctci++) {
-        totalRow.push(companyTotals[companies[ctci]] || 0);
+      var wsData = [exportData.header];
+      for (var i = 0; i < exportData.dataRows.length; i++) {
+        wsData.push(exportData.dataRows[i]);
       }
       wsData.push([]);
-      wsData.push(totalRow);
+      wsData.push(exportData.totalRow);
 
       var wb = XLSX.utils.book_new();
       var ws = XLSX.utils.aoa_to_sheet(wsData);

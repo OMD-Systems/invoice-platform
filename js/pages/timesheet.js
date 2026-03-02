@@ -211,18 +211,6 @@ const Timesheet = {
       '.ts-footer { margin-top:16px; display:flex; justify-content:flex-end; }' +
       '.ts-btn-save { padding:10px 32px; }' +
       '.ts-btn-upload { padding:8px 16px; font-size:13px; }' +
-      '.fury-btn-primary { padding:8px 20px; background:#00E5FF; color:#0D0D0F; border:none; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; transition:background 0.2s,opacity 0.2s; }' +
-      '.fury-btn-primary:hover { background:#00D4EC; }' +
-      '.fury-btn-primary:disabled { opacity:0.4; cursor:not-allowed; }' +
-      '.fury-btn-secondary { padding:8px 16px; background:transparent; color:#9CA3AF; border:1px solid #2A2A30; border-radius:6px; font-size:13px; font-weight:500; cursor:pointer; transition:border-color 0.2s,color 0.2s; }' +
-      '.fury-btn-secondary:hover { border-color:#00E5FF; color:#00E5FF; }' +
-      '.fury-btn-secondary:disabled { opacity:0.4; cursor:not-allowed; }' +
-      '.fury-card { background:#111114; border:1px solid #1F1F23; border-radius:10px; padding:20px; }' +
-      '.fury-toast { position:fixed; bottom:24px; right:24px; padding:12px 24px; border-radius:8px; font-size:13px; font-weight:500; color:#E5E7EB; z-index:10000; opacity:0; transform:translateY(12px); transition:opacity 0.3s,transform 0.3s; pointer-events:none; }' +
-      '.fury-toast.show { opacity:1; transform:translateY(0); pointer-events:auto; }' +
-      '.fury-toast-success { background:#065F46; border:1px solid #10B981; }' +
-      '.fury-toast-error { background:#7F1D1D; border:1px solid #EF4444; }' +
-      '.fury-toast-info { background:#1E3A5F; border:1px solid #3B82F6; }' +
 
       /* ── Hover row highlight ── */
       '.ts-table tbody tr:hover { background:rgba(0,229,255,0.03); }' +

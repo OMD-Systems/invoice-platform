@@ -26,6 +26,12 @@ const ExportService = {
    * @param {number} year  - e.g. 2026
    */
   downloadSummaryXlsx(data, month, year) {
+    if (typeof XLSX === 'undefined') {
+      throw new Error('SheetJS (XLSX) library is not loaded.');
+    }
+    if (!data) {
+      throw new Error('No data provided for export.');
+    }
     var wb = XLSX.utils.book_new();
 
     // ── Sheet 1: Summary ──
@@ -257,11 +263,17 @@ const ExportService = {
    * @param {number} year      - e.g. 2026
    */
   downloadTimesheetTemplate(employees, projects, month, year) {
+    if (typeof XLSX === 'undefined') {
+      throw new Error('SheetJS (XLSX) library is not loaded.');
+    }
+    if (!employees || employees.length === 0) {
+      throw new Error('No employees provided for template.');
+    }
     var self = this;
     var wb = XLSX.utils.book_new();
 
     // Sort projects by display order
-    var sortedProjects = projects.slice().sort(function (a, b) {
+    var sortedProjects = (projects || []).slice().sort(function (a, b) {
       return (self.PROJECT_ORDER[a.code] || 99) - (self.PROJECT_ORDER[b.code] || 99);
     });
 
@@ -335,6 +347,12 @@ const ExportService = {
    * @param {object} invoiceData - Invoice with items, employee, etc.
    */
   downloadInvoiceXlsx(invoiceData) {
+    if (typeof XLSX === 'undefined') {
+      throw new Error('SheetJS (XLSX) library is not loaded.');
+    }
+    if (!invoiceData) {
+      throw new Error('No invoice data provided.');
+    }
     var wb = XLSX.utils.book_new();
     var emp = invoiceData.employee || {};
     var items = invoiceData.items || [];
@@ -440,6 +458,82 @@ const ExportService = {
       }
     }
     return workingDays * 8;
+  },
+
+  /**
+   * Download a dashboard summary as XLSX (single-sheet overview).
+   * Used by the Dashboard page "Export Summary" button.
+   *
+   * @param {Array}  rows  - Dashboard row objects with:
+   *   { name, actualHours, regularHours, overtime, rate, invoiceAmount, status }
+   * @param {object} kpi   - { totalEmployees, invoiced, pending, totalAmount }
+   * @param {number} month - 1-12
+   * @param {number} year  - e.g. 2026
+   */
+  downloadDashboardSummaryXlsx(rows, kpi, month, year) {
+    if (typeof XLSX === 'undefined') {
+      throw new Error('SheetJS (XLSX) library is not loaded.');
+    }
+    if (!rows || rows.length === 0) {
+      throw new Error('No data to export.');
+    }
+    var header = ['Employee', 'Hours', 'Regular Hours', 'Overtime', 'Rate ($)', 'Invoice Amount ($)', 'Status'];
+    var wsData = [header];
+
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      wsData.push([
+        row.name,
+        row.actualHours || 0,
+        row.regularHours || 0,
+        row.overtime || 0,
+        row.rate || 0,
+        row.invoiceAmount || 0,
+        row.status === 'none' ? 'No Invoice' : row.status.charAt(0).toUpperCase() + row.status.slice(1),
+      ]);
+    }
+
+    // Blank separator + totals row
+    var totalHours = rows.reduce(function (s, r) { return s + (r.actualHours || 0); }, 0);
+    var totalOvertime = rows.reduce(function (s, r) { return s + (r.overtime || 0); }, 0);
+    // Use the most common regularHours value (typically all FTEs share the same)
+    var regularHoursForTotal = rows.length > 0 ? rows[0].regularHours || 0 : 0;
+
+    wsData.push([]);
+    wsData.push([
+      'TOTAL',
+      totalHours,
+      regularHoursForTotal,
+      totalOvertime,
+      '',
+      (kpi && kpi.totalAmount) || 0,
+      '',
+    ]);
+
+    // Create workbook
+    var wb = XLSX.utils.book_new();
+    var ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: 25 }, // Employee
+      { wch: 10 }, // Hours
+      { wch: 14 }, // Regular Hours
+      { wch: 10 }, // Overtime
+      { wch: 10 }, // Rate
+      { wch: 16 }, // Invoice Amount
+      { wch: 14 }, // Status
+    ];
+
+    var monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    var sheetName = monthNames[month - 1] + ' ' + year;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+    var filename = 'Invoice_Summary_' + year + '-' + String(month).padStart(2, '0') + '.xlsx';
+    XLSX.writeFile(wb, filename);
   },
 
   /**

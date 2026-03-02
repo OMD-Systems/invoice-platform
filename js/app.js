@@ -3,6 +3,18 @@
    Invoice Platform · OMD Systems
    ═══════════════════════════════════════════════════════ */
 
+/* ── Global Error Handlers ── */
+window.addEventListener('unhandledrejection', function(event) {
+  console.error('[Unhandled Promise]', event.reason);
+  if (typeof showToast === 'function') {
+    showToast('An unexpected error occurred. Check console.', 'error');
+  }
+});
+
+window.addEventListener('error', function(event) {
+  console.error('[Global Error]', event.error);
+});
+
 const App = {
   currentPage: null,
   user: null,
@@ -16,6 +28,12 @@ const App = {
     '/expenses': Expenses,
     '/reports': Reports,
     '/settings': Settings,
+  },
+
+  /* ── Loading Overlay ── */
+  showLoading(show) {
+    var overlay = document.getElementById('loading-overlay');
+    if (overlay) overlay.style.display = show ? 'flex' : 'none';
   },
 
   /* ── Bootstrap ── */

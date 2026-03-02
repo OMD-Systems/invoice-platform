@@ -5,27 +5,41 @@
 
 const Numbering = {
 
-  /* ── Get the next invoice number for an employee ── */
-  async getNextNumber(employeeId, formatType) {
-    formatType = formatType || 'WS';
+  /* ── Format a raw number with optional prefix ── */
+  formatNumber(prefix, num) {
+    var padded = String(num).padStart(3, '0');
+    return prefix ? prefix + '-' + padded : padded;
+  },
 
+  /* ── Get the next invoice number for an employee (raw int) ── */
+  async getNextNumber(employeeId) {
     var result = await DB.client
       .from('employees')
-      .select('next_invoice_number')
+      .select('next_invoice_number, invoice_prefix')
       .eq('id', employeeId)
       .single();
 
     if (result.error) {
       console.error('[Numbering] getNextNumber error:', result.error);
-      return 1;
+      return { number: 1, prefix: '' };
     }
 
-    return (result.data && result.data.next_invoice_number) || 1;
+    return {
+      number: (result.data && result.data.next_invoice_number) || 1,
+      prefix: (result.data && result.data.invoice_prefix) || ''
+    };
+  },
+
+  /* ── Get the next formatted invoice number string (convenience) ── */
+  async getNextFormattedNumber(employeeId) {
+    var info = await this.getNextNumber(employeeId);
+    return this.formatNumber(info.prefix, info.number);
   },
 
   /* ── Increment the invoice number in DB after generation ── */
   async incrementNumber(employeeId) {
-    var current = await this.getNextNumber(employeeId);
+    var info = await this.getNextNumber(employeeId);
+    var current = info.number;
 
     var result = await DB.client
       .from('employees')
@@ -66,8 +80,8 @@ const Numbering = {
         return 'WS-Invoice-' + number + '-' + nameParts.join('-') + ' ' + fullDate + '.docx';
 
       case 'FOP':
-        // {Surname}_Invoice-{N}-FOP.docx
-        return nameParts[0] + '_Invoice-' + number + '-FOP.docx';
+        // {Surname}_Invoice-{N}-FOP.docx  (surname = last part of full_name_lat)
+        return nameParts[nameParts.length - 1] + '_Invoice-' + number + '-FOP.docx';
 
       case 'CUSTOM':
         // {prefix}-{N}.docx
@@ -98,20 +112,24 @@ const Numbering = {
 
   /* ── Get the next available number (skipping used ones) ── */
   async getNextAvailableNumber(employeeId) {
-    var nextNum = await this.getNextNumber(employeeId);
+    var info = await this.getNextNumber(employeeId);
+    var nextNum = info.number;
+    var prefix = info.prefix;
 
     // Check if this number is already used (edge case: manual override)
-    var used = await this.isNumberUsed(employeeId, nextNum);
+    var formatted = this.formatNumber(prefix, nextNum);
+    var used = await this.isNumberUsed(employeeId, formatted);
     var maxAttempts = 100;
     var attempts = 0;
 
     while (used && attempts < maxAttempts) {
       nextNum++;
-      used = await this.isNumberUsed(employeeId, nextNum);
+      formatted = this.formatNumber(prefix, nextNum);
+      used = await this.isNumberUsed(employeeId, formatted);
       attempts++;
     }
 
-    return nextNum;
+    return { number: nextNum, prefix: prefix, formatted: formatted };
   },
 
   /* ── Internal: convert date to DD.MM.YYYY ── */

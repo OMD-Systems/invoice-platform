@@ -12,6 +12,17 @@ const Settlements = {
   /* ── Known companies ── */
   COMPANIES: ['WS', 'OMD', 'OM_ENERGY', 'OM_ENERGY_UA'],
 
+  /* ── Company display labels ── */
+  COMPANY_LABELS: {
+    'WS':           'Woodenshark',
+    'OMD':          'OMD Systems',
+    'OM_ENERGY':    'OM Energy',
+    'OM_ENERGY_UA': 'OM Energy UA',
+  },
+
+  /* ── Preferred project display order ── */
+  PROJECT_ORDER: ['SPECTR', 'FURY', 'KESTREL', 'RATO_BOOSTER', 'MOTORS', 'BATTERIES', 'OTHER'],
+
   /**
    * Load the project -> company mapping from the projects table.
    * Also builds a project_id -> code lookup.
@@ -276,5 +287,219 @@ const Settlements = {
       }
     }
     return true;
+  },
+
+  /**
+   * Get the human-readable label for a company code.
+   * @param {string} code - e.g. 'WS', 'OMD'
+   * @returns {string}
+   */
+  getCompanyLabel(code) {
+    return this.COMPANY_LABELS[code] || code;
+  },
+
+  /**
+   * Extract the unique project codes that appear in settlement results,
+   * sorted by PROJECT_ORDER then alphabetically for unknown codes.
+   *
+   * @param {{ results: Array }} settlementData
+   * @returns {string[]}
+   */
+  getActiveProjectCodes(settlementData) {
+    var seen = {};
+    for (var i = 0; i < settlementData.results.length; i++) {
+      var codes = Object.keys(settlementData.results[i].projectHours);
+      for (var c = 0; c < codes.length; c++) {
+        seen[codes[c]] = true;
+      }
+    }
+
+    // Order: first those in PROJECT_ORDER, then any extras alphabetically
+    var ordered = [];
+    for (var po = 0; po < this.PROJECT_ORDER.length; po++) {
+      if (seen[this.PROJECT_ORDER[po]]) {
+        ordered.push(this.PROJECT_ORDER[po]);
+        delete seen[this.PROJECT_ORDER[po]];
+      }
+    }
+    var extras = Object.keys(seen).sort();
+    for (var ex = 0; ex < extras.length; ex++) {
+      ordered.push(extras[ex]);
+    }
+    return ordered;
+  },
+
+  /**
+   * Extract the unique companies that appear in settlement results, sorted.
+   *
+   * @param {{ results: Array }} settlementData
+   * @returns {string[]}
+   */
+  getActiveCompanies(settlementData) {
+    var seen = {};
+    for (var i = 0; i < settlementData.results.length; i++) {
+      var companies = Object.keys(settlementData.results[i].companyCost);
+      for (var c = 0; c < companies.length; c++) {
+        if (settlementData.results[i].companyCost[companies[c]] !== 0) {
+          seen[companies[c]] = true;
+        }
+      }
+    }
+    // Also include companies from project mapping for completeness
+    var projectCodes = this.getActiveProjectCodes(settlementData);
+    for (var p = 0; p < projectCodes.length; p++) {
+      var comp = this.projectCompanyMap[projectCodes[p]] || 'WS';
+      seen[comp] = true;
+    }
+    return Object.keys(seen).sort();
+  },
+
+  /**
+   * Get the project-to-company mapping entries for display (chips/badges).
+   * Returns array of { code, company, label }.
+   *
+   * @returns {Array<{ code: string, company: string, label: string }>}
+   */
+  getMappingChips() {
+    var chips = [];
+    var codes = Object.keys(this.projectCompanyMap);
+    for (var i = 0; i < codes.length; i++) {
+      var code = codes[i];
+      var company = this.projectCompanyMap[code];
+      chips.push({
+        code: code,
+        company: company,
+        label: this.COMPANY_LABELS[company] || company,
+      });
+    }
+    return chips;
+  },
+
+  /**
+   * Format settlement data for detailed table rendering.
+   * Returns per-employee rows with project-level and company-level allocations,
+   * plus project totals and company totals.
+   *
+   * @param {{ results: Array, totals: object, grandTotal: number }} settlementData
+   * @param {string[]} activeProjectCodes - ordered project codes to include
+   * @param {string[]} companies - ordered company codes to include
+   * @returns {{ rows: Array, projectTotals: object, companyTotals: object, grandTotal: number }}
+   */
+  formatForDetailedTable(settlementData, activeProjectCodes, companies) {
+    var self = this;
+    var rows = [];
+
+    for (var i = 0; i < settlementData.results.length; i++) {
+      var r = settlementData.results[i];
+
+      // Build project allocations for requested codes
+      var projectAllocations = {};
+      for (var p = 0; p < activeProjectCodes.length; p++) {
+        var code = activeProjectCodes[p];
+        projectAllocations[code] = {
+          hours: r.projectHours[code] || 0,
+          percentage: r.projectPct[code] || 0,
+          cost: r.projectCost[code] || 0,
+        };
+      }
+
+      // Build company allocations for requested companies
+      var companyAllocations = {};
+      for (var c = 0; c < companies.length; c++) {
+        companyAllocations[companies[c]] = r.companyCost[companies[c]] || 0;
+      }
+
+      rows.push({
+        employee: r.employee,
+        totalPaid: r.totalPaid,
+        totalHours: r.totalHours,
+        projectAllocations: projectAllocations,
+        companyAllocations: companyAllocations,
+      });
+    }
+
+    // Sort by employee name
+    rows.sort(function (a, b) {
+      var nameA = a.employee.name || '';
+      var nameB = b.employee.name || '';
+      return nameA.localeCompare(nameB);
+    });
+
+    // Calculate project totals
+    var projectTotals = {};
+    for (var pt = 0; pt < activeProjectCodes.length; pt++) {
+      var ptCode = activeProjectCodes[pt];
+      projectTotals[ptCode] = 0;
+      for (var ri = 0; ri < rows.length; ri++) {
+        projectTotals[ptCode] += rows[ri].projectAllocations[ptCode].cost;
+      }
+      projectTotals[ptCode] = self._round(projectTotals[ptCode]);
+    }
+
+    // Company totals from settlementData
+    var companyTotals = {};
+    for (var ct = 0; ct < companies.length; ct++) {
+      companyTotals[companies[ct]] = settlementData.totals[companies[ct]] || 0;
+    }
+
+    return {
+      rows: rows,
+      projectTotals: projectTotals,
+      companyTotals: companyTotals,
+      grandTotal: settlementData.grandTotal,
+    };
+  },
+
+  /**
+   * Format settlement data for XLSX export.
+   * Returns header array and data rows (array of arrays).
+   *
+   * @param {{ rows: Array, projectTotals: object, companyTotals: object, grandTotal: number }} detailedData
+   * @param {string[]} activeProjectCodes
+   * @param {string[]} companies
+   * @returns {{ header: string[], dataRows: Array[], totalRow: Array }}
+   */
+  formatForExport(detailedData, activeProjectCodes, companies) {
+    var self = this;
+
+    var header = ['Employee', 'Total Paid ($)', 'Hours'];
+    for (var pi = 0; pi < activeProjectCodes.length; pi++) {
+      header.push(activeProjectCodes[pi] + ' ($)');
+    }
+    for (var ci = 0; ci < companies.length; ci++) {
+      header.push((self.COMPANY_LABELS[companies[ci]] || companies[ci]) + ' ($)');
+    }
+
+    var dataRows = [];
+    for (var r = 0; r < detailedData.rows.length; r++) {
+      var row = detailedData.rows[r];
+      var dataRow = [
+        row.employee.name || 'Unknown',
+        row.totalPaid,
+        row.totalHours,
+      ];
+      for (var pci = 0; pci < activeProjectCodes.length; pci++) {
+        dataRow.push(row.projectAllocations[activeProjectCodes[pci]].cost);
+      }
+      for (var cci = 0; cci < companies.length; cci++) {
+        dataRow.push(row.companyAllocations[companies[cci]] || 0);
+      }
+      dataRows.push(dataRow);
+    }
+
+    // Total row
+    var totalRow = ['TOTAL', detailedData.grandTotal, ''];
+    for (var ptci = 0; ptci < activeProjectCodes.length; ptci++) {
+      totalRow.push(detailedData.projectTotals[activeProjectCodes[ptci]] || 0);
+    }
+    for (var ctci = 0; ctci < companies.length; ctci++) {
+      totalRow.push(detailedData.companyTotals[companies[ctci]] || 0);
+    }
+
+    return {
+      header: header,
+      dataRows: dataRows,
+      totalRow: totalRow,
+    };
   }
 };

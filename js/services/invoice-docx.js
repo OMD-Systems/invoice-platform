@@ -255,7 +255,10 @@ const InvoiceDocx = {
     });
 
     // Data rows
+    // Accept both item.price (from UI/preview) and item.price_usd (from DB)
     var dataRows = (items || []).map(function (item, idx) {
+      var price = item.price != null ? item.price : (item.price_usd || 0);
+      var total = item.total != null ? item.total : (item.total_usd || (price * (item.qty || 1)));
       return new TableRow({
         children: [
           this._cell(
@@ -268,7 +271,7 @@ const InvoiceDocx = {
           ),
           this._cell(
             this._para(
-              this._text(this.formatCurrency(item.price || 0), { size: this.SIZE_BASE }),
+              this._text(this.formatCurrency(price), { size: this.SIZE_BASE }),
               { alignment: AlignmentType.RIGHT }
             ),
             { width: colW[2], borders: borders }
@@ -282,7 +285,7 @@ const InvoiceDocx = {
           ),
           this._cell(
             this._para(
-              this._text(this.formatCurrency((item.price || 0) * (item.qty || 1)), { size: this.SIZE_BASE }),
+              this._text(this.formatCurrency(total), { size: this.SIZE_BASE }),
               { alignment: AlignmentType.RIGHT }
             ),
             { width: colW[4], borders: borders }
@@ -321,31 +324,37 @@ const InvoiceDocx = {
     var self = this;
     var taxRate = invoiceData.taxRate || 0;
 
+    // Accept both UI fields (subtotal, total) and DB fields (subtotal_usd, total_usd)
+    var subtotal = invoiceData.subtotal != null ? invoiceData.subtotal : (invoiceData.subtotal_usd || 0);
+    var discount = invoiceData.discount != null ? invoiceData.discount : (invoiceData.discount_usd || 0);
+    var tax = invoiceData.tax != null ? invoiceData.tax : (invoiceData.tax_usd || 0);
+    var total = invoiceData.total != null ? invoiceData.total : (invoiceData.total_usd || 0);
+
     var rows = [
       {
         label: 'SUBTOTAL',
-        value: self.formatCurrency(invoiceData.subtotal || 0),
+        value: self.formatCurrency(subtotal),
         labelColor: self.COLORS.SUBTOTAL_GRAY,
         valueSize: self.SIZE_BASE,
         bold: false,
       },
       {
         label: 'DISCOUNT',
-        value: self.formatCurrency(invoiceData.discount || 0),
+        value: self.formatCurrency(discount),
         labelColor: self.COLORS.SUBTOTAL_GRAY,
         valueSize: self.SIZE_BASE,
         bold: false,
       },
       {
         label: 'TAX' + (taxRate ? ' (' + taxRate + '%)' : ' (TAX RATE %)'),
-        value: self.formatCurrency(invoiceData.tax || 0),
+        value: self.formatCurrency(tax),
         labelColor: self.COLORS.SUBTOTAL_GRAY,
         valueSize: self.SIZE_BASE,
         bold: false,
       },
       {
         label: 'INVOICE TOTAL',
-        value: self.formatCurrency(invoiceData.total || 0),
+        value: self.formatCurrency(total),
         labelColor: self.COLORS.SECTION_LABEL,
         valueSize: self.SIZE_TOTAL,
         bold: true,
@@ -458,11 +467,12 @@ const InvoiceDocx = {
      ══════════════════════════════════════════════════════ */
   async generate(invoiceData) {
     // invoiceData = {
-    //   employee: { full_name_lat, address, phone, iban, swift, bank_name, receiver_name },
+    //   employee: { full_name_lat, address, phone, iban, swift, bank_name, receiver_name,
+    //               invoice_format ('WS'|'FOP'|'CUSTOM'), invoice_prefix },
     //   invoiceNumber: 6,
     //   invoiceDate: '28.02.26',
     //   dueDays: 7,
-    //   items: [{ description: 'UAV Systems Development Services', price: 7979, qty: 1 }, ...],
+    //   items: [{ description, price|price_usd, qty, total|total_usd }, ...],
     //   subtotal: 10870,
     //   discount: 0,
     //   tax: 0,
@@ -471,6 +481,8 @@ const InvoiceDocx = {
     //   billedTo: { name: 'Woodenshark LLC', address: '3411 Silverside Road...' },
     //   terms: 'Thank you for your business!...'
     // }
+    // NOTE: items accept both UI field names (price, total) and DB field names
+    //       (price_usd, total_usd). The service resolves with fallback.
 
     const { Document, Packer, Paragraph, TextRun } = docx;
 
@@ -498,8 +510,8 @@ const InvoiceDocx = {
         properties: {
           page: {
             size: {
-              width: 12240,   // US Letter width in twips (8.5")
-              height: 15840,  // US Letter height (11")
+              width: 11906,   // A4 width in twips (210 mm)
+              height: 16838,  // A4 height in twips (297 mm)
             },
             margin: {
               top: 1440,     // 1 inch
@@ -585,26 +597,14 @@ const InvoiceDocx = {
     return dateStr;
   },
 
-  /* ── Generate filename based on employee format ── */
+  /* ── Generate filename — delegates to Numbering service ── */
   getFileName(employee, invoiceNumber, date) {
-    var nameParts = (employee.full_name_lat || 'Unknown').split(' ');
-    var format = employee.invoice_format || 'WS';
-    var fullDate = this.formatDateFull(date);
-    var shortDate = this.formatDate(date);
-
-    switch (format) {
-      case 'WS':
-        // WS-Invoice-{N}-{FIRSTNAME}-{LASTNAME} {DD.MM.YYYY}.docx
-        return 'WS-Invoice-' + invoiceNumber + '-' + nameParts.join('-') + ' ' + fullDate + '.docx';
-      case 'FOP':
-        // {Surname}_Invoice-{N}-FOP.docx
-        return nameParts[0] + '_Invoice-' + invoiceNumber + '-FOP.docx';
-      case 'CUSTOM':
-        // {prefix}-{N}.docx
-        return (employee.invoice_prefix || 'Invoice') + '-' + invoiceNumber + '.docx';
-      default:
-        return 'Invoice-' + invoiceNumber + '-' + nameParts.join('-') + '.docx';
+    if (typeof Numbering !== 'undefined' && Numbering.getFileName) {
+      return Numbering.getFileName(employee, invoiceNumber, date);
     }
+    // Fallback if Numbering service not loaded
+    var nameParts = (employee.full_name_lat || 'Unknown').split(' ');
+    return 'Invoice-' + invoiceNumber + '-' + nameParts.join('-') + '.docx';
   },
 
   /* ── Download single invoice ── */

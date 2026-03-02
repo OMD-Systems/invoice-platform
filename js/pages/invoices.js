@@ -4,7 +4,7 @@
    List view with filtering, generation, preview & download.
    ═══════════════════════════════════════════════════════ */
 
-var Invoices = {
+const Invoices = {
   title: 'Invoices',
   month: new Date().getMonth() + 1,
   year: new Date().getFullYear(),
@@ -511,8 +511,8 @@ var Invoices = {
   async _handleStatusChange(invoiceId, newStatus, container, ctx) {
     try {
       var result = await DB.updateInvoiceStatus(invoiceId, newStatus);
-      if (result.error) {
-        alert('Failed to update status: ' + (result.error.message || 'Unknown error'));
+      if (!result || result.error) {
+        alert('Failed to update status: ' + (result && result.error ? result.error.message : 'Unknown error'));
         return;
       }
       // Update local data
@@ -613,7 +613,7 @@ var Invoices = {
     var estimatedAmount = empType === 'hourly' ? (rate * hours) : rate;
     var prefix = employee.invoice_prefix || '';
     var nextNum = employee.next_invoice_number || 1;
-    var invoiceNumber = prefix ? prefix + '-' + String(nextNum).padStart(3, '0') : String(nextNum).padStart(3, '0');
+    var invoiceNumber = Numbering.formatNumber(prefix, nextNum);
 
     // Last day of selected month
     var lastDay = new Date(this.year, this.month, 0);
@@ -857,6 +857,8 @@ var Invoices = {
     var tax = parseFloat(overlay.querySelector('#gen-tax').value) || 0;
 
     // Collect line items
+    // Fields: description, price, qty, total — matches InvoiceDocx (item.price, item.qty)
+    // and InvoicePreview (item.price, item.total) expected shape
     var items = [];
     var liRows = overlay.querySelectorAll('.gen-line-item');
     for (var i = 0; i < liRows.length; i++) {
@@ -917,7 +919,9 @@ var Invoices = {
         iban: employee.iban || '',
         swift: employee.swift || '',
         receiver_name: employee.receiver_name || employee.full_name_lat || '',
-        bank_name: employee.bank_name || ''
+        bank_name: employee.bank_name || '',
+        invoice_format: employee.invoice_format || 'WS',
+        invoice_prefix: employee.invoice_prefix || ''
       },
       billedTo: this.billedTo || { name: '', address: '' },
       invoiceNumber: invNumber,
@@ -971,8 +975,8 @@ var Invoices = {
       });
 
       var result = await DB.createInvoice(invoicePayload, itemsPayload);
-      if (result.error) {
-        alert('Failed to save invoice: ' + (result.error.message || 'Unknown error'));
+      if (!result || result.error) {
+        alert('Failed to save invoice: ' + (result && result.error ? result.error.message : 'Unknown error'));
         return null;
       }
 
@@ -1028,8 +1032,8 @@ var Invoices = {
       });
 
       var result = await DB.createInvoice(invoicePayload, itemsPayload);
-      if (result.error) {
-        alert('Failed to save invoice: ' + (result.error.message || 'Unknown error'));
+      if (!result || result.error) {
+        alert('Failed to save invoice: ' + (result && result.error ? result.error.message : 'Unknown error'));
         return;
       }
 
@@ -1063,15 +1067,9 @@ var Invoices = {
     var amount = empType === 'hourly' ? (rate * hours) : rate;
     var serviceDesc = employee.service_description || employee.position || 'Software Development Services';
 
-    // Get next invoice number
-    var numResult = await DB.getNextInvoiceNumber(employee.id);
-    var prefix = '';
-    var num = 1;
-    if (numResult && numResult.data) {
-      prefix = numResult.data.prefix || '';
-      num = numResult.data.number || 1;
-    }
-    var invoiceNumber = prefix ? prefix + '-' + String(num).padStart(3, '0') : String(num).padStart(3, '0');
+    // Get next available invoice number via Numbering service (skips used numbers)
+    var numInfo = await Numbering.getNextAvailableNumber(employee.id);
+    var invoiceNumber = numInfo.formatted;
 
     // Last day of month
     var lastDay = new Date(this.year, this.month, 0);
@@ -1100,8 +1098,8 @@ var Invoices = {
     }];
 
     var result = await DB.createInvoice(invoicePayload, itemsPayload);
-    if (result.error) {
-      throw new Error(result.error.message || 'DB error');
+    if (!result || result.error) {
+      throw new Error(result && result.error ? result.error.message : 'DB error');
     }
 
     return result.data;
@@ -1112,18 +1110,27 @@ var Invoices = {
      ═══════════════════════════════════════════════════════ */
 
   /* ── Build preview data from an existing invoice record ── */
+  /* Field mapping: DB invoice_items → preview/DOCX data object
+   *   DB column         →  preview field   →  consumed by
+   *   it.description    →  description     →  InvoiceDocx (item.description), InvoicePreview (item.description)
+   *   it.price_usd      →  price           →  InvoiceDocx (item.price), InvoicePreview (item.price)
+   *   it.qty            →  qty             →  InvoiceDocx (item.qty), InvoicePreview (item.qty)
+   *   it.total_usd      →  total           →  InvoiceDocx (item.price * item.qty fallback), InvoicePreview (item.total)
+   *   it.item_order     →  item_order      →  used for sorting only, not passed to services
+   */
   _buildPreviewData: function (inv) {
     var emp = inv.employees || {};
     var items = (inv.invoice_items || []).map(function (it) {
       return {
         description: it.description || '',
-        price: it.price_usd || 0,
+        price: it.price_usd || 0,       // DB: price_usd → DOCX/Preview: price
         qty: it.qty || 1,
-        total: it.total_usd || 0
+        total: it.total_usd || 0,        // DB: total_usd → DOCX/Preview: total
+        item_order: it.item_order || 0   // kept for sorting, not used by services
       };
     });
 
-    // Sort by item_order
+    // Sort by item_order (from DB)
     items.sort(function (a, b) { return (a.item_order || 0) - (b.item_order || 0); });
 
     var subtotal = inv.subtotal_usd || 0;
@@ -1147,7 +1154,9 @@ var Invoices = {
         iban: emp.iban || '',
         swift: emp.swift || '',
         receiver_name: emp.receiver_name || emp.full_name_lat || '',
-        bank_name: emp.bank_name || ''
+        bank_name: emp.bank_name || '',
+        invoice_format: inv.format_type || emp.invoice_format || 'WS',
+        invoice_prefix: emp.invoice_prefix || ''
       },
       billedTo: this.billedTo || { name: '', address: '' },
       invoiceNumber: inv.invoice_number || '',

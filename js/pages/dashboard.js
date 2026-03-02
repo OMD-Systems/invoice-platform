@@ -468,7 +468,10 @@ const Dashboard = {
       var errors = [];
       for (var i = 0; i < pendingRows.length; i++) {
         try {
-          await DB.generateInvoice(pendingRows[i].id, this.month, this.year);
+          var genResult = await DB.generateInvoice(pendingRows[i].id, this.month, this.year);
+          if (genResult && genResult.error) {
+            errors.push(pendingRows[i].name + ': ' + (genResult.error.message || 'Failed'));
+          }
         } catch (err) {
           errors.push(pendingRows[i].name + ': ' + (err.message || 'Failed'));
         }
@@ -499,7 +502,10 @@ const Dashboard = {
     button.textContent = '...';
 
     try {
-      await DB.generateInvoice(employeeId, this.month, this.year);
+      var genResult = await DB.generateInvoice(employeeId, this.month, this.year);
+      if (genResult && genResult.error) {
+        throw new Error(genResult.error.message || 'Failed to generate invoice');
+      }
       await this._reloadData(container, ctx);
     } catch (err) {
       console.error('[Dashboard] Generate single error:', err);
@@ -524,7 +530,10 @@ const Dashboard = {
       var parsedData = await TimesheetParser.parse(file);
 
       // Upload parsed data to DB
-      await DB.uploadTimesheets(parsedData, this.month, this.year);
+      var uploadResult = await DB.uploadTimesheets(parsedData, this.month, this.year);
+      if (uploadResult && uploadResult.error) {
+        throw new Error(uploadResult.error.message || 'Upload failed');
+      }
 
       // Reload
       await this._reloadData(container, ctx);
@@ -539,7 +548,7 @@ const Dashboard = {
     }
   },
 
-  /* ── Export Summary ── */
+  /* ── Export Summary (delegates to ExportService) ── */
   async _handleExportSummary() {
     if (!this.data || !this.data.rows || this.data.rows.length === 0) {
       alert('No data to export.');
@@ -547,60 +556,12 @@ const Dashboard = {
     }
 
     try {
-      var monthNames = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-      ];
-
-      // Build worksheet data
-      var header = ['Employee', 'Hours', 'Regular Hours', 'Overtime', 'Rate ($)', 'Invoice Amount ($)', 'Status'];
-      var wsData = [header];
-
-      for (var i = 0; i < this.data.rows.length; i++) {
-        var row = this.data.rows[i];
-        wsData.push([
-          row.name,
-          row.actualHours,
-          row.regularHours,
-          row.overtime,
-          row.rate,
-          row.invoiceAmount,
-          row.status === 'none' ? 'No Invoice' : row.status.charAt(0).toUpperCase() + row.status.slice(1),
-        ]);
-      }
-
-      // Add totals row
-      wsData.push([]);
-      wsData.push([
-        'TOTAL',
-        this.data.rows.reduce(function (s, r) { return s + r.actualHours; }, 0),
-        this.data.rows.length > 0 ? this.data.rows[0].regularHours : 0,
-        this.data.rows.reduce(function (s, r) { return s + r.overtime; }, 0),
-        '',
-        this.data.kpi.totalAmount,
-        '',
-      ]);
-
-      // Create workbook and download
-      var wb = XLSX.utils.book_new();
-      var ws = XLSX.utils.aoa_to_sheet(wsData);
-
-      // Set column widths
-      ws['!cols'] = [
-        { wch: 25 }, // Employee
-        { wch: 10 }, // Hours
-        { wch: 14 }, // Regular Hours
-        { wch: 10 }, // Overtime
-        { wch: 10 }, // Rate
-        { wch: 16 }, // Invoice Amount
-        { wch: 14 }, // Status
-      ];
-
-      var sheetName = monthNames[this.month - 1] + ' ' + this.year;
-      XLSX.utils.book_append_sheet(wb, ws, sheetName);
-
-      var filename = 'Invoice_Summary_' + this.year + '-' + String(this.month).padStart(2, '0') + '.xlsx';
-      XLSX.writeFile(wb, filename);
+      ExportService.downloadDashboardSummaryXlsx(
+        this.data.rows,
+        this.data.kpi,
+        this.month,
+        this.year
+      );
     } catch (err) {
       console.error('[Dashboard] Export error:', err);
       alert('Failed to export summary: ' + (err.message || 'Unknown error'));

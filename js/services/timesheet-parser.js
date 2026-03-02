@@ -111,7 +111,10 @@ const TimesheetParser = {
       console.warn('TimesheetParser: no TS sheet found, using first sheet');
     }
 
-    const sheet = workbook.Sheets[sheetName || workbook.SheetNames[0]];
+    const effectiveName = sheetName || (workbook.SheetNames.length > 0 ? workbook.SheetNames[0] : null);
+    if (!effectiveName) return [];
+
+    const sheet = workbook.Sheets[effectiveName];
     if (!sheet) return [];
 
     const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: true });
@@ -314,6 +317,16 @@ const TimesheetParser = {
       throw new Error('DB service is not available');
     }
 
+    if (!parsedData || parsedData.length === 0) {
+      return { imported: 0, skipped: 0, errors: ['No data to import'] };
+    }
+
+    // Run validation and log warnings (non-blocking — issues are informational)
+    const validationIssues = this.validate(parsedData);
+    if (validationIssues.length > 0) {
+      console.warn('TimesheetParser.importToDb: validation issues found:', validationIssues);
+    }
+
     const matched = await this.matchEmployees(parsedData);
     const results = { imported: 0, skipped: 0, errors: [] };
 
@@ -446,6 +459,10 @@ const TimesheetParser = {
    * @returns {Object} { byProject, byEmployee, totals }
    */
   summarize(parsedTimesheets) {
+    if (!Array.isArray(parsedTimesheets) || parsedTimesheets.length === 0) {
+      return { byProject: {}, byEmployee: {}, totals: { employees: 0, totalHours: 0, regularHours: 0, overtime: 0 } };
+    }
+
     const byProject  = {};
     const byEmployee = {};
     let totalHours = 0;
@@ -559,7 +576,10 @@ const TimesheetParser = {
       if (!cellValue) continue;
 
       for (const proj of knownProjects) {
-        if (cellValue.includes(proj) || proj.includes(cellValue)) {
+        // Require exact match or substring match with a minimum length of 3
+        // to avoid false positives from short cell values like "O" matching "MOTORS"
+        if (cellValue === proj ||
+            (cellValue.length >= 3 && (cellValue.includes(proj) || proj.includes(cellValue)))) {
           // Normalize to underscore form
           const code = proj.replace(/\s+/g, '_');
           detected[code] = col;
