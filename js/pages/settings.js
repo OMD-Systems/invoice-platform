@@ -51,6 +51,8 @@ const Settings = {
           '<button class="fury-tab' + (this.activeTab === 'teams' ? ' active' : '') + '" data-tab="teams">Teams</button>' +
           '<button class="fury-tab' + (this.activeTab === 'users' ? ' active' : '') + '" data-tab="users">Users</button>' +
           '<button class="fury-tab' + (this.activeTab === 'months' ? ' active' : '') + '" data-tab="months">Month Control</button>' +
+          '<button class="fury-tab' + (this.activeTab === 'email_requests' ? ' active' : '') + '" data-tab="email_requests">Email Requests</button>' +
+          '<button class="fury-tab' + (this.activeTab === 'working_hours' ? ' active' : '') + '" data-tab="working_hours">Working Hours</button>' +
         '</div>' +
 
         /* ── Tab Content ── */
@@ -496,8 +498,10 @@ const Settings = {
       case 'projects': html = this.renderProjects(); break;
       case 'teams':    html = this.renderTeams();    break;
       case 'users':    html = this.renderUsers();    break;
-      case 'months':   html = this.renderMonths();   break;
-      default:         html = this.renderGeneral();  break;
+      case 'months':          html = this.renderMonths();         break;
+      case 'email_requests':  html = this.renderEmailRequests();  break;
+      case 'working_hours':   html = this.renderWorkingHours();   break;
+      default:                html = this.renderGeneral();        break;
     }
 
     contentEl.innerHTML = html;
@@ -616,6 +620,12 @@ const Settings = {
         break;
       case 'months':
         self._bindMonthEvents(container);
+        break;
+      case 'email_requests':
+        self._bindEmailRequestEvents(container);
+        break;
+      case 'working_hours':
+        self._bindWorkingHoursEvents(container);
         break;
     }
   },
@@ -1403,5 +1413,291 @@ const Settings = {
       .replace(/&/g, '&amp;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  },
+
+  /* ═══════════════════════════════════════════════════
+     EMAIL REQUESTS TAB
+     ═══════════════════════════════════════════════════ */
+  renderEmailRequests() {
+    var self = this;
+    var requests = self._emailRequests || [];
+
+    var html =
+      '<div class="fury-card">' +
+        '<div class="fury-card-header" style="margin-bottom:16px">' +
+          '<h3 style="font-size:15px;font-weight:600">Email Requests</h3>' +
+        '</div>' +
+        '<p style="color:var(--fury-text-secondary);font-size:13px;margin-bottom:16px">' +
+          'Manage corporate email provisioning requests. When a request is approved and marked as "created", the email is auto-synced to the employee record.' +
+        '</p>' +
+        '<table class="fury-table"><thead><tr>' +
+          '<th>Employee</th><th>Status</th><th>Requested</th><th>Note/Email</th><th style="width:200px">Actions</th>' +
+        '</tr></thead><tbody id="set-email-tbody">';
+
+    if (requests.length === 0) {
+      html += '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--fury-text-muted)">No email requests found.</td></tr>';
+    } else {
+      for (var i = 0; i < requests.length; i++) {
+        var req = requests[i];
+        var empName = (req.employees && req.employees.name) || 'Unknown';
+        var currentEmail = (req.employees && req.employees.work_email) || '';
+        var statusBadge = self._emailStatusBadge(req.status);
+        var dateStr = req.created_at ? new Date(req.created_at).toLocaleDateString() : '—';
+
+        html += '<tr data-req-id="' + req.id + '">' +
+          '<td style="font-weight:500">' + self._escapeHtml(empName) + (currentEmail ? '<br><span style="font-size:11px;color:var(--fury-text-muted)">' + self._escapeHtml(currentEmail) + '</span>' : '') + '</td>' +
+          '<td>' + statusBadge + '</td>' +
+          '<td style="color:var(--fury-text-secondary);font-size:12px">' + dateStr + '</td>' +
+          '<td>';
+
+        if (req.status === 'pending' || req.status === 'approved') {
+          html += '<input type="text" class="fury-input fury-input-sm set-email-note" data-id="' + req.id + '" placeholder="email@omdsystems.com" value="' + self._escapeAttr(req.admin_note || '') + '" style="width:200px" />';
+        } else {
+          html += '<span style="font-size:12px;color:var(--fury-text-secondary)">' + self._escapeHtml(req.admin_note || '—') + '</span>';
+        }
+
+        html += '</td><td>';
+
+        if (req.status === 'pending') {
+          html += '<button class="fury-btn fury-btn-accent fury-btn-sm set-email-approve" data-id="' + req.id + '">Approve</button> ' +
+            '<button class="fury-btn fury-btn-secondary fury-btn-sm set-email-reject" data-id="' + req.id + '" style="color:var(--fury-danger)">Reject</button>';
+        } else if (req.status === 'approved') {
+          html += '<button class="fury-btn fury-btn-success fury-btn-sm set-email-create" data-id="' + req.id + '">Mark Created</button>';
+        } else {
+          html += '<span style="font-size:11px;color:var(--fury-text-muted)">' + (req.status === 'created' ? 'Done' : 'Rejected') + '</span>';
+        }
+
+        html += '</td></tr>';
+      }
+    }
+
+    html += '</tbody></table></div>';
+    return html;
+  },
+
+  _emailStatusBadge(status) {
+    var map = {
+      pending: 'fury-badge fury-badge-warning',
+      approved: 'fury-badge fury-badge-info',
+      rejected: 'fury-badge fury-badge-neutral',
+      created: 'fury-badge fury-badge-success'
+    };
+    var label = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected', created: 'Created' };
+    return '<span class="' + (map[status] || 'fury-badge') + '">' + (label[status] || status) + '</span>';
+  },
+
+  _bindEmailRequestEvents(container) {
+    var self = this;
+
+    // Load email requests data
+    DB.getEmailRequests().then(function (result) {
+      self._emailRequests = (result && result.data) || [];
+      var contentEl = container.querySelector('#settings-content');
+      if (contentEl) {
+        contentEl.innerHTML = self.renderEmailRequests();
+        self._attachEmailRequestHandlers(container);
+      }
+    });
+  },
+
+  _attachEmailRequestHandlers(container) {
+    var self = this;
+
+    // Approve
+    var approveBtns = container.querySelectorAll('.set-email-approve');
+    for (var a = 0; a < approveBtns.length; a++) {
+      approveBtns[a].addEventListener('click', function () {
+        var id = this.getAttribute('data-id');
+        var noteInput = container.querySelector('.set-email-note[data-id="' + id + '"]');
+        var note = noteInput ? noteInput.value.trim() : '';
+        DB.updateEmailRequest(id, { status: 'approved', admin_note: note }).then(function () {
+          showToast('Request approved', 'success');
+          self._bindEmailRequestEvents(container);
+        });
+      });
+    }
+
+    // Reject
+    var rejectBtns = container.querySelectorAll('.set-email-reject');
+    for (var r = 0; r < rejectBtns.length; r++) {
+      rejectBtns[r].addEventListener('click', function () {
+        var id = this.getAttribute('data-id');
+        DB.updateEmailRequest(id, { status: 'rejected' }).then(function () {
+          showToast('Request rejected', 'success');
+          self._bindEmailRequestEvents(container);
+        });
+      });
+    }
+
+    // Mark created
+    var createBtns = container.querySelectorAll('.set-email-create');
+    for (var c = 0; c < createBtns.length; c++) {
+      createBtns[c].addEventListener('click', function () {
+        var id = this.getAttribute('data-id');
+        var noteInput = container.querySelector('.set-email-note[data-id="' + id + '"]');
+        var note = noteInput ? noteInput.value.trim() : '';
+        if (!note || note.indexOf('@') === -1) {
+          showToast('Please enter the created email address', 'error');
+          return;
+        }
+        DB.updateEmailRequest(id, { status: 'created', admin_note: note }).then(function () {
+          showToast('Email created and synced!', 'success');
+          self._bindEmailRequestEvents(container);
+        });
+      });
+    }
+  },
+
+  /* ═══════════════════════════════════════════════════
+     WORKING HOURS TAB
+     ═══════════════════════════════════════════════════ */
+  renderWorkingHours() {
+    var self = this;
+    var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    var now = new Date();
+    var selMonth = self._whMonth || (now.getMonth() + 1);
+    var selYear = self._whYear || now.getFullYear();
+    var config = self._whConfig || {};
+
+    // Auto-calculate working days
+    var autoDays = 0;
+    var daysInMonth = new Date(selYear, selMonth, 0).getDate();
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dow = new Date(selYear, selMonth - 1, d).getDay();
+      if (dow !== 0 && dow !== 6) autoDays++;
+    }
+
+    var monthOpts = '';
+    for (var m = 1; m <= 12; m++) {
+      monthOpts += '<option value="' + m + '"' + (m === selMonth ? ' selected' : '') + '>' + MONTHS[m - 1] + '</option>';
+    }
+    var yearOpts = '';
+    for (var y = now.getFullYear() - 1; y <= now.getFullYear() + 1; y++) {
+      yearOpts += '<option value="' + y + '"' + (y === selYear ? ' selected' : '') + '>' + y + '</option>';
+    }
+
+    var workingDays = config.working_days != null ? config.working_days : autoDays;
+    var hpd = config.hours_per_day != null ? config.hours_per_day : 8;
+    var adj = config.adjustment_hours != null ? config.adjustment_hours : 0;
+    var totalHours = (workingDays * hpd) + adj;
+
+    return '' +
+      '<div class="fury-card">' +
+        '<div class="fury-card-header" style="margin-bottom:16px">' +
+          '<h3 style="font-size:15px;font-weight:600">Working Hours Configuration</h3>' +
+        '</div>' +
+        '<p style="color:var(--fury-text-secondary);font-size:13px;margin-bottom:16px">' +
+          'Configure working days and hours per month. Auto-calculated values are used as defaults if no override is set.' +
+        '</p>' +
+
+        '<div class="fury-flex fury-gap-3 fury-mb-3">' +
+          '<select class="fury-select" id="set-wh-month" style="width:auto">' + monthOpts + '</select>' +
+          '<select class="fury-select" id="set-wh-year" style="width:auto">' + yearOpts + '</select>' +
+          '<span style="color:var(--fury-text-muted);font-size:12px;align-self:center">' +
+            'Auto-calculated: ' + autoDays + ' working days' +
+          '</span>' +
+        '</div>' +
+
+        '<div class="fury-form-row fury-mb-3">' +
+          '<div class="fury-form-group">' +
+            '<label class="fury-label">Working Days</label>' +
+            '<input type="number" class="fury-input" id="set-wh-days" min="0" max="31" value="' + workingDays + '" />' +
+          '</div>' +
+          '<div class="fury-form-group">' +
+            '<label class="fury-label">Hours per Day</label>' +
+            '<input type="number" class="fury-input" id="set-wh-hpd" min="0" max="24" step="0.5" value="' + hpd + '" />' +
+          '</div>' +
+          '<div class="fury-form-group">' +
+            '<label class="fury-label">Adjustment Hours</label>' +
+            '<input type="number" class="fury-input" id="set-wh-adj" step="0.5" value="' + adj + '" />' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="fury-flex fury-gap-3 fury-mb-3" style="align-items:center">' +
+          '<span style="font-size:14px;font-weight:600;color:var(--fury-accent)">' +
+            'Total: ' + totalHours.toFixed(1) + ' hours' +
+          '</span>' +
+          '<span style="font-size:12px;color:var(--fury-text-muted)">' +
+            '(' + workingDays + ' &times; ' + hpd + 'h' + (adj !== 0 ? ' ' + (adj > 0 ? '+' : '') + adj + 'h adj' : '') + ')' +
+          '</span>' +
+        '</div>' +
+
+        '<div class="fury-form-group fury-mb-3">' +
+          '<label class="fury-label">Notes</label>' +
+          '<input type="text" class="fury-input" id="set-wh-notes" placeholder="e.g. Public holidays included" value="' + self._escapeAttr((config.notes || '')) + '" />' +
+        '</div>' +
+
+        '<button class="fury-btn fury-btn-primary" id="set-wh-save">Save Configuration</button>' +
+      '</div>';
+  },
+
+  _bindWorkingHoursEvents(container) {
+    var self = this;
+    self._whMonth = self._whMonth || (new Date().getMonth() + 1);
+    self._whYear = self._whYear || new Date().getFullYear();
+
+    // Load config for selected month
+    DB.getWorkingHoursConfig(self._whMonth, self._whYear).then(function (result) {
+      self._whConfig = (result && result.data) || {};
+      var contentEl = container.querySelector('#settings-content');
+      if (contentEl) {
+        contentEl.innerHTML = self.renderWorkingHours();
+        self._attachWorkingHoursHandlers(container);
+      }
+    });
+  },
+
+  _attachWorkingHoursHandlers(container) {
+    var self = this;
+
+    // Month/year change
+    var monthSel = container.querySelector('#set-wh-month');
+    var yearSel = container.querySelector('#set-wh-year');
+    if (monthSel) {
+      monthSel.addEventListener('change', function () {
+        self._whMonth = parseInt(this.value, 10);
+        self._bindWorkingHoursEvents(container);
+      });
+    }
+    if (yearSel) {
+      yearSel.addEventListener('change', function () {
+        self._whYear = parseInt(this.value, 10);
+        self._bindWorkingHoursEvents(container);
+      });
+    }
+
+    // Save
+    var saveBtn = container.querySelector('#set-wh-save');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async function () {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving...';
+        try {
+          var config = {
+            month: self._whMonth,
+            year: self._whYear,
+            working_days: parseInt(container.querySelector('#set-wh-days').value, 10) || 0,
+            hours_per_day: parseFloat(container.querySelector('#set-wh-hpd').value) || 8,
+            adjustment_hours: parseFloat(container.querySelector('#set-wh-adj').value) || 0,
+            notes: (container.querySelector('#set-wh-notes').value || '').trim()
+          };
+          var result = await DB.upsertWorkingHoursConfig(config);
+          if (result && result.error) throw new Error(result.error.message);
+          showToast('Working hours config saved!', 'success');
+          self._whConfig = config;
+          var contentEl = container.querySelector('#settings-content');
+          if (contentEl) {
+            contentEl.innerHTML = self.renderWorkingHours();
+            self._attachWorkingHoursHandlers(container);
+          }
+        } catch (err) {
+          showToast('Error: ' + (err.message || 'Unknown'), 'error');
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Save Configuration';
+        }
+      });
+    }
   }
 };

@@ -759,4 +759,192 @@ INSERT INTO settings (key, value) VALUES
   ('billed_to', '{"name":"Woodenshark LLC","address":"3411 Silverside Road, Suite 104, Rodney Building, Wilmington, Delaware 19810, USA"}'::jsonb),
   ('payment_terms', '{"text":"Thank you for your business! Please make the payment within 14 days. There will be a 4% interest charge per month on late invoices.","due_days":14}'::jsonb),
   ('uah_usd_rate', '{"rate":42.16,"updated":"2026-03-01"}'::jsonb),
-  ('working_hours_adjustment', '{"subtract_hours":8}'::jsonb);
+  ('working_hours_adjustment', '{"subtract_hours":8}'::jsonb),
+  ('email_admin', '{"email":"","name":"Email Admin"}'::jsonb)
+ON CONFLICT (key) DO NOTHING;
+
+
+-- ============================================================
+-- 12. EMPLOYEES — Additional columns for contracts & email
+-- ============================================================
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS work_email TEXT;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS contract_type TEXT DEFAULT 'Contractor'
+  CHECK (contract_type IN ('Full-Time', 'Part-Time', 'Contractor'));
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS contract_uploaded_at TIMESTAMPTZ;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS nda_uploaded_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_employees_email ON employees(work_email);
+
+
+-- ============================================================
+-- 13. EMAIL_REQUESTS — Corporate email provisioning workflow
+-- ============================================================
+CREATE TABLE IF NOT EXISTS email_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id UUID REFERENCES employees(id) ON DELETE CASCADE,
+  requested_by UUID REFERENCES auth.users(id),
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'created')),
+  admin_note TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE email_requests ENABLE ROW LEVEL SECURITY;
+
+-- All authenticated users can read email requests
+CREATE POLICY "email_requests_select_authenticated" ON email_requests
+  FOR SELECT TO authenticated
+  USING (true);
+
+-- Admin can insert email requests
+CREATE POLICY "email_requests_insert_admin" ON email_requests
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin'
+    )
+  );
+
+-- Lead can insert email requests for their team
+CREATE POLICY "email_requests_insert_lead" ON email_requests
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      JOIN teams t ON t.lead_email = p.email
+      JOIN team_members tm ON tm.team_id = t.id
+      WHERE p.id = auth.uid()
+        AND p.role = 'lead'
+        AND tm.employee_id = email_requests.employee_id
+    )
+  );
+
+-- Admin can update email requests
+CREATE POLICY "email_requests_update_admin" ON email_requests
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin'
+    )
+  );
+
+-- Admin can delete email requests
+CREATE POLICY "email_requests_delete_admin" ON email_requests
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin'
+    )
+  );
+
+CREATE INDEX IF NOT EXISTS idx_email_requests_employee ON email_requests(employee_id);
+CREATE INDEX IF NOT EXISTS idx_email_requests_status ON email_requests(status);
+
+
+-- ============================================================
+-- 14. WORKING_HOURS_CONFIG — Monthly working days/hours config
+-- ============================================================
+CREATE TABLE IF NOT EXISTS working_hours_config (
+  month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+  year INTEGER NOT NULL CHECK (year BETWEEN 2024 AND 2030),
+  working_days INTEGER NOT NULL,
+  hours_per_day NUMERIC(4,1) DEFAULT 8.0,
+  adjustment_hours NUMERIC(4,1) DEFAULT 0,
+  notes TEXT,
+  PRIMARY KEY (month, year)
+);
+
+ALTER TABLE working_hours_config ENABLE ROW LEVEL SECURITY;
+
+-- All authenticated users can read working hours config
+CREATE POLICY "working_hours_config_select_authenticated" ON working_hours_config
+  FOR SELECT TO authenticated
+  USING (true);
+
+-- Admin can insert working hours config
+CREATE POLICY "working_hours_config_insert_admin" ON working_hours_config
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin'
+    )
+  );
+
+-- Admin can update working hours config
+CREATE POLICY "working_hours_config_update_admin" ON working_hours_config
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin'
+    )
+  );
+
+-- Admin can delete working hours config
+CREATE POLICY "working_hours_config_delete_admin" ON working_hours_config
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM profiles p WHERE p.id = auth.uid() AND p.role = 'admin'
+    )
+  );
+
+
+-- ============================================================
+-- HELPER FUNCTION: Calculate regular working hours for a month
+-- ============================================================
+CREATE OR REPLACE FUNCTION get_regular_hours(p_month INTEGER, p_year INTEGER)
+RETURNS NUMERIC AS $$
+DECLARE
+  config_row working_hours_config%ROWTYPE;
+  calc_working_days INTEGER := 0;
+  d DATE;
+BEGIN
+  -- Try to get from config table first
+  SELECT * INTO config_row
+  FROM working_hours_config
+  WHERE month = p_month AND year = p_year;
+
+  IF FOUND THEN
+    RETURN (config_row.working_days * config_row.hours_per_day) + config_row.adjustment_hours;
+  END IF;
+
+  -- Fallback: auto-calculate working days (Mon-Fri)
+  d := make_date(p_year, p_month, 1);
+  WHILE EXTRACT(MONTH FROM d) = p_month LOOP
+    IF EXTRACT(DOW FROM d) NOT IN (0, 6) THEN
+      calc_working_days := calc_working_days + 1;
+    END IF;
+    d := d + INTERVAL '1 day';
+  END LOOP;
+
+  RETURN calc_working_days * 8.0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+
+-- ============================================================
+-- TRIGGER: Auto-sync email when email_request status = 'created'
+-- ============================================================
+CREATE OR REPLACE FUNCTION sync_email_on_request_created()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status = 'created' AND (OLD.status IS NULL OR OLD.status <> 'created') THEN
+    -- Extract email from admin_note if provided, otherwise leave as-is
+    IF NEW.admin_note IS NOT NULL AND NEW.admin_note LIKE '%@%' THEN
+      UPDATE employees SET work_email = trim(NEW.admin_note)
+      WHERE id = NEW.employee_id;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER tr_email_request_sync
+  AFTER UPDATE ON email_requests
+  FOR EACH ROW
+  EXECUTE FUNCTION sync_email_on_request_created();
+
+
+-- ============================================================
+-- STORAGE BUCKETS: contracts and documents
+-- ============================================================
+-- Note: Storage buckets must be created via Supabase dashboard or API
+-- INSERT INTO storage.buckets (id, name, public) VALUES ('contracts', 'contracts', false);
+-- INSERT INTO storage.buckets (id, name, public) VALUES ('documents', 'documents', false);
+
+-- Storage RLS policies (applied via Supabase dashboard):
+-- contracts bucket: authenticated read, admin upload/delete
+-- documents bucket: authenticated read, admin upload/delete

@@ -21,13 +21,18 @@ const App = {
   role: null, // 'admin' | 'lead' | 'viewer'
 
   pages: {
-    '/dashboard': Dashboard,
-    '/timesheet': Timesheet,
+    '/team': Team,
     '/invoices': Invoices,
-    '/employees': Employees,
     '/expenses': Expenses,
-    '/reports': Reports,
     '/settings': Settings,
+  },
+
+  /* ── Legacy route redirects ── */
+  REDIRECTS: {
+    '/dashboard': '/team',
+    '/timesheet': '/team',
+    '/employees': '/team',
+    '/reports': '/invoices',
   },
 
   /* ── Loading Overlay ── */
@@ -51,7 +56,7 @@ const App = {
         this.role = (roleResult && roleResult.data) || 'viewer';
         this.showApp();
         this.setupRouter();
-        this.navigate(window.location.hash || '#/dashboard');
+        this.navigate(window.location.hash || '#/team');
       } else {
         this.showLogin();
       }
@@ -164,7 +169,7 @@ const App = {
         self.role = (roleRes && roleRes.data) || 'viewer';
         self.showApp();
         self.setupRouter();
-        self.navigate(window.location.hash || '#/dashboard');
+        self.navigate(window.location.hash || '#/team');
       } catch (err) {
         errorEl.textContent = err.message || 'Invalid code. Please try again.';
       } finally {
@@ -206,17 +211,23 @@ const App = {
 
   /* ── Page Navigation ── */
   async navigate(hash) {
-    var path = (hash || '').replace('#', '') || '/dashboard';
+    var path = (hash || '').replace('#', '') || '/team';
+
+    // Handle legacy route redirects
+    if (this.REDIRECTS && this.REDIRECTS[path]) {
+      window.location.hash = '#' + this.REDIRECTS[path];
+      return;
+    }
 
     // Redirect unknown routes
     if (!this.pages[path]) {
-      window.location.hash = '#/dashboard';
+      window.location.hash = '#/team';
       return;
     }
 
     // Block non-admin from settings
     if (path === '/settings' && this.role !== 'admin') {
-      window.location.hash = '#/dashboard';
+      window.location.hash = '#/team';
       return;
     }
 

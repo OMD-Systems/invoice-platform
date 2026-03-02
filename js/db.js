@@ -849,6 +849,221 @@ const DB = {
     }
   },
 
+  // ----------------------------------------------------------
+  // CONTRACTS & NDA (Supabase Storage)
+  // ----------------------------------------------------------
+
+  /**
+   * Upload a contract PDF for an employee.
+   * @param {string} employeeId
+   * @param {File} file - PDF file
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async uploadContract(employeeId, file) {
+    try {
+      var path = employeeId + '/contract.pdf';
+      var { data, error } = await this.client.storage
+        .from('contracts')
+        .upload(path, file, { upsert: true, contentType: 'application/pdf' });
+
+      if (error) return { data: null, error };
+
+      // Update timestamp on employee
+      await this.client
+        .from('employees')
+        .update({ contract_uploaded_at: new Date().toISOString() })
+        .eq('id', employeeId);
+
+      return { data, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get a signed URL for an employee's contract PDF.
+   * @param {string} employeeId
+   * @returns {Promise<{data: string|null, error: object|null}>}
+   */
+  async getContractUrl(employeeId) {
+    try {
+      var path = employeeId + '/contract.pdf';
+      var { data, error } = await this.client.storage
+        .from('contracts')
+        .createSignedUrl(path, 3600); // 1 hour
+
+      if (error) return { data: null, error };
+      return { data: data.signedUrl, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Upload an NDA PDF for an employee.
+   * @param {string} employeeId
+   * @param {File} file - PDF file
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async uploadNda(employeeId, file) {
+    try {
+      var path = employeeId + '/nda.pdf';
+      var { data, error } = await this.client.storage
+        .from('documents')
+        .upload(path, file, { upsert: true, contentType: 'application/pdf' });
+
+      if (error) return { data: null, error };
+
+      // Update timestamp on employee
+      await this.client
+        .from('employees')
+        .update({ nda_uploaded_at: new Date().toISOString() })
+        .eq('id', employeeId);
+
+      return { data, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get a signed URL for an employee's NDA PDF.
+   * @param {string} employeeId
+   * @returns {Promise<{data: string|null, error: object|null}>}
+   */
+  async getNdaUrl(employeeId) {
+    try {
+      var path = employeeId + '/nda.pdf';
+      var { data, error } = await this.client.storage
+        .from('documents')
+        .createSignedUrl(path, 3600);
+
+      if (error) return { data: null, error };
+      return { data: data.signedUrl, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  // ----------------------------------------------------------
+  // EMAIL REQUESTS
+  // ----------------------------------------------------------
+
+  /**
+   * Create a new email request for an employee.
+   * @param {string} employeeId
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async createEmailRequest(employeeId) {
+    try {
+      var { data: session } = await this.client.auth.getSession();
+      var userId = session?.session?.user?.id || null;
+
+      var { data, error } = await this.client
+        .from('email_requests')
+        .insert({
+          employee_id: employeeId,
+          requested_by: userId,
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get all email requests, optionally filtered by status.
+   * @param {string} [status] - 'pending', 'approved', 'rejected', 'created'
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getEmailRequests(status) {
+    try {
+      var query = this.client
+        .from('email_requests')
+        .select('*, employees ( id, name, work_email )')
+        .order('created_at', { ascending: false });
+
+      if (status) {
+        query = query.eq('status', status);
+      }
+
+      var { data, error } = await query;
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Update an email request (approve/reject/mark created).
+   * @param {string} id - Email request UUID
+   * @param {object} updates - { status, admin_note }
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async updateEmailRequest(id, updates) {
+    try {
+      updates.updated_at = new Date().toISOString();
+      var { data, error } = await this.client
+        .from('email_requests')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  // ----------------------------------------------------------
+  // WORKING HOURS CONFIG
+  // ----------------------------------------------------------
+
+  /**
+   * Get working hours config for a month/year.
+   * @param {number} month
+   * @param {number} year
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async getWorkingHoursConfig(month, year) {
+    try {
+      var { data, error } = await this.client
+        .from('working_hours_config')
+        .select('*')
+        .eq('month', month)
+        .eq('year', year)
+        .maybeSingle();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Upsert working hours config for a month/year.
+   * @param {object} config - { month, year, working_days, hours_per_day, adjustment_hours, notes }
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async upsertWorkingHoursConfig(config) {
+    try {
+      var { data, error } = await this.client
+        .from('working_hours_config')
+        .upsert(config, { onConflict: 'month,year' })
+        .select()
+        .single();
+
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
   /**
    * Upload parsed timesheet data (from TimesheetParser) to DB.
    * @param {object} parsedData - { timesheets, employees, metadata } from TimesheetParser.parse()

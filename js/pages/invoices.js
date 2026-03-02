@@ -10,11 +10,16 @@ const Invoices = {
   year: new Date().getFullYear(),
   statusFilter: 'all',
   employeeFilter: 'all',
+  activeTab: 'invoices',
   invoices: [],
   employees: [],
   timesheetMap: {},
+  timesheets: [],
+  projects: [],
   billedTo: null,
   defaultTerms: '',
+  exchangeRate: 42.16,
+  hoursAdjustment: 0,
 
   /* ═══════════════════════════════════════════════════════
      RENDER
@@ -23,7 +28,7 @@ const Invoices = {
     container.innerHTML = this.template();
     this.bindEvents(container, ctx);
     await this.loadData(ctx);
-    this.updateTable(container);
+    this.renderActiveTab(container);
   },
 
   /* ═══════════════════════════════════════════════════════
@@ -50,6 +55,16 @@ const Invoices = {
 
     return (
       '<div class="invoices-page">' +
+
+        /* ── Tabs ── */
+        '<div class="fury-tabs fury-mb-3">' +
+          '<button class="fury-tab' + (this.activeTab === 'invoices' ? ' active' : '') + '" data-inv-tab="invoices">All Invoices</button>' +
+          '<button class="fury-tab' + (this.activeTab === 'summary' ? ' active' : '') + '" data-inv-tab="summary">Monthly Summary</button>' +
+          '<button class="fury-tab' + (this.activeTab === 'settlements' ? ' active' : '') + '" data-inv-tab="settlements">Settlements</button>' +
+        '</div>' +
+
+        /* ── Tab Content Container ── */
+        '<div id="inv-tab-content">' +
 
         /* ── Filters Row ── */
         '<div class="fury-flex-between fury-mb-3" style="flex-wrap: wrap; gap: 12px;">' +
@@ -121,6 +136,8 @@ const Invoices = {
           '</div>' +
         '</div>' +
 
+      '</div>' + /* inv-tab-content */
+
       '</div>'
     );
   },
@@ -169,12 +186,360 @@ const Invoices = {
       var termsResult = await DB.getSetting('invoice_terms');
       this.defaultTerms = (termsResult && termsResult.data) ? termsResult.data : 'Payment is due within 15 days of invoice date.';
 
+      // Load timesheets + projects for Summary/Settlements tabs
+      var tsFullResult = await DB.getTimesheets(this.month, this.year);
+      this.timesheets = (tsFullResult && tsFullResult.data) || [];
+
+      var projResult = await DB.getProjects();
+      this.projects = (projResult && projResult.data) || [];
+
+      // Exchange rate
+      var rateResult = await DB.getSetting('uah_usd_rate');
+      if (rateResult && rateResult.data) {
+        var rateData = typeof rateResult.data === 'string' ? JSON.parse(rateResult.data) : rateResult.data;
+        if (rateData.rate) this.exchangeRate = parseFloat(rateData.rate) || 42.16;
+      }
+
+      // Hours adjustment
+      try {
+        var adjResult = await DB.getSetting('working_hours_adjustment');
+        if (adjResult && adjResult.data) {
+          var adjData = typeof adjResult.data === 'string' ? JSON.parse(adjResult.data) : adjResult.data;
+          if (adjData.subtract_hours) this.hoursAdjustment = parseInt(adjData.subtract_hours) || 0;
+        }
+      } catch (e) { /* default 0 */ }
+
     } catch (err) {
       console.error('[Invoices] loadData error:', err);
       this.employees = [];
       this.invoices = [];
       this.timesheetMap = {};
     }
+  },
+
+  /* ═══════════════════════════════════════════════════════
+     RENDER ACTIVE TAB
+     ═══════════════════════════════════════════════════════ */
+  renderActiveTab(container) {
+    var tabContent = container.querySelector('#inv-tab-content');
+    if (!tabContent) return;
+
+    switch (this.activeTab) {
+      case 'summary':
+        tabContent.innerHTML = '';
+        this._renderSummaryTab(tabContent);
+        break;
+      case 'settlements':
+        tabContent.innerHTML = '';
+        this._renderSettlementsTab(tabContent);
+        break;
+      default:
+        // Show existing invoice content (already in template)
+        this.updateTable(container);
+        break;
+    }
+  },
+
+  /* ═══════════════════════════════════════════════════════
+     SUMMARY TAB (from reports.js)
+     ═══════════════════════════════════════════════════════ */
+  _renderSummaryTab(content) {
+    var self = this;
+    // Use all invoices for this period (ignore status filter for summary)
+    var invoices = self.invoices;
+
+    // Calculate KPIs
+    var totalInvoiced = 0;
+    var amounts = [];
+    for (var i = 0; i < invoices.length; i++) {
+      var total = parseFloat(invoices[i].total_usd) || 0;
+      totalInvoiced += total;
+      amounts.push(total);
+    }
+    var avgPerPerson = invoices.length > 0 ? totalInvoiced / invoices.length : 0;
+    var highest = amounts.length > 0 ? Math.max.apply(null, amounts) : 0;
+    var lowest = amounts.length > 0 ? Math.min.apply(null, amounts) : 0;
+
+    // Count by status
+    var statusCounts = { draft: 0, generated: 0, sent: 0, paid: 0 };
+    for (var s = 0; s < invoices.length; s++) {
+      var status = invoices[s].status || 'draft';
+      if (statusCounts[status] !== undefined) statusCounts[status]++;
+    }
+
+    var kpiHtml =
+      '<div class="fury-grid-4 fury-mb-3">' +
+        self._kpiCard('Total Invoiced', self._formatCurrency(totalInvoiced), 'fury-kpi-accent') +
+        self._kpiCard('Avg per Person', self._formatCurrency(avgPerPerson), '') +
+        self._kpiCard('Highest Invoice', self._formatCurrency(highest), '') +
+        self._kpiCard('Lowest Invoice', self._formatCurrency(lowest), '') +
+      '</div>';
+
+    var statusHtml =
+      '<div class="fury-flex fury-gap-3 fury-mb-3">' +
+        '<span class="fury-badge fury-badge-neutral">' + statusCounts.draft + ' Draft</span>' +
+        '<span class="fury-badge fury-badge-info">' + statusCounts.generated + ' Generated</span>' +
+        '<span class="fury-badge fury-badge-warning">' + statusCounts.sent + ' Sent</span>' +
+        '<span class="fury-badge fury-badge-success">' + statusCounts.paid + ' Paid</span>' +
+      '</div>';
+
+    // Summary table
+    var tableHtml =
+      '<div class="fury-card" style="padding:0;overflow:hidden">' +
+        '<div class="fury-card-header" style="padding:16px 24px;margin-bottom:0">' +
+          '<h3 style="font-size:14px;font-weight:600;color:var(--fury-text)">Invoice Summary</h3>' +
+          '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-export-summary">Export .xlsx</button>' +
+        '</div>' +
+        '<div style="overflow-x:auto"><table class="fury-table"><thead><tr>' +
+          '<th style="width:40px">#</th><th>Employee</th><th>Invoice #</th><th>Date</th>' +
+          '<th style="text-align:right">Subtotal ($)</th><th style="text-align:right">Discount ($)</th>' +
+          '<th style="text-align:right">Total ($)</th><th style="text-align:center">Status</th>' +
+        '</tr></thead><tbody>';
+
+    if (invoices.length === 0) {
+      tableHtml += '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--fury-text-muted)">No invoices for this period.</td></tr>';
+    } else {
+      var sorted = invoices.slice().sort(function (a, b) {
+        return ((a.employees && a.employees.name) || '').localeCompare((b.employees && b.employees.name) || '');
+      });
+      for (var r = 0; r < sorted.length; r++) {
+        var inv = sorted[r];
+        var empName = (inv.employees && inv.employees.name) || 'Unknown';
+        var prefix = (inv.employees && inv.employees.invoice_prefix) || '';
+        var invNum = prefix ? prefix + '-' + inv.invoice_number : String(inv.invoice_number);
+        var subtotal = parseFloat(inv.subtotal_usd) || 0;
+        var discount = parseFloat(inv.discount_usd) || 0;
+        var invTotal = parseFloat(inv.total_usd) || 0;
+
+        tableHtml +=
+          '<tr><td style="color:var(--fury-text-muted)">' + (r + 1) + '</td>' +
+          '<td style="font-weight:500">' + self._escHtml(empName) + '</td>' +
+          '<td><span class="fury-badge fury-badge-info">' + self._escHtml(invNum) + '</span></td>' +
+          '<td style="color:var(--fury-text-secondary)">' + self._escHtml(inv.invoice_date || '') + '</td>' +
+          '<td style="text-align:right;font-variant-numeric:tabular-nums">' + self._formatCurrency(subtotal) + '</td>' +
+          '<td style="text-align:right;color:var(--fury-text-secondary)">' + (discount > 0 ? '-' + self._formatCurrency(discount) : '$0.00') + '</td>' +
+          '<td style="text-align:right;font-weight:600">' + self._formatCurrency(invTotal) + '</td>' +
+          '<td style="text-align:center">' + self._statusBadgeHtml(inv.status || 'draft') + '</td></tr>';
+      }
+      // Grand total
+      tableHtml +=
+        '<tr style="background:var(--fury-bg);border-top:2px solid var(--fury-accent)">' +
+        '<td colspan="4" style="font-weight:700;color:var(--fury-accent)">GRAND TOTAL</td>' +
+        '<td style="text-align:right;font-weight:600">' +
+          self._formatCurrency(invoices.reduce(function (s, inv) { return s + (parseFloat(inv.subtotal_usd) || 0); }, 0)) + '</td>' +
+        '<td style="text-align:right;color:var(--fury-text-secondary)">-' +
+          self._formatCurrency(invoices.reduce(function (s, inv) { return s + (parseFloat(inv.discount_usd) || 0); }, 0)) + '</td>' +
+        '<td style="text-align:right;font-weight:700;color:var(--fury-accent);font-size:15px">' +
+          self._formatCurrency(totalInvoiced) + '</td><td></td></tr>';
+    }
+    tableHtml += '</tbody></table></div></div>';
+
+    content.innerHTML = kpiHtml + statusHtml + tableHtml;
+
+    // Bind export
+    var exportBtn = content.querySelector('#btn-export-summary');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', function () {
+        self._exportSummaryXlsx();
+      });
+    }
+  },
+
+  /* ═══════════════════════════════════════════════════════
+     SETTLEMENTS TAB (from reports.js)
+     ═══════════════════════════════════════════════════════ */
+  async _renderSettlementsTab(content) {
+    var self = this;
+    content.innerHTML = '<div style="text-align:center;padding:40px;color:var(--fury-text-muted)">Calculating settlements...</div>';
+
+    try {
+      if (typeof Settlements === 'undefined') {
+        content.innerHTML = '<div class="fury-card" style="padding:24px;text-align:center;color:var(--fury-text-muted)">Settlements module not available.</div>';
+        return;
+      }
+
+      var settlementData = await Settlements.calculate(
+        self.month, self.year, self.employees, self.timesheets, self.invoices
+      );
+
+      var activeProjectCodes = Settlements.getActiveProjectCodes(settlementData);
+      var companies = Settlements.getActiveCompanies(settlementData);
+      var detailed = Settlements.formatForDetailedTable(settlementData, activeProjectCodes, companies);
+      var rows = detailed.rows;
+      var companyTotals = detailed.companyTotals;
+      var grandTotal = detailed.grandTotal;
+
+      // Build table
+      var projHeaders = '';
+      for (var phi = 0; phi < activeProjectCodes.length; phi++) {
+        projHeaders += '<th style="text-align:right;font-size:10px">' + activeProjectCodes[phi] + '</th>';
+      }
+      var compHeaders = '';
+      for (var chi = 0; chi < companies.length; chi++) {
+        compHeaders += '<th style="text-align:right;font-size:10px;background:rgba(0,212,255,0.05)">' +
+          self._escHtml(Settlements.getCompanyLabel(companies[chi])) + '</th>';
+      }
+
+      // Mapping chips
+      var chips = Settlements.getMappingChips();
+      var chipsHtml = '<div class="fury-card fury-mb-3" style="padding:16px">' +
+        '<h3 style="font-size:14px;font-weight:600;margin-bottom:8px">Project-to-Company Mapping</h3>' +
+        '<div class="fury-flex fury-gap-3" style="flex-wrap:wrap">';
+      for (var ci = 0; ci < chips.length; ci++) {
+        var chip = chips[ci];
+        var bgC = chip.company === 'WS' ? 'rgba(0,212,255,0.1)' : chip.company === 'OMD' ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.1)';
+        var txC = chip.company === 'WS' ? 'var(--fury-accent)' : chip.company === 'OMD' ? 'var(--fury-warning)' : '#A78BFA';
+        chipsHtml += '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:var(--fury-radius-full);font-size:12px;font-weight:500;background:' + bgC + ';color:' + txC + '">' + chip.code + ' &rarr; ' + self._escHtml(chip.label) + '</span>';
+      }
+      chipsHtml += '</div></div>';
+
+      var tableHtml =
+        '<div class="fury-card" style="padding:0;overflow:hidden">' +
+        '<div class="fury-card-header" style="padding:16px 24px;margin-bottom:0">' +
+          '<h3 style="font-size:14px;font-weight:600">Cost Allocation</h3>' +
+          '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-export-settlements">Export .xlsx</button>' +
+        '</div>' +
+        '<div style="overflow-x:auto"><table class="fury-table" style="font-size:13px"><thead><tr>' +
+          '<th>Employee</th><th style="text-align:right">Total Paid</th><th style="text-align:right">Hours</th>' +
+          projHeaders + compHeaders +
+        '</tr></thead><tbody>';
+
+      if (rows.length === 0) {
+        tableHtml += '<tr><td colspan="' + (3 + activeProjectCodes.length + companies.length) + '" style="text-align:center;padding:40px;color:var(--fury-text-muted)">No data for this period.</td></tr>';
+      } else {
+        for (var ri = 0; ri < rows.length; ri++) {
+          var row = rows[ri];
+          var projCells = '';
+          for (var pci = 0; pci < activeProjectCodes.length; pci++) {
+            var alloc = row.projectAllocations[activeProjectCodes[pci]];
+            projCells += '<td style="text-align:right;font-variant-numeric:tabular-nums">' +
+              (alloc.cost > 0 ? self._formatCurrency(alloc.cost) : '<span style="color:var(--fury-text-muted)">-</span>') + '</td>';
+          }
+          var compCells = '';
+          for (var cci = 0; cci < companies.length; cci++) {
+            var cc = row.companyAllocations[companies[cci]] || 0;
+            compCells += '<td style="text-align:right;font-weight:600;background:rgba(0,212,255,0.03)">' +
+              (cc > 0 ? self._formatCurrency(cc) : '-') + '</td>';
+          }
+          tableHtml += '<tr><td style="font-weight:500">' + self._escHtml(row.employee.name) + '</td>' +
+            '<td style="text-align:right;font-weight:600">' + self._formatCurrency(row.totalPaid) + '</td>' +
+            '<td style="text-align:right;color:var(--fury-text-secondary)">' + row.totalHours.toFixed(1) + '</td>' +
+            projCells + compCells + '</tr>';
+        }
+        // Total row
+        var ptCells = '';
+        for (var ptci = 0; ptci < activeProjectCodes.length; ptci++) {
+          ptCells += '<td style="text-align:right;font-weight:700;color:var(--fury-accent)">' +
+            self._formatCurrency(detailed.projectTotals[activeProjectCodes[ptci]] || 0) + '</td>';
+        }
+        var ctCells = '';
+        for (var ctci = 0; ctci < companies.length; ctci++) {
+          ctCells += '<td style="text-align:right;font-weight:700;color:var(--fury-accent);background:rgba(0,212,255,0.05)">' +
+            self._formatCurrency(companyTotals[companies[ctci]] || 0) + '</td>';
+        }
+        tableHtml += '<tr style="background:var(--fury-bg);border-top:2px solid var(--fury-accent)">' +
+          '<td style="font-weight:700;color:var(--fury-accent)">TOTAL</td>' +
+          '<td style="text-align:right;font-weight:700;color:var(--fury-accent)">' + self._formatCurrency(grandTotal) + '</td>' +
+          '<td></td>' + ptCells + ctCells + '</tr>';
+      }
+      tableHtml += '</tbody></table></div></div>';
+
+      // Settlement cards
+      var cardsHtml = '';
+      if (rows.length > 0 && companies.length > 1) {
+        cardsHtml = '<div class="fury-grid-' + Math.min(companies.length, 4) + ' fury-mt-3">';
+        for (var sci = 0; sci < companies.length; sci++) {
+          var cCode = companies[sci];
+          var cLabel = Settlements.getCompanyLabel(cCode);
+          var cTotal = companyTotals[cCode] || 0;
+          var cPct = grandTotal > 0 ? ((cTotal / grandTotal) * 100).toFixed(1) : '0.0';
+          cardsHtml += '<div class="fury-card"><h4 style="font-size:12px;font-weight:600;text-transform:uppercase;color:var(--fury-text-secondary);margin-bottom:8px">' +
+            self._escHtml(cLabel) + '</h4><div class="fury-kpi-value" style="font-size:24px;margin-bottom:4px">' + self._formatCurrency(cTotal) + '</div>' +
+            '<div style="font-size:12px;color:var(--fury-text-muted)">' + cPct + '% of total</div></div>';
+        }
+        cardsHtml += '</div>';
+
+        // Net settlement
+        cardsHtml += '<div class="fury-card fury-mt-3"><h3 style="font-size:14px;font-weight:600;margin-bottom:12px">Inter-Company Settlement</h3>' +
+          '<div class="fury-grid-' + Math.min(companies.length - 1, 3) + '">';
+        for (var nsi = 0; nsi < companies.length; nsi++) {
+          if (companies[nsi] === 'WS') continue;
+          cardsHtml += '<div style="padding:16px;border:1px solid var(--fury-border);border-radius:var(--fury-radius);background:var(--fury-elevated)">' +
+            '<div style="font-size:12px;color:var(--fury-text-secondary);margin-bottom:4px">' + self._escHtml(Settlements.getCompanyLabel(companies[nsi])) + ' owes WS</div>' +
+            '<div style="font-size:22px;font-weight:700;color:var(--fury-success)">' + self._formatCurrency(companyTotals[companies[nsi]] || 0) + '</div></div>';
+        }
+        cardsHtml += '</div></div>';
+      }
+
+      content.innerHTML = chipsHtml + tableHtml + cardsHtml;
+
+      // Export button
+      var expBtn = content.querySelector('#btn-export-settlements');
+      if (expBtn) {
+        expBtn.addEventListener('click', function () {
+          self._exportSettlementsXlsx(detailed, activeProjectCodes, companies);
+        });
+      }
+    } catch (err) {
+      console.error('[Invoices] settlements error:', err);
+      content.innerHTML = '<div class="fury-card" style="padding:24px;text-align:center;color:var(--fury-danger)">Error: ' + self._escHtml(err.message) + '</div>';
+    }
+  },
+
+  /* ── Summary/Settlements helpers ── */
+  _kpiCard(label, value, extraClass) {
+    return '<div class="fury-kpi ' + (extraClass || '') + '"><span class="fury-kpi-value">' + value + '</span><span class="fury-kpi-label">' + label + '</span></div>';
+  },
+  _formatCurrency(amount) {
+    if (amount == null || isNaN(amount)) return '$0.00';
+    return '$' + Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  },
+  _escHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  },
+  _statusBadgeHtml(status) {
+    var m = { draft: 'neutral', generated: 'info', sent: 'warning', paid: 'success' };
+    var l = { draft: 'Draft', generated: 'Generated', sent: 'Sent', paid: 'Paid' };
+    return '<span class="fury-badge fury-badge-' + (m[status] || 'neutral') + '">' + (l[status] || 'Draft') + '</span>';
+  },
+  _exportSummaryXlsx() {
+    var self = this;
+    if (typeof XLSX === 'undefined') { alert('XLSX not loaded'); return; }
+    if (self.invoices.length === 0) { showToast('No data to export', 'error'); return; }
+    try {
+      var header = ['#', 'Employee', 'Invoice #', 'Date', 'Subtotal ($)', 'Discount ($)', 'Total ($)', 'Status'];
+      var wsData = [header];
+      var sorted = self.invoices.slice().sort(function (a, b) {
+        return ((a.employees && a.employees.name) || '').localeCompare((b.employees && b.employees.name) || '');
+      });
+      var gt = 0;
+      for (var i = 0; i < sorted.length; i++) {
+        var inv = sorted[i];
+        var t = parseFloat(inv.total_usd) || 0; gt += t;
+        wsData.push([i + 1, (inv.employees && inv.employees.name) || '', ((inv.employees && inv.employees.invoice_prefix) || '') + '-' + inv.invoice_number,
+          inv.invoice_date || '', parseFloat(inv.subtotal_usd) || 0, parseFloat(inv.discount_usd) || 0, t, (inv.status || 'draft')]);
+      }
+      wsData.push([]); wsData.push(['', 'GRAND TOTAL', '', '', '', '', gt, '']);
+      var wb = XLSX.utils.book_new();
+      var ws = XLSX.utils.aoa_to_sheet(wsData);
+      XLSX.utils.book_append_sheet(wb, ws, self.MONTH_NAMES[self.month - 1] + ' ' + self.year);
+      XLSX.writeFile(wb, 'Invoice_Summary_' + self.year + '-' + String(self.month).padStart(2, '0') + '.xlsx');
+      showToast('Exported!', 'success');
+    } catch (err) { showToast('Export failed: ' + err.message, 'error'); }
+  },
+  MONTH_NAMES: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+  _exportSettlementsXlsx(detailed, activeCodes, companies) {
+    if (typeof XLSX === 'undefined' || typeof Settlements === 'undefined') return;
+    try {
+      var exp = Settlements.formatForExport(detailed, activeCodes, companies);
+      var wsData = [exp.header]; for (var i = 0; i < exp.dataRows.length; i++) wsData.push(exp.dataRows[i]);
+      wsData.push([]); wsData.push(exp.totalRow);
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), 'Settlements');
+      XLSX.writeFile(wb, 'Settlements_' + this.year + '-' + String(this.month).padStart(2, '0') + '.xlsx');
+      showToast('Exported!', 'success');
+    } catch (err) { showToast('Export failed: ' + err.message, 'error'); }
   },
 
   /* ═══════════════════════════════════════════════════════
@@ -347,6 +712,17 @@ const Invoices = {
   bindEvents: function (container, ctx) {
     var self = this;
 
+    // ── Tab switching ──
+    var tabs = container.querySelectorAll('.fury-tab[data-inv-tab]');
+    for (var ti = 0; ti < tabs.length; ti++) {
+      tabs[ti].addEventListener('click', function () {
+        for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove('active');
+        this.classList.add('active');
+        self.activeTab = this.getAttribute('data-inv-tab');
+        self.renderActiveTab(container);
+      });
+    }
+
     // ── Filter changes ──
     var monthSel = container.querySelector('#inv-month');
     var yearSel = container.querySelector('#inv-year');
@@ -472,7 +848,7 @@ const Invoices = {
     if (pendingSection) pendingSection.style.display = 'none';
 
     await this.loadData(ctx);
-    this.updateTable(container);
+    this.renderActiveTab(container);
   },
 
   /* ═══════════════════════════════════════════════════════

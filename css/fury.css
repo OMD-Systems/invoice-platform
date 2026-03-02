@@ -1888,3 +1888,409 @@ textarea.fury-input {
     max-width: 100%;
   }
 }
+
+
+/* ============================================================
+   TEAM PAGE — Master-Detail Layout
+   ============================================================ */
+.team-page {
+  display: flex;
+  gap: 0;
+  height: calc(100vh - 56px - 48px);
+  margin: -24px;
+}
+
+.team-list {
+  width: 380px;
+  min-width: 380px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--fury-border);
+  background: var(--fury-card);
+}
+
+.team-list-header {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.team-search {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.team-period {
+  display: flex;
+  gap: 8px;
+}
+
+.team-period .fury-select-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+  flex: 1;
+}
+
+.team-list-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.team-list-footer {
+  padding: 12px 16px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+}
+
+.team-upload-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+  cursor: pointer;
+}
+
+/* ── List Item ── */
+.team-list-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background var(--fury-transition);
+}
+
+.team-list-item:hover {
+  background: rgba(0, 212, 255, 0.03);
+}
+
+.team-list-item.active {
+  background: rgba(0, 212, 255, 0.08);
+  border-left: 3px solid var(--fury-accent);
+  padding-left: 13px;
+}
+
+.team-list-item-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.team-list-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fury-text);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.team-list-item-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 16px;
+}
+
+.team-list-rate {
+  font-size: 11px;
+  color: var(--fury-success);
+  font-weight: 500;
+}
+
+.team-list-hours {
+  font-size: 11px;
+  color: var(--fury-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Status Dot ── */
+.team-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.team-status-active {
+  background: var(--fury-success);
+  box-shadow: 0 0 4px rgba(34, 197, 94, 0.4);
+}
+
+.team-status-inactive {
+  background: var(--fury-text-muted);
+}
+
+/* ── Invoice Status Dot (in list) ── */
+.team-inv-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.team-inv-draft { background: var(--fury-neutral); }
+.team-inv-sent { background: var(--fury-warning); }
+.team-inv-paid { background: var(--fury-success); }
+
+/* ── Badges ── */
+.team-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: var(--fury-radius-sm);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.team-badge-ft { background: rgba(0, 212, 255, 0.12); color: var(--fury-accent); }
+.team-badge-pt { background: rgba(139, 92, 246, 0.15); color: #A78BFA; }
+.team-badge-ctr { background: rgba(107, 114, 128, 0.15); color: var(--fury-text-secondary); }
+
+/* ── Detail Panel ── */
+.team-detail {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.team-detail-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.team-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.team-detail-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--fury-text);
+  margin-bottom: 6px;
+}
+
+.team-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.team-detail-rate {
+  font-size: 13px;
+  color: var(--fury-success);
+  font-weight: 500;
+}
+
+.team-detail-team {
+  font-size: 12px;
+  color: var(--fury-text-muted);
+}
+
+/* ── Detail Sections ── */
+.team-detail-section {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.team-detail-section:last-child {
+  border-bottom: none;
+}
+
+.team-detail-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fury-accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.team-auto-calc {
+  font-weight: 400;
+  color: var(--fury-text-muted);
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.team-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.team-detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.team-detail-label {
+  font-size: 11px;
+  color: var(--fury-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.team-detail-value {
+  font-size: 13px;
+  color: var(--fury-text);
+}
+
+.team-muted {
+  color: var(--fury-text-muted);
+}
+
+.team-detail-docs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.team-upload-doc {
+  cursor: pointer;
+}
+
+/* ── Hours Table ── */
+.team-hours-table {
+  max-width: 400px;
+}
+
+.team-hours-input {
+  width: 80px;
+  text-align: right;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.team-hours-total td {
+  border-top: 2px solid var(--fury-border);
+}
+
+.team-diff-over { color: var(--fury-success); }
+.team-diff-under { color: var(--fury-danger); }
+.team-diff-zero { color: var(--fury-text-muted); }
+
+/* ── Invoice Card ── */
+.team-invoice-card {
+  background: var(--fury-elevated);
+  border: 1px solid var(--fury-border);
+  border-radius: var(--fury-radius);
+  padding: 16px;
+}
+
+.team-invoice-info {
+  margin-bottom: 12px;
+}
+
+.team-invoice-amount {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--fury-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.team-invoice-hours {
+  font-size: 12px;
+  color: var(--fury-text-muted);
+  margin-top: 4px;
+}
+
+.team-invoice-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.team-invoice-empty {
+  text-align: center;
+  padding: 20px;
+}
+
+/* ── Fury Button Variants ── */
+.fury-btn-accent {
+  background: var(--fury-accent);
+  color: var(--fury-bg);
+  border: none;
+  padding: 8px 20px;
+  border-radius: var(--fury-radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--fury-transition);
+}
+
+.fury-btn-accent:hover {
+  background: var(--fury-accent-hover);
+}
+
+.fury-btn-accent:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fury-btn-success {
+  background: var(--fury-success);
+  color: #fff;
+  border: none;
+  padding: 6px 14px;
+  border-radius: var(--fury-radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--fury-transition);
+}
+
+.fury-btn-success:hover {
+  opacity: 0.9;
+}
+
+/* ── Compact Table ── */
+.fury-table-compact th,
+.fury-table-compact td {
+  padding: 6px 12px;
+}
+
+/* ── Small Input ── */
+.fury-input-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* ── Responsive: stack on narrow screens ── */
+@media (max-width: 900px) {
+  .team-page {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .team-list {
+    width: 100%;
+    min-width: 0;
+    max-height: 300px;
+    border-right: none;
+    border-bottom: 1px solid var(--fury-border);
+  }
+
+  .team-detail {
+    min-height: 400px;
+  }
+}
