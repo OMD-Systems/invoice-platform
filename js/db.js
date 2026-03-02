@@ -29,6 +29,19 @@ const DB = {
    * @returns {Promise<{data: string|null, error: object|null}>}
    */
   async getUserRole(email) {
+    // Primary: read role from JWT app_metadata (set via Admin API, no RLS issues)
+    try {
+      const { data: { session } } = await this.client.auth.getSession();
+      const appRole = session?.user?.app_metadata?.role;
+      if (appRole) {
+        console.log('[DB] getUserRole from JWT app_metadata:', appRole);
+        return { data: appRole, error: null };
+      }
+    } catch (e) {
+      console.warn('[DB] JWT app_metadata check failed:', e);
+    }
+
+    // Fallback: direct query (may fail if profiles RLS is recursive)
     try {
       const { data, error } = await this.client
         .from('profiles')
@@ -36,7 +49,7 @@ const DB = {
         .eq('email', email)
         .maybeSingle();
 
-      console.log('[DB] getUserRole:', email, '→ data:', data, 'error:', error);
+      console.log('[DB] getUserRole query:', email, '→ data:', data, 'error:', error);
 
       if (error) return { data: null, error };
       if (!data) return { data: null, error: { message: 'No profile found for ' + email } };
