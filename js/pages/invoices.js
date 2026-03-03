@@ -84,6 +84,11 @@ const Invoices = {
       '</select>' +
       '</div>' +
       '<div style="display: flex; align-items: center; gap: 8px;">' +
+      (App.role === 'admin' ?
+        '<button class="fury-btn fury-btn-sm" id="btn-delete-selected" disabled style="background-color: var(--fury-danger); border-color: var(--fury-danger); color: white;">' +
+        'Delete Selected' +
+        '</button>'
+        : '') +
       '<button class="fury-btn fury-btn-primary fury-btn-sm" id="btn-generate-selected" disabled>' +
       'Generate Selected' +
       '</button>' +
@@ -730,12 +735,14 @@ const Invoices = {
   _updateBatchButtons: function (container) {
     var genBtn = container.querySelector('#btn-generate-selected');
     var dlBtn = container.querySelector('#btn-batch-download');
+    var delSelBtn = container.querySelector('#btn-delete-selected');
 
-    // Generate Selected: enable when pending checkboxes exist
-    var pendingChecks = container.querySelectorAll('.inv-pending-check');
+    var pendingChecks = container.querySelectorAll('.inv-pending-check:checked');
     if (genBtn) genBtn.disabled = pendingChecks.length === 0;
 
-    // Download All DOCX: enable when invoices exist
+    var invChecks = container.querySelectorAll('.inv-row-check:checked');
+    if (delSelBtn) delSelBtn.disabled = invChecks.length === 0;
+
     if (dlBtn) dlBtn.disabled = this.invoices.length === 0;
   },
 
@@ -806,6 +813,7 @@ const Invoices = {
         for (var i = 0; i < checks.length; i++) {
           checks[i].checked = this.checked;
         }
+        self._updateBatchButtons(container);
       });
     }
 
@@ -817,8 +825,16 @@ const Invoices = {
         for (var i = 0; i < checks.length; i++) {
           checks[i].checked = this.checked;
         }
+        self._updateBatchButtons(container);
       });
     }
+
+    // Individual checkboxes
+    container.addEventListener('change', function (e) {
+      if (e.target.classList.contains('inv-row-check') || e.target.classList.contains('inv-pending-check')) {
+        self._updateBatchButtons(container);
+      }
+    });
 
     // ── Generate Selected ──
     var genBtn = container.querySelector('#btn-generate-selected');
@@ -833,6 +849,14 @@ const Invoices = {
     if (dlBtn) {
       dlBtn.addEventListener('click', function () {
         self._handleBatchDownload(container, ctx);
+      });
+    }
+
+    // ── Bulk Delete ──
+    var delSelBtn = container.querySelector('#btn-delete-selected');
+    if (delSelBtn) {
+      delSelBtn.addEventListener('click', function () {
+        self._handleDeleteSelected(container, ctx);
       });
     }
 
@@ -1035,6 +1059,49 @@ const Invoices = {
     await this._reload(container, ctx);
   },
 
+  /* ── Delete selected invoices ── */
+  async _handleDeleteSelected(container, ctx) {
+    if (App.role !== 'admin') return;
+
+    var checks = container.querySelectorAll('.inv-row-check:checked');
+    if (checks.length === 0) return;
+
+    if (!confirm('Are you sure you want to permanently delete ' + checks.length + ' selected invoice(s)?')) return;
+
+    var btn = container.querySelector('#btn-delete-selected');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+    }
+
+    var errors = [];
+    var deletedCount = 0;
+
+    for (var i = 0; i < checks.length; i++) {
+      var id = checks[i].getAttribute('data-invoice-id');
+      try {
+        var result = await DB.deleteInvoice(id);
+        if (result && result.error) throw new Error(result.error.message);
+        deletedCount++;
+      } catch (err) {
+        errors.push(id + ': ' + (err.message || 'Failed'));
+      }
+    }
+
+    if (errors.length > 0) {
+      alert('Some deletions failed:\n\n' + errors.join('\n'));
+    } else if (deletedCount > 0) {
+      showToast(deletedCount + ' invoice(s) deleted', 'success');
+    }
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Delete Selected';
+    }
+
+    await this._reload(container, ctx);
+  },
+
   /* ── Batch download ── */
   _handleBatchDownload: async function (container, ctx) {
     try {
@@ -1072,12 +1139,7 @@ const Invoices = {
     if (empType === 'hourly' || empType === 'Hourly Contractor') {
       estimatedAmount = rate * hours;
     } else {
-      var expectedHours = (this.workingDays || 21) * (this.hoursPerDay || 8);
-      if (ts && expectedHours > 0) {
-        estimatedAmount = rate * (hours / expectedHours);
-      } else {
-        estimatedAmount = rate;
-      }
+      estimatedAmount = rate;
     }
 
     var prefix = employee.invoice_prefix || '';

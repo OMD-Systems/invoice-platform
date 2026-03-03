@@ -32,24 +32,26 @@ var InvoicePreview = {
     // Build overlay
     var overlay = document.createElement('div');
     overlay.className = 'fury-modal-overlay active invoice-preview-overlay';
-    overlay.setAttribute('data-print', 'hide');
+
+    var mainContainer = document.querySelector('.fury-main');
+    if (mainContainer) mainContainer.setAttribute('data-print', 'hide');
 
     overlay.innerHTML =
       '<div class="fury-modal fury-modal-lg" style="max-width: 860px; max-height: 92vh;">' +
-        '<div class="fury-modal-header">' +
-          '<span class="fury-modal-title">Invoice Preview</span>' +
-          '<div style="display: flex; align-items: center; gap: 8px;">' +
-            '<button class="fury-btn fury-btn-secondary fury-btn-sm no-print" id="ipv-btn-print">' +
-              'Print / PDF' +
-            '</button>' +
-            '<button class="fury-modal-close no-print" id="ipv-btn-close" title="Close">&times;</button>' +
-          '</div>' +
-        '</div>' +
-        '<div class="fury-modal-body" style="padding: 24px; overflow-y: auto;">' +
-          '<div class="invoice-preview">' +
-            this.renderInvoiceHTML(invoiceData) +
-          '</div>' +
-        '</div>' +
+      '<div class="fury-modal-header">' +
+      '<span class="fury-modal-title">Invoice Preview</span>' +
+      '<div style="display: flex; align-items: center; gap: 8px;">' +
+      '<button class="fury-btn fury-btn-secondary fury-btn-sm no-print" id="ipv-btn-print">' +
+      'Print / PDF' +
+      '</button>' +
+      '<button class="fury-modal-close no-print" id="ipv-btn-close" title="Close">&times;</button>' +
+      '</div>' +
+      '</div>' +
+      '<div class="fury-modal-body" style="padding: 24px; overflow-y: auto;">' +
+      '<div class="invoice-preview">' +
+      this.renderInvoiceHTML(invoiceData) +
+      '</div>' +
+      '</div>' +
       '</div>';
 
     document.body.appendChild(overlay);
@@ -96,6 +98,10 @@ var InvoicePreview = {
   _closeOverlay: function (overlay) {
     if (!overlay) return;
     overlay.classList.remove('active');
+
+    var mainContainer = document.querySelector('.fury-main');
+    if (mainContainer) mainContainer.removeAttribute('data-print');
+
     setTimeout(function () {
       if (overlay.parentNode) overlay.remove();
     }, 260);
@@ -139,11 +145,11 @@ var InvoicePreview = {
 
       itemsHtml +=
         '<tr>' +
-          '<td class="text-center">' + (i + 1) + '</td>' +
-          '<td>' + this._esc(item.description || '') + '</td>' +
-          '<td class="text-right">$' + this._fmtNum(itemPrice) + '</td>' +
-          '<td class="text-center">' + itemQty + '</td>' +
-          '<td class="text-right">$' + this._fmtNum(itemTotal) + '</td>' +
+        '<td class="text-center">' + (i + 1) + '</td>' +
+        '<td>' + this._esc(item.description || '') + '</td>' +
+        '<td class="text-right">$' + this._fmtNum(itemPrice) + '</td>' +
+        '<td class="text-center">' + itemQty + '</td>' +
+        '<td class="text-right">$' + this._fmtNum(itemTotal) + '</td>' +
         '</tr>';
     }
 
@@ -155,103 +161,103 @@ var InvoicePreview = {
     // Compose all 5 sections
     var html =
       '<div class="invoice-stamp" style="position: relative;">' +
-        stampHtml +
+      stampHtml +
 
-        /* ═════ SECTION 1: Header ═════ */
-        '<div class="invoice-header">' +
-          '<div>' +
-            '<div class="invoice-company-name" style="color: #205968; font-size: 14pt;">' +
-              this._esc(emp.full_name_lat || emp.name || '') +
-            '</div>' +
-            '<div class="invoice-address">' + this._esc(emp.address || '') + '</div>' +
-            '<div class="invoice-contact">' + this._esc(emp.phone || '') + '</div>' +
-          '</div>' +
-          '<div style="text-align: right;">' +
-            '<div class="invoice-title">INVOICE</div>' +
-          '</div>' +
-        '</div>' +
+      /* ═════ SECTION 1: Header ═════ */
+      '<div class="invoice-header">' +
+      '<div>' +
+      '<div class="invoice-company-name" style="color: #205968; font-size: 14pt;">' +
+      this._esc(emp.full_name_lat || emp.name || '') +
+      '</div>' +
+      '<div class="invoice-address">' + this._esc(emp.address || '') + '</div>' +
+      '<div class="invoice-contact">' + this._esc(emp.phone || '') + '</div>' +
+      '</div>' +
+      '<div style="text-align: right;">' +
+      '<div class="invoice-title">INVOICE</div>' +
+      '</div>' +
+      '</div>' +
 
-        /* ═════ SECTION 2: Billing Info ═════ */
-        '<div class="invoice-parties">' +
-          '<div class="invoice-to">' +
-            '<div class="invoice-section-label">BILLED TO</div>' +
-            '<div class="invoice-company-name">' + this._esc(billedTo.name || '') + '</div>' +
-            '<div class="invoice-address">' + this._nlToBr(this._esc(billedTo.address || '')) + '</div>' +
-          '</div>' +
-          '<div style="flex: 1;">' +
-            '<div style="display: flex; flex-direction: column; gap: 12pt; align-items: flex-end;">' +
-              '<div class="invoice-meta-item">' +
-                '<div class="invoice-meta-label">INVOICE NUMBER</div>' +
-                '<div class="invoice-meta-value">' + this._esc(data.invoiceNumber || '') + '</div>' +
-              '</div>' +
-              '<div class="invoice-meta-item">' +
-                '<div class="invoice-meta-label">INVOICE DATE</div>' +
-                '<div class="invoice-meta-value">' + this._esc(data.invoiceDate || '') + '</div>' +
-              '</div>' +
-              '<div class="invoice-meta-item">' +
-                '<div class="invoice-meta-label">DUE DATE</div>' +
-                '<div class="invoice-meta-value">' + this._esc(data.dueDays || '') + '</div>' +
-              '</div>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
+      /* ═════ SECTION 2: Billing Info ═════ */
+      '<div class="invoice-parties">' +
+      '<div class="invoice-to">' +
+      '<div class="invoice-section-label">BILLED TO</div>' +
+      '<div class="invoice-company-name">' + this._esc(billedTo.name || '') + '</div>' +
+      '<div class="invoice-address">' + this._nlToBr(this._esc(billedTo.address || '')) + '</div>' +
+      '</div>' +
+      '<div style="flex: 1;">' +
+      '<div style="display: flex; flex-direction: column; gap: 12pt; align-items: flex-end;">' +
+      '<div class="invoice-meta-item">' +
+      '<div class="invoice-meta-label">INVOICE NUMBER</div>' +
+      '<div class="invoice-meta-value">' + this._esc(data.invoiceNumber || '') + '</div>' +
+      '</div>' +
+      '<div class="invoice-meta-item">' +
+      '<div class="invoice-meta-label">INVOICE DATE</div>' +
+      '<div class="invoice-meta-value">' + this._esc(data.invoiceDate || '') + '</div>' +
+      '</div>' +
+      '<div class="invoice-meta-item">' +
+      '<div class="invoice-meta-label">DUE DATE</div>' +
+      '<div class="invoice-meta-value">' + this._esc(data.dueDays || '') + '</div>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
 
-        /* ═════ SECTION 3: Line Items Table ═════ */
-        '<table class="invoice-table">' +
-          '<thead>' +
-            '<tr>' +
-              '<th style="width: 40pt; text-align: center;">ID</th>' +
-              '<th>Description</th>' +
-              '<th class="text-right" style="width: 80pt;">Price</th>' +
-              '<th style="width: 50pt; text-align: center;">QTY</th>' +
-              '<th class="text-right" style="width: 80pt;">Total</th>' +
-            '</tr>' +
-          '</thead>' +
-          '<tbody>' +
-            itemsHtml +
-          '</tbody>' +
-        '</table>' +
+      /* ═════ SECTION 3: Line Items Table ═════ */
+      '<table class="invoice-table">' +
+      '<thead>' +
+      '<tr>' +
+      '<th style="width: 40pt; text-align: center;">ID</th>' +
+      '<th>Description</th>' +
+      '<th class="text-right" style="width: 80pt;">Price</th>' +
+      '<th style="width: 50pt; text-align: center;">QTY</th>' +
+      '<th class="text-right" style="width: 80pt;">Total</th>' +
+      '</tr>' +
+      '</thead>' +
+      '<tbody>' +
+      itemsHtml +
+      '</tbody>' +
+      '</table>' +
 
-        /* ═════ SECTION 4: Totals ═════ */
-        '<div class="invoice-totals">' +
-          '<table class="invoice-totals-table">' +
-            '<tr class="subtotal">' +
-              '<td>SUBTOTAL</td>' +
-              '<td>$' + this._fmtNum(subtotal) + '</td>' +
-            '</tr>' +
-            '<tr class="discount">' +
-              '<td>DISCOUNT</td>' +
-              '<td>$' + this._fmtNum(discount) + '</td>' +
-            '</tr>' +
-            '<tr class="tax">' +
-              '<td>TAX (' + this._esc(taxRate) + '%)</td>' +
-              '<td>$' + this._fmtNum(tax) + '</td>' +
-            '</tr>' +
-            '<tr class="total">' +
-              '<td>INVOICE TOTAL</td>' +
-              '<td class="invoice-total-amount">$' + this._fmtNum(total) + '</td>' +
-            '</tr>' +
-          '</table>' +
-        '</div>' +
+      /* ═════ SECTION 4: Totals ═════ */
+      '<div class="invoice-totals">' +
+      '<table class="invoice-totals-table">' +
+      '<tr class="subtotal">' +
+      '<td>SUBTOTAL</td>' +
+      '<td>$' + this._fmtNum(subtotal) + '</td>' +
+      '</tr>' +
+      '<tr class="discount">' +
+      '<td>DISCOUNT</td>' +
+      '<td>$' + this._fmtNum(discount) + '</td>' +
+      '</tr>' +
+      '<tr class="tax">' +
+      '<td>TAX (' + this._esc(taxRate) + '%)</td>' +
+      '<td>$' + this._fmtNum(tax) + '</td>' +
+      '</tr>' +
+      '<tr class="total">' +
+      '<td>INVOICE TOTAL</td>' +
+      '<td class="invoice-total-amount">$' + this._fmtNum(total) + '</td>' +
+      '</tr>' +
+      '</table>' +
+      '</div>' +
 
-        /* ═════ SECTION 5: Footer (Bank + Terms) ═════ */
-        '<div style="display: flex; justify-content: space-between; gap: 24pt; margin-top: 12pt;">' +
-          '<div class="invoice-payment" style="flex: 1;">' +
-            '<div class="invoice-payment-title">BANK ACCOUNT</div>' +
-            '<div class="invoice-payment-details">' +
-              (emp.iban ? '<strong>IBAN:</strong> ' + this._esc(emp.iban) + '<br>' : '') +
-              (emp.swift ? '<strong>SWIFT/BIC Code:</strong> ' + this._esc(emp.swift) + '<br>' : '') +
-              (emp.receiver_name ? '<strong>Receiver:</strong> ' + this._esc(emp.receiver_name) + '<br>' : '') +
-              (emp.bank_name ? '<strong>Bank:</strong> ' + this._esc(emp.bank_name) : '') +
-            '</div>' +
-          '</div>' +
-          (terms ?
-            '<div class="invoice-terms" style="flex: 1; margin-top: 0; padding-top: 0; border-top: none;">' +
-              '<div class="invoice-terms-title">TERMS AND CONDITIONS</div>' +
-              '<div class="invoice-terms-text">' + this._nlToBr(this._esc(terms)) + '</div>' +
-            '</div>'
-          : '') +
-        '</div>' +
+      /* ═════ SECTION 5: Footer (Bank + Terms) ═════ */
+      '<div style="display: flex; justify-content: space-between; gap: 24pt; margin-top: 12pt;">' +
+      '<div class="invoice-payment" style="flex: 1;">' +
+      '<div class="invoice-payment-title">BANK ACCOUNT</div>' +
+      '<div class="invoice-payment-details">' +
+      (emp.iban ? '<strong>IBAN:</strong> ' + this._esc(emp.iban) + '<br>' : '') +
+      (emp.swift ? '<strong>SWIFT/BIC Code:</strong> ' + this._esc(emp.swift) + '<br>' : '') +
+      (emp.receiver_name ? '<strong>Receiver:</strong> ' + this._esc(emp.receiver_name) + '<br>' : '') +
+      (emp.bank_name ? '<strong>Bank:</strong> ' + this._esc(emp.bank_name) : '') +
+      '</div>' +
+      '</div>' +
+      (terms ?
+        '<div class="invoice-terms" style="flex: 1; margin-top: 0; padding-top: 0; border-top: none;">' +
+        '<div class="invoice-terms-title">TERMS AND CONDITIONS</div>' +
+        '<div class="invoice-terms-text">' + this._nlToBr(this._esc(terms)) + '</div>' +
+        '</div>'
+        : '') +
+      '</div>' +
 
       '</div>'; // close .invoice-stamp
 
