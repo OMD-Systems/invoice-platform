@@ -503,7 +503,7 @@ const Invoices = {
       }
     } catch (err) {
       console.error('[Invoices] settlements error:', err);
-      content.innerHTML = '<div class="fury-card" style="padding:24px;text-align:center;color:var(--fury-danger)">Error: ' + self._escHtml(err.message) + '</div>';
+      content.innerHTML = '<div class="fury-card" style="padding:24px;text-align:center;color:var(--fury-danger)">Failed to load settlements. Please try again.</div>';
     }
   },
 
@@ -517,7 +517,7 @@ const Invoices = {
   },
   _escHtml(str) {
     if (!str) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   },
   _statusBadgeHtml(status) {
     var m = { draft: 'neutral', generated: 'info', sent: 'warning', paid: 'success' };
@@ -547,7 +547,7 @@ const Invoices = {
       XLSX.utils.book_append_sheet(wb, ws, self.MONTH_NAMES[self.month - 1] + ' ' + self.year);
       XLSX.writeFile(wb, 'Invoice_Summary_' + self.year + '-' + String(self.month).padStart(2, '0') + '.xlsx');
       showToast('Exported!', 'success');
-    } catch (err) { showToast('Export failed: ' + err.message, 'error'); }
+    } catch (err) { console.error('[Invoices] export error:', err); showToast('Export failed. Please try again.', 'error'); }
   },
   MONTH_NAMES: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
   _exportSettlementsXlsx(detailed, activeCodes, companies) {
@@ -560,7 +560,7 @@ const Invoices = {
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), 'Settlements');
       XLSX.writeFile(wb, 'Settlements_' + this.year + '-' + String(this.month).padStart(2, '0') + '.xlsx');
       showToast('Exported!', 'success');
-    } catch (err) { showToast('Export failed: ' + err.message, 'error'); }
+    } catch (err) { console.error('[Invoices] settlements export error:', err); showToast('Export failed. Please try again.', 'error'); }
   },
 
   /* ═══════════════════════════════════════════════════════
@@ -755,16 +755,14 @@ const Invoices = {
     // ── Tab switching ──
     var tabs = container.querySelectorAll('.fury-tab[data-inv-tab]');
     for (var ti = 0; ti < tabs.length; ti++) {
-      tabs[ti].addEventListener('click', function () {
+      tabs[ti].addEventListener('click', async function () {
         var clickedTab = this.getAttribute('data-inv-tab');
         if (self.activeTab === clickedTab) return;
 
         self.activeTab = clickedTab;
         if (clickedTab === 'invoices') {
           // Re-render entire page to restore destroyed DOM template and events
-          container.innerHTML = self.render(ctx);
-          self.bindEvents(container, ctx);
-          self.renderActiveTab(container);
+          await self.render(container, ctx);
           return;
         }
 
@@ -895,7 +893,7 @@ const Invoices = {
               await self._reload(container, ctx);
             } catch (err) {
               console.error('[Invoices] delete error:', err);
-              alert('Delete failed: ' + err.message);
+              alert('Failed to delete invoice. Please try again.');
               btnDel.innerHTML = btnOriginalHtml;
               btnDel.disabled = false;
             }
@@ -976,7 +974,7 @@ const Invoices = {
         await InvoiceDocx.downloadInvoice(docxData);
       } catch (err) {
         console.error('[Invoices] DOCX download error:', err);
-        alert('Failed to generate DOCX: ' + (err.message || 'Unknown error'));
+        alert('Failed to generate DOCX. Please try again.');
       }
     } else {
       alert('DOCX generation service is not available.');
@@ -988,7 +986,8 @@ const Invoices = {
     try {
       var result = await DB.updateInvoiceStatus(invoiceId, newStatus);
       if (!result || result.error) {
-        alert('Failed to update status: ' + (result && result.error ? result.error.message : 'Unknown error'));
+        console.error('[Invoices] Status change error:', result.error);
+        alert('Failed to update status. Please try again.');
         return;
       }
       // Update local data
@@ -1000,7 +999,7 @@ const Invoices = {
       }
     } catch (err) {
       console.error('[Invoices] Status change error:', err);
-      alert('Failed to update status: ' + (err.message || 'Unknown error'));
+      alert('Failed to update status. Please try again.');
     }
   },
 
@@ -1043,7 +1042,7 @@ const Invoices = {
         await this._autoGenerateInvoice(emp, ctx);
       } catch (err) {
         var eName = emp.full_name_lat || emp.name || 'Unknown';
-        errors.push(eName + ': ' + (err.message || 'Failed'));
+        errors.push(eName + ': generation failed');
       }
     }
 
@@ -1084,7 +1083,7 @@ const Invoices = {
         if (result && result.error) throw new Error(result.error.message);
         deletedCount++;
       } catch (err) {
-        errors.push(id + ': ' + (err.message || 'Failed'));
+        errors.push(id + ': deletion failed');
       }
     }
 
@@ -1118,7 +1117,7 @@ const Invoices = {
       }
     } catch (err) {
       console.error('[Invoices] batch download error:', err);
-      alert('Batch download failed: ' + (err.message || 'Unknown error'));
+      alert('Batch download failed. Please try again.');
     }
   },
 
@@ -1347,6 +1346,7 @@ const Invoices = {
     // Preview
     overlay.querySelector('#gen-preview').addEventListener('click', function () {
       var modalData = self.collectModalData(overlay, employee);
+      if (!modalData) return;
       InvoicePreview.show(modalData);
     });
 
@@ -1392,6 +1392,24 @@ const Invoices = {
     var discount = parseFloat(overlay.querySelector('#gen-discount').value) || 0;
     var tax = parseFloat(overlay.querySelector('#gen-tax').value) || 0;
 
+    // Validation
+    if (!invNumber) {
+      showToast('Invoice number is required', 'error');
+      return null;
+    }
+    if (!invDate) {
+      showToast('Invoice date is required', 'error');
+      return null;
+    }
+    if (discount < 0) {
+      showToast('Discount cannot be negative', 'error');
+      return null;
+    }
+    if (tax < 0) {
+      showToast('Tax rate cannot be negative', 'error');
+      return null;
+    }
+
     // Collect line items
     // Fields: description, price, qty, total — matches InvoiceDocx (item.price, item.qty)
     // and InvoicePreview (item.price, item.total) expected shape
@@ -1402,6 +1420,14 @@ const Invoices = {
       var price = parseFloat(liRows[i].querySelector('.gen-li-price').value) || 0;
       var qty = parseFloat(liRows[i].querySelector('.gen-li-qty').value) || 1;
       var totalVal = parseFloat(liRows[i].querySelector('.gen-li-total').value) || 0;
+      if (price < 0) {
+        showToast('Line item price cannot be negative', 'error');
+        return null;
+      }
+      if (qty <= 0) {
+        showToast('Line item quantity must be positive', 'error');
+        return null;
+      }
       if (desc || price > 0) {
         items.push({
           description: desc || 'Service',
@@ -1432,6 +1458,12 @@ const Invoices = {
     for (var k = 0; k < items.length; k++) {
       subtotal += items[k].total;
     }
+
+    if (discount > subtotal) {
+      showToast('Discount cannot exceed subtotal', 'error');
+      return null;
+    }
+
     var total = subtotal - discount + tax;
 
     // Format the invoice date for display
@@ -1478,6 +1510,12 @@ const Invoices = {
   /* ── Save invoice to DB ── */
   async _saveInvoice(overlay, employee, status, container, ctx, closeCallback) {
     var data = this.collectModalData(overlay, employee);
+    if (!data) return null;
+
+    if (!data.items || data.items.length === 0) {
+      showToast('At least one line item is required', 'error');
+      return null;
+    }
 
     var saveBtn = overlay.querySelector('#gen-save-draft');
     if (saveBtn) {
@@ -1512,7 +1550,8 @@ const Invoices = {
 
       var result = await DB.createInvoice(invoicePayload, itemsPayload);
       if (!result || result.error) {
-        alert('Failed to save invoice: ' + (result && result.error ? result.error.message : 'Unknown error'));
+        console.error('[Invoices] Save error:', result && result.error);
+        alert('Failed to save invoice. Please try again.');
         return null;
       }
 
@@ -1521,7 +1560,7 @@ const Invoices = {
       return result.data;
     } catch (err) {
       console.error('[Invoices] Save error:', err);
-      alert('Failed to save invoice: ' + (err.message || 'Unknown error'));
+      alert('Failed to save invoice. Please try again.');
       return null;
     } finally {
       if (saveBtn) {
@@ -1534,6 +1573,12 @@ const Invoices = {
   /* ── Save and Download DOCX ── */
   async _saveAndDownload(overlay, employee, container, ctx, closeCallback) {
     var data = this.collectModalData(overlay, employee);
+    if (!data) return null;
+
+    if (!data.items || data.items.length === 0) {
+      showToast('At least one line item is required', 'error');
+      return null;
+    }
 
     var dlBtn = overlay.querySelector('#gen-download');
     if (dlBtn) {
@@ -1569,7 +1614,8 @@ const Invoices = {
 
       var result = await DB.createInvoice(invoicePayload, itemsPayload);
       if (!result || result.error) {
-        alert('Failed to save invoice: ' + (result && result.error ? result.error.message : 'Unknown error'));
+        console.error('[Invoices] Generate & download save error:', result && result.error);
+        alert('Failed to save invoice. Please try again.');
         return;
       }
 
@@ -1585,7 +1631,7 @@ const Invoices = {
       await this._reload(container, ctx);
     } catch (err) {
       console.error('[Invoices] Generate & download error:', err);
-      alert('Failed to generate invoice: ' + (err.message || 'Unknown error'));
+      alert('Failed to generate invoice. Please try again.');
     } finally {
       if (dlBtn) {
         dlBtn.disabled = false;

@@ -83,7 +83,7 @@ const Auth = {
       const { data, error } = await DB.client.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
         options: {
-          shouldCreateUser: true, // Allow new users to register
+          shouldCreateUser: false, // SECURITY: disabled open registration
           emailRedirectTo: window.location.origin + window.location.pathname
         }
       });

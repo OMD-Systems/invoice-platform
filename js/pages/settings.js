@@ -562,7 +562,7 @@ const Settings = {
 
     } catch (err) {
       console.error('[Settings] loadData error:', err);
-      showToast('Error loading settings data: ' + (err.message || 'Unknown error'), 'error');
+      showToast('Failed to load settings. Please try again.', 'error');
     }
   },
 
@@ -685,7 +685,7 @@ const Settings = {
           showToast('Settings saved successfully!', 'success');
         } catch (err) {
           console.error('[Settings] save general error:', err);
-          showToast('Error saving settings: ' + (err.message || 'Unknown error'), 'error');
+          showToast('Failed to save settings. Please try again.', 'error');
         } finally {
           saveBtn.disabled = false;
           saveBtn.textContent = 'Save Settings';
@@ -913,6 +913,16 @@ const Settings = {
         return;
       }
 
+      if (!/^[A-Za-z0-9_-]{1,10}$/.test(code)) {
+        showToast('Project code: alphanumeric, underscore, dash only, max 10 chars.', 'error');
+        return;
+      }
+
+      if (name.length > 100) {
+        showToast('Project name must be 100 characters or less.', 'error');
+        return;
+      }
+
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
 
@@ -949,7 +959,7 @@ const Settings = {
 
       } catch (err) {
         console.error('[Settings] save project error:', err);
-        showToast('Error saving project: ' + (err.message || 'Unknown error'), 'error');
+        showToast('Failed to save project. Please try again.', 'error');
         saveBtn.disabled = false;
         saveBtn.textContent = isEdit ? 'Update' : 'Create';
       }
@@ -995,7 +1005,7 @@ const Settings = {
         showToast('Team name is required.', 'error');
         return;
       }
-      if (leadEmail && (leadEmail.indexOf('@') === -1 || leadEmail.indexOf('.') === -1)) {
+      if (leadEmail && typeof Validation !== 'undefined' && !Validation.isValidEmail(leadEmail)) {
         showToast('Please enter a valid lead email.', 'error');
         return;
       }
@@ -1031,7 +1041,7 @@ const Settings = {
 
       } catch (err) {
         console.error('[Settings] save team error:', err);
-        showToast('Error saving team: ' + (err.message || 'Unknown error'), 'error');
+        showToast('Failed to save team. Please try again.', 'error');
         saveBtn.disabled = false;
         saveBtn.textContent = isEdit ? 'Update' : 'Create';
       }
@@ -1131,7 +1141,7 @@ const Settings = {
 
         } catch (err) {
           console.error('[Settings] remove member error:', err);
-          showToast('Error removing member: ' + (err.message || 'Unknown error'), 'error');
+          showToast('Failed to remove member. Please try again.', 'error');
         }
       });
     }
@@ -1173,7 +1183,7 @@ const Settings = {
 
         } catch (err) {
           console.error('[Settings] add member error:', err);
-          showToast('Error adding member: ' + (err.message || 'Unknown error'), 'error');
+          showToast('Failed to add member. Please try again.', 'error');
           addMemberBtn.disabled = false;
           addMemberBtn.textContent = 'Add';
         }
@@ -1260,7 +1270,7 @@ const Settings = {
         showToast('Email is required.', 'error');
         return;
       }
-      if (email.indexOf('@') === -1 || email.indexOf('.') === -1) {
+      if (typeof Validation !== 'undefined' && !Validation.isValidEmail(email)) {
         showToast('Please enter a valid email address.', 'error');
         return;
       }
@@ -1280,10 +1290,15 @@ const Settings = {
         if (result.error) throw result.error;
 
         self._closeModal();
-        showToast('User created! Temp password: ' + tempPassword, 'success');
 
-        // Show alert so admin can copy the password
-        alert('User created successfully.\n\nEmail: ' + email + '\nTemporary Password: ' + tempPassword + '\n\nPlease share this password with the user.');
+        // Copy temp password to clipboard securely instead of showing it in UI
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(tempPassword).then(function() {
+            showToast('User created! Password copied to clipboard.', 'success');
+          });
+        } else {
+          prompt('User created. Copy the temporary password:', tempPassword);
+        }
 
         // Reload profiles
         var profileResult = await DB.client
@@ -1295,7 +1310,7 @@ const Settings = {
 
       } catch (err) {
         console.error('[Settings] add user error:', err);
-        showToast('Error creating user: ' + (err.message || 'Unknown error'), 'error');
+        showToast('Failed to create user. Please try again.', 'error');
         saveBtn.disabled = false;
         saveBtn.textContent = 'Create User';
       }
@@ -1330,7 +1345,7 @@ const Settings = {
 
     } catch (err) {
       console.error('[Settings] change role error:', err);
-      showToast('Error changing role: ' + (err.message || 'Unknown error'), 'error');
+      showToast('Failed to change role. Please try again.', 'error');
       // Re-render to reset the select
       self.renderActiveTab(container);
     }
@@ -1367,7 +1382,7 @@ const Settings = {
 
     } catch (err) {
       console.error('[Settings] lock month error:', err);
-      showToast('Error locking month: ' + (err.message || 'Unknown error'), 'error');
+      showToast('Failed to lock month. Please try again.', 'error');
     }
   },
 
@@ -1399,7 +1414,7 @@ const Settings = {
 
     } catch (err) {
       console.error('[Settings] unlock month error:', err);
-      showToast('Error unlocking month: ' + (err.message || 'Unknown error'), 'error');
+      showToast('Failed to unlock month. Please try again.', 'error');
     }
   },
 
@@ -1523,7 +1538,8 @@ const Settings = {
           showToast('Request approved', 'success');
           self._bindEmailRequestEvents(container);
         }).catch(function (err) {
-          showToast('Error: ' + (err.message || 'Failed to approve'), 'error');
+          console.error('[Settings] approve error:', err);
+          showToast('Failed to approve request. Please try again.', 'error');
         });
       });
     }
@@ -1537,7 +1553,8 @@ const Settings = {
           showToast('Request rejected', 'success');
           self._bindEmailRequestEvents(container);
         }).catch(function (err) {
-          showToast('Error: ' + (err.message || 'Failed to reject'), 'error');
+          console.error('[Settings] reject error:', err);
+          showToast('Failed to reject request. Please try again.', 'error');
         });
       });
     }
@@ -1549,7 +1566,7 @@ const Settings = {
         var id = this.getAttribute('data-id');
         var noteInput = container.querySelector('.set-email-note[data-id="' + id + '"]');
         var note = noteInput ? noteInput.value.trim() : '';
-        if (!note || note.indexOf('@') === -1) {
+        if (!note || (typeof Validation !== 'undefined' && !Validation.isValidEmail(note))) {
           showToast('Please enter the created email address', 'error');
           return;
         }
@@ -1557,7 +1574,8 @@ const Settings = {
           showToast('Email created and synced!', 'success');
           self._bindEmailRequestEvents(container);
         }).catch(function (err) {
-          showToast('Error: ' + (err.message || 'Failed to update'), 'error');
+          console.error('[Settings] update email error:', err);
+          showToast('Failed to update request. Please try again.', 'error');
         });
       });
     }
@@ -1707,7 +1725,7 @@ const Settings = {
             self._attachWorkingHoursHandlers(container);
           }
         } catch (err) {
-          showToast('Error: ' + (err.message || 'Unknown'), 'error');
+          showToast('Failed to save working hours config. Please try again.', 'error');
         } finally {
           saveBtn.disabled = false;
           saveBtn.textContent = 'Save Configuration';

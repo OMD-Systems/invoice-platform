@@ -58,6 +58,25 @@ const App = {
         this.role = (['admin', 'lead', 'viewer'].indexOf(rawRole) !== -1) ? rawRole : 'viewer';
         this.showApp();
         this.setupRouter();
+
+        // Listen for auth state changes (session expiry, token refresh)
+        var self = this;
+        DB.client.auth.onAuthStateChange(function(event, session) {
+          if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+            if (event === 'SIGNED_OUT') {
+              self.clearAppState();
+              self.showLogin();
+            }
+            if (event === 'TOKEN_REFRESHED' && session) {
+              var appRole = session.user?.app_metadata?.role;
+              if (appRole && appRole !== self.role) {
+                self.role = appRole;
+                self.applyRoleVisibility();
+              }
+            }
+          }
+        });
+
         this.navigate(window.location.hash || '#/team');
       } else {
         this.showLogin();
@@ -104,6 +123,34 @@ const App = {
     var badge = document.getElementById('top-bar-role-badge');
     badge.textContent = this.role || 'viewer';
     badge.className = 'role-badge ' + (this.role || 'viewer');
+  },
+
+  /* ── Clear all app state on logout/session expiry ── */
+  clearAppState() {
+    this.user = null;
+    this.role = null;
+    if (this.currentPage && typeof this.currentPage.destroy === 'function') {
+      try { this.currentPage.destroy(); } catch(e) {}
+    }
+    this.currentPage = null;
+    // Clear page singletons data
+    if (typeof Team !== 'undefined') {
+      Team.allEmployees = [];
+      Team.projects = [];
+      Team.allTimesheets = [];
+      Team.invoices = [];
+    }
+    if (typeof Invoices !== 'undefined') {
+      Invoices.invoices = [];
+      Invoices.employees = [];
+    }
+    if (typeof Expenses !== 'undefined') {
+      Expenses.invoices = [];
+      Expenses.allExpenses = [];
+    }
+    // Clear DOM content
+    var mainContent = document.getElementById('main-content');
+    if (mainContent) mainContent.innerHTML = '';
   },
 
   /* ── Hide admin-only nav items for non-admins ── */
@@ -221,19 +268,13 @@ const App = {
       } catch (err) {
         console.warn('[App] signOut error:', err);
       }
-      // Cleanup current page
-      if (self.currentPage && typeof self.currentPage.destroy === 'function') {
-        try { self.currentPage.destroy(); } catch (e) {}
-      }
       // Remove router
       if (self._hashChangeHandler) {
         window.removeEventListener('hashchange', self._hashChangeHandler);
         self._hashChangeHandler = null;
       }
       self._routerReady = false;
-      self.user = null;
-      self.role = null;
-      self.currentPage = null;
+      self.clearAppState();
       window.location.hash = '';
       self.showLogin();
     });
@@ -306,7 +347,7 @@ const App = {
       console.error('[App] Page render error (' + path + '):', err);
       container.innerHTML =
         '<div class="loading" style="color:#EF4444;">' +
-        'Error loading page: ' + (err.message || 'Unknown error') +
+        'Failed to load page. Please try again.' +
         '</div>';
       this.currentPage = null;
     }

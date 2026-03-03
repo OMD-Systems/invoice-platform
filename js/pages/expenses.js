@@ -496,7 +496,7 @@ const Expenses = {
     } catch (err) {
       console.error('[Expenses] updateRate error:', err);
       if (typeof showToast === 'function') {
-        showToast('Failed to update rate: ' + (err.message || 'Unknown error'), 'error');
+        showToast('Failed to update rate. Please try again.', 'error');
       }
     } finally {
       if (rateBtn) {
@@ -531,9 +531,9 @@ const Expenses = {
     } catch (err) {
       console.error('[Expenses] delete error:', err);
       if (typeof showToast === 'function') {
-        showToast('Failed to delete: ' + (err.message || 'Unknown error'), 'error');
+        showToast('Failed to delete expense. Please try again.', 'error');
       } else {
-        alert('Failed to delete: ' + (err.message || 'Unknown error'));
+        alert('Failed to delete expense. Please try again.');
       }
     }
   },
@@ -762,11 +762,39 @@ const Expenses = {
       return;
     }
 
+    if (description.length > 500) {
+      if (typeof showToast === 'function') {
+        showToast('Description must be 500 characters or less.', 'error');
+      }
+      return;
+    }
+
+    if (amountUah < 0) {
+      if (typeof showToast === 'function') {
+        showToast('Amount UAH cannot be negative.', 'error');
+      }
+      return;
+    }
+
+    if (amountUsd < 0) {
+      if (typeof showToast === 'function') {
+        showToast('Amount USD cannot be negative.', 'error');
+      }
+      return;
+    }
+
     if (amountUah <= 0 && amountUsd <= 0) {
       if (typeof showToast === 'function') {
         showToast('Please enter an amount in UAH or USD.', 'error');
       } else {
         alert('Please enter an amount in UAH or USD.');
+      }
+      return;
+    }
+
+    if (rate <= 0) {
+      if (typeof showToast === 'function') {
+        showToast('Exchange rate must be positive.', 'error');
       }
       return;
     }
@@ -823,9 +851,9 @@ const Expenses = {
     } catch (err) {
       console.error('[Expenses] save error:', err);
       if (typeof showToast === 'function') {
-        showToast('Failed to save: ' + (err.message || 'Unknown error'), 'error');
+        showToast('Failed to save expense. Please try again.', 'error');
       } else {
-        alert('Failed to save: ' + (err.message || 'Unknown error'));
+        alert('Failed to save expense. Please try again.');
       }
     } finally {
       if (saveBtn) {

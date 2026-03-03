@@ -34,7 +34,7 @@ const DB = {
       const { data: { session } } = await this.client.auth.getSession();
       const appRole = session?.user?.app_metadata?.role;
       if (appRole) {
-        console.log('[DB] getUserRole from JWT app_metadata:', appRole);
+        // Role resolved from JWT
         return { data: appRole, error: null };
       }
     } catch (e) {
@@ -49,7 +49,7 @@ const DB = {
         .eq('email', email)
         .maybeSingle();
 
-      console.log('[DB] getUserRole query:', email, '→ data:', data, 'error:', error);
+      // Role resolved from profiles query
 
       if (error) return { data: null, error };
       if (!data) return { data: null, error: { message: 'No profile found for ' + email } };
@@ -91,7 +91,7 @@ const DB = {
     try {
       const { data, error } = await this.client
         .from('employees')
-        .select('*')
+        .select('id, pin, name, full_name_lat, employee_type, contract_type, is_active, work_email, email, invoice_format, invoice_prefix, next_invoice_number, service_description, contract_uploaded_at, nda_uploaded_at, created_at')
         .eq('is_active', true)
         .order('name', { ascending: true });
 
@@ -108,6 +108,7 @@ const DB = {
    */
   async getEmployee(id) {
     try {
+      // Full select needed for admin edit form
       const { data, error } = await this.client
         .from('employees')
         .select('*')
@@ -127,9 +128,18 @@ const DB = {
    */
   async upsertEmployee(employeeData) {
     try {
+      var allowed = ['id', 'pin', 'name', 'full_name_lat', 'employee_type', 'contract_type',
+        'is_active', 'work_email', 'email', 'phone', 'address', 'rate_usd', 'iban', 'swift',
+        'bank_name', 'receiver_name', 'invoice_format', 'invoice_prefix', 'next_invoice_number',
+        'service_description'];
+      var cleaned = {};
+      for (var i = 0; i < allowed.length; i++) {
+        if (employeeData[allowed[i]] !== undefined) cleaned[allowed[i]] = employeeData[allowed[i]];
+      }
+
       const { data, error } = await this.client
         .from('employees')
-        .upsert(employeeData, { onConflict: 'id' })
+        .upsert(cleaned, { onConflict: 'id' })
         .select()
         .single();
 
@@ -172,7 +182,7 @@ const DB = {
       // Fetch the actual employee records
       const { data, error } = await this.client
         .from('employees')
-        .select('*')
+        .select('id, pin, name, full_name_lat, employee_type, contract_type, is_active, work_email, email, invoice_format, invoice_prefix, next_invoice_number, service_description, contract_uploaded_at, nda_uploaded_at, created_at')
         .in('id', employeeIds)
         .eq('is_active', true)
         .order('name', { ascending: true });
@@ -232,14 +242,7 @@ const DB = {
     try {
       const { data, error } = await this.client
         .from('team_members')
-        .select(`
-          id,
-          employee_id,
-          employees (
-            id, pin, name, full_name_lat, rate_usd,
-            employee_type, invoice_format, is_active
-          )
-        `)
+        .select('*, employees(id, pin, name, full_name_lat, employee_type, is_active, work_email, rate_usd, invoice_format)')
         .eq('team_id', teamId);
 
       return { data: data || [], error };
@@ -592,9 +595,15 @@ const DB = {
    */
   async upsertExpense(expenseData) {
     try {
+      var allowed = ['id', 'invoice_id', 'category', 'description', 'amount_uah', 'amount_usd', 'exchange_rate', 'expense_date'];
+      var cleaned = {};
+      for (var i = 0; i < allowed.length; i++) {
+        if (expenseData[allowed[i]] !== undefined) cleaned[allowed[i]] = expenseData[allowed[i]];
+      }
+
       const { data, error } = await this.client
         .from('expenses')
-        .upsert(expenseData, { onConflict: 'id' })
+        .upsert(cleaned, { onConflict: 'id' })
         .select()
         .single();
 
@@ -805,7 +814,7 @@ const DB = {
    */
   async generateInvoice(employeeId, month, year) {
     try {
-      // Get employee details
+      // Full select needed — invoice generation requires bank details (iban, swift, bank_name, receiver_name, address, phone)
       const { data: emp, error: empErr } = await this.client
         .from('employees')
         .select('*')
@@ -1066,10 +1075,15 @@ const DB = {
    */
   async updateEmailRequest(id, updates) {
     try {
-      updates.updated_at = new Date().toISOString();
+      var allowed = ['status', 'admin_note', 'updated_at'];
+      var cleaned = { updated_at: new Date().toISOString() };
+      for (var i = 0; i < allowed.length; i++) {
+        if (updates[allowed[i]] !== undefined) cleaned[allowed[i]] = updates[allowed[i]];
+      }
+
       var { data, error } = await this.client
         .from('email_requests')
-        .update(updates)
+        .update(cleaned)
         .eq('id', id)
         .select()
         .single();

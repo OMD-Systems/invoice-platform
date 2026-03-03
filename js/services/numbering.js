@@ -3,6 +3,10 @@
    Invoice Platform · OMD Systems
    ═══════════════════════════════════════════════════════ */
 
+function _sanitizeFileName(name) {
+  return String(name).replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\.{2,}/g, '.').slice(0, 200);
+}
+
 const Numbering = {
 
   /* ── Format a raw number with optional prefix ── */

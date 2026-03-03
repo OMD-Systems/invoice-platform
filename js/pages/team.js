@@ -95,7 +95,8 @@ const Team = {
       '<div class="team-list-header">' +
       '<input type="text" class="fury-input team-search" id="team-search" ' +
       'placeholder="Search employees..." />' +
-      '<div class="team-period">' +
+      (App.role === 'admin' ? '<button id="team-btn-add" class="fury-btn fury-btn-primary fury-btn-sm" style="margin-left: 8px;">+ Add Employee</button>' : '') +
+      '<div class="team-period" style="margin-top: 8px;">' +
       '<select class="fury-select fury-select-sm" id="team-month">' + monthOptions + '</select>' +
       '<select class="fury-select fury-select-sm" id="team-year">' + yearOptions + '</select>' +
       '</div>' +
@@ -204,11 +205,7 @@ const Team = {
         self.defaultTerms = ptData.text || '';
       }
 
-      console.log('[Team] loadData done — employees:', self.allEmployees.length,
-        'projects:', self.projects.length,
-        'timesheets:', self.allTimesheets.length,
-        'invoices:', self.invoices.length,
-        'role:', ctx.role);
+      // Data loaded
 
     } catch (err) {
       console.error('[Team] loadData error:', err);
@@ -653,6 +650,14 @@ const Team = {
       });
     }
 
+    // Add Employee (Admin only)
+    var addBtn = container.querySelector('#team-btn-add');
+    if (addBtn) {
+      addBtn.addEventListener('click', function () {
+        self.showEditModal(null, container);
+      });
+    }
+
     // Month/Year change
     var monthSelect = container.querySelector('#team-month');
     var yearSelect = container.querySelector('#team-year');
@@ -767,7 +772,8 @@ const Team = {
             }
             self.renderDetail(container);
           } else {
-            showToast('Upload failed: ' + ((result && result.error && result.error.message) || 'Unknown'), 'error');
+            console.error('[Team] contract upload error:', result && result.error);
+            showToast('Contract upload failed. Please try again.', 'error');
           }
         }
       });
@@ -800,7 +806,8 @@ const Team = {
             }
             self.renderDetail(container);
           } else {
-            showToast('Upload failed: ' + ((result && result.error && result.error.message) || 'Unknown'), 'error');
+            console.error('[Team] NDA upload error:', result && result.error);
+            showToast('NDA upload failed. Please try again.', 'error');
           }
         }
       });
@@ -916,6 +923,13 @@ const Team = {
     for (var i = 0; i < inputs.length; i++) {
       var projectId = inputs[i].getAttribute('data-project-id');
       var hours = parseFloat(inputs[i].value) || 0;
+
+      if (hours < 0 || hours > 744) {
+        showToast('Hours must be between 0 and 744', 'error');
+        inputs[i].focus();
+        return;
+      }
+
       if (hours > 0 || self.timesheets.some(function (ts) { return ts.project_id === projectId; })) {
         rows.push({
           employee_id: emp.id,
@@ -954,7 +968,7 @@ const Team = {
       self.highlightSelected(container);
     } catch (err) {
       console.error('[Team] save hours error:', err);
-      showToast('Error saving hours: ' + (err.message || 'Unknown'), 'error');
+      showToast('Failed to save hours. Please try again.', 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Save Hours'; }
     }
@@ -985,7 +999,7 @@ const Team = {
       self.highlightSelected(container);
     } catch (err) {
       console.error('[Team] generate invoice error:', err);
-      showToast('Error: ' + (err.message || 'Unknown'), 'error');
+      showToast('Failed to generate invoice. Please try again.', 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Generate Invoice'; }
     }
@@ -1021,7 +1035,7 @@ const Team = {
       self.highlightSelected(container);
     } catch (err) {
       console.error('[Team] delete invoice error:', err);
-      showToast('Error deleting invoice: ' + (err.message || 'Unknown'), 'error');
+      showToast('Failed to delete invoice. Please try again.', 'error');
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Delete'; }
     }
@@ -1034,7 +1048,7 @@ const Team = {
     var invoice = self.getEmployeeInvoice(emp.id);
     if (!invoice || !emp) return;
 
-    if (typeof InvoicePreview !== 'undefined' && typeof InvoicePreview.render === 'function') {
+    if (typeof InvoicePreview !== 'undefined' && typeof InvoicePreview.show === 'function') {
       var overlay = container.querySelector('#team-modal-overlay');
       var modal = container.querySelector('#team-modal');
       if (overlay && modal) {
@@ -1096,7 +1110,7 @@ const Team = {
         await InvoiceDocx.downloadInvoice(invoiceData);
         showToast('DOCX downloaded!', 'success');
       } catch (err) {
-        showToast('Download failed: ' + (err.message || 'Unknown'), 'error');
+        showToast('Download failed. Please try again.', 'error');
       }
     } else {
       showToast('DOCX module not available', 'error');
@@ -1123,7 +1137,8 @@ const Team = {
       self.renderEmployeeList(container);
       self.highlightSelected(container);
     } catch (err) {
-      showToast('Error: ' + (err.message || 'Unknown'), 'error');
+      console.error('[Team] status change error:', err);
+      showToast('Failed to update status. Please try again.', 'error');
     }
   },
 
@@ -1156,7 +1171,7 @@ const Team = {
       }
     } catch (err) {
       console.error('[Team] upload error:', err);
-      showToast('Upload failed: ' + (err.message || 'Unknown error'), 'error');
+      showToast('Upload failed. Please try again.', 'error');
     }
   },
 
@@ -1193,6 +1208,10 @@ const Team = {
       document.removeEventListener('keydown', this._escHandler);
       this._escHandler = null;
     }
+    this.allEmployees = [];
+    this.projects = [];
+    this.allTimesheets = [];
+    this.invoices = [];
   },
 
   /* ── Period change ── */
@@ -1385,6 +1404,31 @@ const Team = {
       return;
     }
 
+    if (data.work_email && typeof Validation !== 'undefined' && !Validation.isValidEmail(data.work_email)) {
+      showToast('Invalid email format', 'error');
+      return;
+    }
+
+    if (data.rate_usd !== null && data.rate_usd < 0) {
+      showToast('Rate cannot be negative', 'error');
+      return;
+    }
+
+    if (data.iban && typeof Validation !== 'undefined' && !Validation.isValidIBAN(data.iban)) {
+      showToast('Invalid IBAN format', 'error');
+      return;
+    }
+
+    if (data.swift && typeof Validation !== 'undefined' && !Validation.isValidSWIFT(data.swift)) {
+      showToast('Invalid SWIFT/BIC format', 'error');
+      return;
+    }
+
+    if (data.next_invoice_number !== null && (!Number.isInteger(data.next_invoice_number) || data.next_invoice_number < 1)) {
+      showToast('Next invoice number must be a positive integer', 'error');
+      return;
+    }
+
     try {
       if (existingEmployee) {
         data.id = existingEmployee.id;
@@ -1406,7 +1450,8 @@ const Team = {
         self.renderDetail(container);
       }
     } catch (err) {
-      showToast('Error: ' + (err.message || 'Unknown'), 'error');
+      console.error('[Team] save employee error:', err);
+      showToast('Failed to save employee. Please try again.', 'error');
     }
   },
 

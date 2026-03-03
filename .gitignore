@@ -1,9 +1,11 @@
 node_modules/
 .env
+.env.*
 .DS_Store
 Thumbs.db
 desktop.ini
 *.log
+tmp_*.js
 .github/workflows/
 
 # Note: js/config.js is committed because GitHub Pages is static (no build step).

@@ -8,6 +8,8 @@
   <meta name="theme-color" content="#0D0D0F">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; frame-ancestors 'self';">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <title>OMD Finance</title>
   <link rel="icon" type="image/svg+xml"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='8' fill='%230D0D0F'/><path d='M20 4L35 12.5V27.5L20 36L5 27.5V12.5Z' stroke='%2300D4FF' stroke-width='1.5' fill='rgba(0,212,255,0.08)'/><path d='M20 10L29 15.2V25.8L20 31L11 25.8V15.2Z' stroke='%2300D4FF' stroke-width='1' fill='none' opacity='0.4'/><text x='20' y='23' text-anchor='middle' fill='%2300D4FF' font-family='Inter,sans-serif' font-size='9' font-weight='700' letter-spacing='1'>OMD</text></svg>">
@@ -614,8 +616,8 @@
   </div>
 
   <!-- ════════ CDN Libraries (with SRI integrity checks) ════════ -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"
-    integrity="sha384-Sm2s7OXxsAMTyJ4iIyRBgVpeGUvMPk2lRQnnZhE78Wej7oggIoolKt+SCt0XJbUB"
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"
+    integrity="sha384-YieCqqg9gQufX7+5HcFvCEg/n3KUEdl8/Jb+A6J0npf1mB740VayvwKjTrtCeUoy"
     crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/docx@9.6.0/dist/index.iife.js"
     integrity="sha384-EnzP2fNDJUs+3si27zZLZyP85ASuHhB5HQqhJZLfMidfEbtNwMuZ/999aXTwlhzB"
@@ -623,11 +625,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"
     integrity="sha384-PlRSzpewlarQuj5alIadXwjNUX+2eNMKwr0f07ShWYLy8B6TjEbm7ZlcN/ScSbwy"
     crossorigin="anonymous"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"
+    integrity="sha384-NG/W3xvO3ynQEcDQYIOcZTXRtwUs83cLv1FIl9PuqWPDuNhsMRF6wutlNLFwlb71"
+    crossorigin="anonymous"></script>
 
   <!-- ════════ App Modules ════════ -->
   <script src="js/config.js"></script>
   <script src="js/utils.js"></script>
+  <script src="js/validation.js"></script>
   <script src="js/db.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/services/timesheet-parser.js"></script>
