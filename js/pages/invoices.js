@@ -641,6 +641,12 @@ const Invoices = {
         '<option value="sent"' + (status === 'sent' ? ' selected' : '') + '>Sent</option>' +
         '<option value="paid"' + (status === 'paid' ? ' selected' : '') + '>Paid</option>' +
         '</select>' +
+        (App.role === 'admin' ?
+          '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-delete" ' +
+          'data-invoice-id="' + inv.id + '" title="Delete Invoice" style="color:var(--fury-danger)">' +
+          '&#x1F5D1;' +
+          '</button>'
+          : '') +
         '</div>' +
         '</td>' +
         '</tr>';
@@ -819,22 +825,46 @@ const Invoices = {
       });
     }
 
-    // ── Delegated clicks on invoice table ──
-    var invTbody = container.querySelector('#inv-tbody');
-    if (invTbody) {
-      invTbody.addEventListener('click', function (e) {
+    // ── Invoice row actions (Delegated) ──
+    var tbody = container.querySelector('#inv-tbody');
+    if (tbody) {
+      tbody.addEventListener('click', async function (e) {
         // Preview
-        var previewBtn = e.target.closest('.inv-act-preview');
-        if (previewBtn) {
-          var invoiceId = previewBtn.getAttribute('data-invoice-id');
-          self._handlePreview(invoiceId);
+        var btnPreview = e.target.closest('.inv-act-preview');
+        if (btnPreview) {
+          var id = btnPreview.getAttribute('data-invoice-id');
+          await self._handlePreview(id);
           return;
         }
-        // Download DOCX
-        var downloadBtn = e.target.closest('.inv-act-download');
-        if (downloadBtn) {
-          var invId = downloadBtn.getAttribute('data-invoice-id');
-          self._handleDownload(invId);
+
+        // Download
+        var btnDl = e.target.closest('.inv-act-download');
+        if (btnDl) {
+          var did = btnDl.getAttribute('data-invoice-id');
+          await self._handleDownload(did);
+          return;
+        }
+
+        // Delete
+        var btnDel = e.target.closest('.inv-act-delete');
+        if (btnDel) {
+          var delId = btnDel.getAttribute('data-invoice-id');
+          if (confirm('Are you sure you want to permanently delete this invoice?')) {
+            var btnOriginalHtml = btnDel.innerHTML;
+            btnDel.innerHTML = '...';
+            btnDel.disabled = true;
+            try {
+              var result = await DB.deleteInvoice(delId);
+              if (result && result.error) throw new Error(result.error.message);
+              showToast('Invoice deleted', 'success');
+              await self._reload(container, ctx);
+            } catch (err) {
+              console.error('[Invoices] delete error:', err);
+              alert('Delete failed: ' + err.message);
+              btnDel.innerHTML = btnOriginalHtml;
+              btnDel.disabled = false;
+            }
+          }
           return;
         }
       });
@@ -1028,7 +1058,7 @@ const Invoices = {
 
     // Prorate math dynamically
     var estimatedAmount = 0;
-    if (empType === 'hourly') {
+    if (empType === 'hourly' || empType === 'Hourly Contractor') {
       estimatedAmount = rate * hours;
     } else {
       var expectedHours = (this.workingDays || 21) * (this.hoursPerDay || 8);
@@ -1492,7 +1522,18 @@ const Invoices = {
     var hours = ts ? ts.total_hours : 0;
     var rate = employee.rate_usd || employee.hourly_rate || 0;
     var empType = employee.employee_type || 'monthly';
-    var amount = empType === 'hourly' ? (rate * hours) : rate;
+
+    var amount = 0;
+    if (empType === 'hourly' || empType === 'Hourly Contractor') {
+      amount = rate * hours;
+    } else {
+      var expectedHours = (this.workingDays || 21) * (this.hoursPerDay || 8);
+      if (ts && expectedHours > 0) {
+        amount = rate * (hours / expectedHours);
+      } else {
+        amount = rate;
+      }
+    }
     var serviceDesc = employee.service_description || employee.position || 'Software Development Services';
 
     // Get next available invoice number via Numbering service (skips used numbers)

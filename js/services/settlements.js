@@ -108,7 +108,7 @@ const Settlements = {
 
       if (invoice && invoice.total_usd != null) {
         totalPaid = parseFloat(invoice.total_usd) || 0;
-      } else if (empType === 'hourly') {
+      } else if (empType === 'hourly' || empType === 'Hourly Contractor') {
         totalPaid = rate * totalHours;
       } else {
         // Monthly - prorated

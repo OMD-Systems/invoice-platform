@@ -423,6 +423,25 @@ const DB = {
   },
 
   /**
+   * Delete an existing invoice (Admin only).
+   * @param {string} invoiceId
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async deleteInvoice(invoiceId) {
+    try {
+      const { data, error } = await this.client
+        .from('invoices')
+        .delete()
+        .eq('id', invoiceId)
+        .select()
+        .single();
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
    * Create a new invoice along with its line items in a single transaction-like flow.
    * Also increments the employee's next_invoice_number.
    * @param {object} invoiceData - Invoice fields (without id)
