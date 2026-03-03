@@ -395,7 +395,7 @@ const DB = {
         .from('invoices')
         .select(`
           *,
-          employees ( id, pin, name, full_name_lat, invoice_prefix ),
+          employees ( id, pin, name, full_name_lat, invoice_prefix, invoice_format, address, phone, iban, swift, bank_name, receiver_name ),
           invoice_items ( id, item_order, description, price_usd, qty, total_usd )
         `);
 
@@ -454,9 +454,15 @@ const DB = {
   async createInvoice(invoiceData, items = []) {
     try {
       // Use the newly created atomic RPC function
+      // Ensure invoice_number is integer (UI may pass formatted string like "WS-001")
+      var invNum = invoiceData.invoice_number;
+      if (typeof invNum === 'string') {
+        invNum = parseInt(invNum.replace(/\D/g, '')) || 1;
+      }
+
       const { data: invoiceId, error: rpcError } = await this.client.rpc('create_invoice_atomic', {
         p_employee_id: invoiceData.employee_id,
-        p_invoice_number: invoiceData.invoice_number,
+        p_invoice_number: invNum,
         p_invoice_date: invoiceData.invoice_date,
         p_month: invoiceData.month,
         p_year: invoiceData.year,
@@ -464,6 +470,8 @@ const DB = {
         p_subtotal_usd: invoiceData.subtotal_usd,
         p_total_usd: invoiceData.total_usd,
         p_status: invoiceData.status || 'draft',
+        p_discount_usd: invoiceData.discount_usd || 0,
+        p_tax_usd: invoiceData.tax_usd || 0,
         p_items: items.map((item, index) => ({
           item_order: item.item_order || index + 1,
           description: item.description,
@@ -480,7 +488,7 @@ const DB = {
         .from('invoices')
         .select(`
           *,
-          employees ( id, name, full_name_lat, invoice_prefix ),
+          employees ( id, name, full_name_lat, invoice_prefix, invoice_format, address, phone, iban, swift, bank_name, receiver_name ),
           invoice_items ( id, item_order, description, price_usd, qty, total_usd )
         `)
         .eq('id', invoiceId)

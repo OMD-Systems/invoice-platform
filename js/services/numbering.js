@@ -77,24 +77,23 @@ const Numbering = {
     var nameParts = (employee.full_name_lat || 'Unknown').split(' ');
     var format = employee.invoice_format || 'WS';
 
+    var rawName;
     switch (format) {
       case 'WS':
-        // WS-Invoice-{N}-{FIRSTNAME}-{LASTNAME} {DD.MM.YYYY}.docx
         var fullDate = Numbering._toFullDate(date);
-        return 'WS-Invoice-' + number + '-' + nameParts.join('-') + ' ' + fullDate + '.docx';
-
+        rawName = 'WS-Invoice-' + number + '-' + nameParts.join('-') + ' ' + fullDate + '.docx';
+        break;
       case 'FOP':
-        // {Surname}_Invoice-{N}-FOP.docx  (surname = last part of full_name_lat)
-        return nameParts[nameParts.length - 1] + '_Invoice-' + number + '-FOP.docx';
-
+        rawName = nameParts[nameParts.length - 1] + '_Invoice-' + number + '-FOP.docx';
+        break;
       case 'CUSTOM':
-        // {prefix}-{N}.docx
         var prefix = employee.invoice_prefix || 'Invoice';
-        return prefix + '-' + number + '.docx';
-
+        rawName = prefix + '-' + number + '.docx';
+        break;
       default:
-        return 'Invoice-' + number + '-' + nameParts.join('-') + '.docx';
+        rawName = 'Invoice-' + number + '-' + nameParts.join('-') + '.docx';
     }
+    return _sanitizeFileName(rawName);
   },
 
   /* ── Validate invoice number is not already used ── */

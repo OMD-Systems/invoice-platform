@@ -635,7 +635,7 @@ const Invoices = {
         '&#x1F441;' +
         '</button>' +
         '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-download" ' +
-        'data-invoice-id="' + inv.id + '" title="Download DOCX">' +
+        'data-invoice-id="' + inv.id + '" title="Save PDF">' +
         '&#x2B07;' +
         '</button>' +
         '<select class="fury-select inv-act-status" ' +
@@ -960,25 +960,23 @@ const Invoices = {
     InvoicePreview.show(previewData);
   },
 
-  /* ── Download DOCX for a single invoice ── */
-  _handleDownload: async function (invoiceId) {
+  /* ── Download PDF for a single invoice (via print dialog) ── */
+  _handleDownload: function (invoiceId) {
     var inv = this._findInvoice(invoiceId);
     if (!inv) {
       alert('Invoice not found.');
       return;
     }
 
-    if (typeof InvoiceDocx !== 'undefined' && InvoiceDocx.downloadInvoice) {
-      try {
-        var docxData = this._buildPreviewData(inv);
-        await InvoiceDocx.downloadInvoice(docxData);
-      } catch (err) {
-        console.error('[Invoices] DOCX download error:', err);
-        alert('Failed to generate DOCX. Please try again.');
+    var previewData = this._buildPreviewData(inv);
+    InvoicePreview.show(previewData);
+    // Auto-trigger print for PDF save
+    setTimeout(function () {
+      var previewOverlay = document.querySelector('.invoice-preview-overlay');
+      if (previewOverlay && typeof InvoicePreview._printInvoice === 'function') {
+        InvoicePreview._printInvoice(previewOverlay);
       }
-    } else {
-      alert('DOCX generation service is not available.');
-    }
+    }, 300);
   },
 
   /* ── Status change ── */
@@ -1237,7 +1235,7 @@ const Invoices = {
       '<button class="fury-btn fury-btn-ghost" id="gen-cancel">Cancel</button>' +
       '<button class="fury-btn fury-btn-secondary" id="gen-preview">Preview</button>' +
       '<button class="fury-btn fury-btn-secondary" id="gen-save-draft">Save Draft</button>' +
-      '<button class="fury-btn fury-btn-primary" id="gen-download">Generate &amp; Download DOCX</button>' +
+      '<button class="fury-btn fury-btn-primary" id="gen-download">Generate &amp; Save PDF</button>' +
       '</div>' +
       '</div>';
 
@@ -1587,6 +1585,26 @@ const Invoices = {
     }
 
     try {
+      // Fetch full employee data (with bank details) for preview/PDF
+      var fullEmp = employee;
+      try {
+        var empResult = await DB.getEmployee(employee.id);
+        if (empResult && empResult.data) fullEmp = empResult.data;
+      } catch (e) { /* use cached employee as fallback */ }
+
+      // Rebuild data.employee with full details
+      data.employee = {
+        full_name_lat: fullEmp.full_name_lat || fullEmp.name || '',
+        address: fullEmp.address || '',
+        phone: fullEmp.phone || '',
+        iban: fullEmp.iban || '',
+        swift: fullEmp.swift || '',
+        receiver_name: fullEmp.receiver_name || fullEmp.full_name_lat || '',
+        bank_name: fullEmp.bank_name || '',
+        invoice_format: fullEmp.invoice_format || 'WS',
+        invoice_prefix: fullEmp.invoice_prefix || ''
+      };
+
       // Save to DB with 'generated' status
       var invoicePayload = {
         employee_id: employee.id,
@@ -1599,7 +1617,7 @@ const Invoices = {
         discount_usd: data.discount,
         tax_usd: data.tax,
         status: 'generated',
-        format_type: employee.invoice_format || 'standard'
+        format_type: fullEmp.invoice_format || 'standard'
       };
 
       var itemsPayload = data.items.map(function (item, idx) {
@@ -1619,15 +1637,19 @@ const Invoices = {
         return;
       }
 
-      // Download DOCX
-      if (typeof InvoiceDocx !== 'undefined' && InvoiceDocx.downloadInvoice) {
-        await InvoiceDocx.downloadInvoice(data);
-      } else {
-        // Fallback: show preview for manual print
-        InvoicePreview.show(data);
-      }
-
+      // Close the generate modal
       if (closeCallback) closeCallback();
+
+      // Show preview and auto-trigger print for PDF
+      InvoicePreview.show(data);
+      // Small delay to let the DOM render, then auto-print
+      setTimeout(function () {
+        var previewOverlay = document.querySelector('.invoice-preview-overlay');
+        if (previewOverlay && typeof InvoicePreview._printInvoice === 'function') {
+          InvoicePreview._printInvoice(previewOverlay);
+        }
+      }, 300);
+
       await this._reload(container, ctx);
     } catch (err) {
       console.error('[Invoices] Generate & download error:', err);
@@ -1635,7 +1657,7 @@ const Invoices = {
     } finally {
       if (dlBtn) {
         dlBtn.disabled = false;
-        dlBtn.textContent = 'Generate & Download DOCX';
+        dlBtn.textContent = 'Generate & Save PDF';
       }
     }
   },

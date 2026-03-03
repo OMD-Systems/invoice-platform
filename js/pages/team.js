@@ -537,7 +537,7 @@ const Team = {
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
         ' Preview' +
         '</button>' +
-        '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-download" data-fury-tooltip="Download DOCX">' +
+        '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-download" data-fury-tooltip="Save PDF">' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
         ' DOCX' +
         '</button>' +
@@ -1042,13 +1042,55 @@ const Team = {
   },
 
   /* ── Preview invoice ── */
-  handlePreviewInvoice(container) {
+  async handlePreviewInvoice(container) {
     var self = this;
     var emp = self.findEmployee(self.selectedId);
-    var invoice = self.getEmployeeInvoice(emp.id);
+    var invoice = self.getEmployeeInvoice(emp ? emp.id : null);
     if (!invoice || !emp) return;
 
-    if (typeof InvoicePreview !== 'undefined' && typeof InvoicePreview.show === 'function') {
+    if (typeof InvoicePreview !== 'undefined' && typeof InvoicePreview.renderInvoiceHTML === 'function') {
+      // Fetch full employee data (with bank details) for preview
+      var fullEmp = emp;
+      try {
+        var empResult = await DB.getEmployee(emp.id);
+        if (empResult && empResult.data) fullEmp = empResult.data;
+      } catch (e) { /* use cached emp as fallback */ }
+
+      var items = (invoice.invoice_items || []).map(function (it) {
+        return {
+          description: it.description || '',
+          price: it.price_usd || 0,
+          qty: it.qty || 1,
+          total: it.total_usd || 0
+        };
+      });
+
+      var invoiceData = {
+        employee: {
+          full_name_lat: fullEmp.full_name_lat || fullEmp.name || '',
+          address: fullEmp.address || '',
+          phone: fullEmp.phone || '',
+          iban: fullEmp.iban || '',
+          swift: fullEmp.swift || '',
+          receiver_name: fullEmp.receiver_name || fullEmp.full_name_lat || '',
+          bank_name: fullEmp.bank_name || '',
+          invoice_format: fullEmp.invoice_format || 'WS',
+          invoice_prefix: fullEmp.invoice_prefix || ''
+        },
+        billedTo: self.billedTo || { name: '', address: '' },
+        invoiceNumber: invoice.invoice_number || '',
+        invoiceDate: invoice.invoice_date || '',
+        dueDays: 15,
+        items: items,
+        subtotal: invoice.subtotal_usd || 0,
+        discount: invoice.discount_usd || 0,
+        tax: invoice.tax_usd || 0,
+        taxRate: invoice.tax_rate || '0',
+        total: invoice.total_usd || 0,
+        terms: self.defaultTerms || '',
+        status: invoice.status || 'draft'
+      };
+
       var overlay = container.querySelector('#team-modal-overlay');
       var modal = container.querySelector('#team-modal');
       if (overlay && modal) {
@@ -1057,12 +1099,11 @@ const Team = {
           '<div style="display:flex;justify-content:flex-end;padding:8px;background:#111114;border-radius:8px 8px 0 0">' +
           '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-preview-close">&times; Close</button>' +
           '</div>' +
-          '<div id="team-preview-content" style="padding:20px"></div>' +
+          '<div id="team-preview-content" style="padding:20px"><div class="invoice-preview">' +
+          InvoicePreview.renderInvoiceHTML(invoiceData) +
+          '</div></div>' +
           '</div>';
         overlay.classList.add('active');
-
-        var previewContainer = modal.querySelector('#team-preview-content');
-        InvoicePreview.render(previewContainer, invoice, emp, self.billedTo, self.defaultTerms);
 
         var closeBtn = modal.querySelector('#team-preview-close');
         if (closeBtn) {
@@ -1076,45 +1117,62 @@ const Team = {
     }
   },
 
-  /* ── Download DOCX ── */
+  /* ── Download PDF (via preview + print) ── */
   async handleDownloadInvoice() {
     var self = this;
     var emp = self.findEmployee(self.selectedId);
-    var invoice = self.getEmployeeInvoice(emp.id);
+    var invoice = self.getEmployeeInvoice(emp ? emp.id : null);
     if (!invoice || !emp) return;
 
-    if (typeof InvoiceDocx !== 'undefined' && typeof InvoiceDocx.downloadInvoice === 'function') {
-      try {
-        var items = (invoice.invoice_items || []).map(function (it) {
-          return {
-            description: it.description || '',
-            price: it.price_usd || 0,
-            qty: it.qty || 1,
-            total: it.total_usd || 0,
-          };
-        });
-        var invoiceData = {
-          employee: emp,
-          invoiceNumber: invoice.invoice_number || '',
-          invoiceDate: invoice.invoice_date || '',
-          dueDays: 15,
-          items: items,
-          subtotal: invoice.subtotal_usd || 0,
-          discount: invoice.discount_usd || 0,
-          tax: invoice.tax_usd || 0,
-          taxRate: invoice.tax_rate || 0,
-          total: invoice.total_usd || 0,
-          billedTo: self.billedTo || {},
-          terms: self.defaultTerms || '',
-        };
-        await InvoiceDocx.downloadInvoice(invoiceData);
-        showToast('DOCX downloaded!', 'success');
-      } catch (err) {
-        showToast('Download failed. Please try again.', 'error');
+    // Fetch full employee data (with bank details)
+    var fullEmp = emp;
+    try {
+      var empResult = await DB.getEmployee(emp.id);
+      if (empResult && empResult.data) fullEmp = empResult.data;
+    } catch (e) { /* use cached emp as fallback */ }
+
+    var items = (invoice.invoice_items || []).map(function (it) {
+      return {
+        description: it.description || '',
+        price: it.price_usd || 0,
+        qty: it.qty || 1,
+        total: it.total_usd || 0,
+      };
+    });
+    var invoiceData = {
+      employee: {
+        full_name_lat: fullEmp.full_name_lat || fullEmp.name || '',
+        address: fullEmp.address || '',
+        phone: fullEmp.phone || '',
+        iban: fullEmp.iban || '',
+        swift: fullEmp.swift || '',
+        receiver_name: fullEmp.receiver_name || fullEmp.full_name_lat || '',
+        bank_name: fullEmp.bank_name || '',
+        invoice_format: fullEmp.invoice_format || 'WS',
+        invoice_prefix: fullEmp.invoice_prefix || ''
+      },
+      invoiceNumber: invoice.invoice_number || '',
+      invoiceDate: invoice.invoice_date || '',
+      dueDays: 15,
+      items: items,
+      subtotal: invoice.subtotal_usd || 0,
+      discount: invoice.discount_usd || 0,
+      tax: invoice.tax_usd || 0,
+      taxRate: invoice.tax_rate || 0,
+      total: invoice.total_usd || 0,
+      billedTo: self.billedTo || {},
+      terms: self.defaultTerms || '',
+      status: invoice.status || 'draft'
+    };
+
+    // Show preview and auto-trigger print for PDF
+    InvoicePreview.show(invoiceData);
+    setTimeout(function () {
+      var previewOverlay = document.querySelector('.invoice-preview-overlay');
+      if (previewOverlay && typeof InvoicePreview._printInvoice === 'function') {
+        InvoicePreview._printInvoice(previewOverlay);
       }
-    } else {
-      showToast('DOCX module not available', 'error');
-    }
+    }, 300);
   },
 
   /* ── Status change (mark sent / mark paid) ── */

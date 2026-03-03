@@ -77,11 +77,11 @@ var InvoicePreview = {
       closeBtn.addEventListener('click', closeOverlay);
     }
 
-    // Bind print
+    // Bind print — uses dedicated print container for reliability
     var printBtn = overlay.querySelector('#ipv-btn-print');
     if (printBtn) {
       printBtn.addEventListener('click', function () {
-        window.print();
+        self._printInvoice(overlay);
       });
     }
 
@@ -89,6 +89,32 @@ var InvoicePreview = {
     overlay.addEventListener('click', function (e) {
       if (e.target === overlay) closeOverlay();
     });
+  },
+
+  /**
+   * Print the invoice by extracting content into a dedicated print container.
+   * This avoids CSS specificity wars with modal overlay display:none.
+   */
+  _printInvoice: function (overlay) {
+    var invoiceHtml = overlay.querySelector('.invoice-preview');
+    if (!invoiceHtml) return;
+
+    // Create print container outside all modals (hidden on screen, shown by print CSS)
+    var printArea = document.createElement('div');
+    printArea.id = 'invoice-print-area';
+    printArea.className = 'invoice-preview';
+    printArea.style.cssText = 'position:fixed;left:-9999px;top:0;';
+    printArea.innerHTML = invoiceHtml.innerHTML;
+    document.body.appendChild(printArea);
+
+    // Hide overlay during print (we show printArea instead)
+    overlay.style.display = 'none';
+
+    window.print();
+
+    // Cleanup after print dialog closes
+    overlay.style.display = '';
+    if (printArea.parentNode) printArea.remove();
   },
 
   /**
@@ -196,7 +222,7 @@ var InvoicePreview = {
       '</div>' +
       '<div class="invoice-meta-item">' +
       '<div class="invoice-meta-label">DUE DATE</div>' +
-      '<div class="invoice-meta-value">' + this._esc(data.dueDays || '') + '</div>' +
+      '<div class="invoice-meta-value">' + this._esc(this._calcDueDate(data.invoiceDate, data.dueDays)) + '</div>' +
       '</div>' +
       '</div>' +
       '</div>' +
@@ -301,6 +327,37 @@ var InvoicePreview = {
     if (typeof val === 'number') return val;
     var cleaned = String(val).replace(/[^0-9.\-]/g, '');
     return parseFloat(cleaned) || 0;
+  },
+
+  /**
+   * Calculate due date from invoice date + dueDays.
+   * @param {string} invoiceDate - Any date format
+   * @param {number|string} dueDays - Number of days (default 15)
+   * @returns {string} Formatted date string
+   */
+  _calcDueDate: function (invoiceDate, dueDays) {
+    var days = parseInt(String(dueDays).replace(/\D/g, '')) || 15;
+    var base;
+    if (invoiceDate) {
+      base = new Date(invoiceDate);
+      if (isNaN(base.getTime())) {
+        // Try DD.MM.YY or DD.MM.YYYY
+        var m = String(invoiceDate).match(/^(\d{2})\.(\d{2})\.(\d{2,4})$/);
+        if (m) {
+          var yr = m[3].length === 2 ? '20' + m[3] : m[3];
+          base = new Date(yr + '-' + m[2] + '-' + m[1]);
+        } else {
+          base = new Date();
+        }
+      }
+    } else {
+      base = new Date();
+    }
+    if (isNaN(base.getTime())) base = new Date();
+    base.setDate(base.getDate() + days);
+    var monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    return monthNames[base.getMonth()] + ' ' + base.getDate() + ', ' + base.getFullYear();
   },
 
   /**
