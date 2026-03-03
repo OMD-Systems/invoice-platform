@@ -1139,7 +1139,12 @@ const Invoices = {
     if (empType === 'hourly' || empType === 'Hourly Contractor') {
       estimatedAmount = rate * hours;
     } else {
-      estimatedAmount = rate;
+      var expectedHours = (this.workingDays || 21) * (this.hoursPerDay || 8);
+      if (ts && expectedHours > 0) {
+        estimatedAmount = rate * (hours / expectedHours);
+      } else {
+        estimatedAmount = rate;
+      }
     }
 
     var prefix = employee.invoice_prefix || '';

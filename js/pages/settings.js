@@ -26,9 +26,9 @@ const Settings = {
     if (ctx.role !== 'admin') {
       container.innerHTML =
         '<div class="fury-empty">' +
-          '<div class="fury-empty-icon" style="font-size:48px;">&#x26D4;</div>' +
-          '<div class="fury-empty-title">Access Denied</div>' +
-          '<div class="fury-empty-text">This page is restricted to administrators only.</div>' +
+        '<div class="fury-empty-icon" style="font-size:48px;">&#x26D4;</div>' +
+        '<div class="fury-empty-title">Access Denied</div>' +
+        '<div class="fury-empty-text">This page is restricted to administrators only.</div>' +
         '</div>';
       return;
     }
@@ -44,52 +44,52 @@ const Settings = {
     return (
       '<div class="settings-page" style="max-width:1200px;">' +
 
-        /* ── Tabs ── */
-        '<div class="fury-tabs fury-mb-3">' +
-          '<button class="fury-tab' + (this.activeTab === 'general' ? ' active' : '') + '" data-tab="general">General</button>' +
-          '<button class="fury-tab' + (this.activeTab === 'projects' ? ' active' : '') + '" data-tab="projects">Projects</button>' +
-          '<button class="fury-tab' + (this.activeTab === 'teams' ? ' active' : '') + '" data-tab="teams">Teams</button>' +
-          '<button class="fury-tab' + (this.activeTab === 'users' ? ' active' : '') + '" data-tab="users">Users</button>' +
-          '<button class="fury-tab' + (this.activeTab === 'months' ? ' active' : '') + '" data-tab="months">Month Control</button>' +
-          '<button class="fury-tab' + (this.activeTab === 'email_requests' ? ' active' : '') + '" data-tab="email_requests">Email Requests</button>' +
-          '<button class="fury-tab' + (this.activeTab === 'working_hours' ? ' active' : '') + '" data-tab="working_hours">Working Hours</button>' +
-        '</div>' +
+      /* ── Tabs ── */
+      '<div class="fury-tabs fury-mb-3">' +
+      '<button class="fury-tab' + (this.activeTab === 'general' ? ' active' : '') + '" data-tab="general">General</button>' +
+      '<button class="fury-tab' + (this.activeTab === 'projects' ? ' active' : '') + '" data-tab="projects">Projects</button>' +
+      '<button class="fury-tab' + (this.activeTab === 'teams' ? ' active' : '') + '" data-tab="teams">Teams</button>' +
+      '<button class="fury-tab' + (this.activeTab === 'users' ? ' active' : '') + '" data-tab="users">Users</button>' +
+      '<button class="fury-tab' + (this.activeTab === 'months' ? ' active' : '') + '" data-tab="months">Month Control</button>' +
+      '<button class="fury-tab' + (this.activeTab === 'email_requests' ? ' active' : '') + '" data-tab="email_requests">Email Requests</button>' +
+      '<button class="fury-tab' + (this.activeTab === 'working_hours' ? ' active' : '') + '" data-tab="working_hours">Working Hours</button>' +
+      '</div>' +
 
-        /* ── Tab Content ── */
-        '<div id="settings-content"></div>' +
+      /* ── Tab Content ── */
+      '<div id="settings-content"></div>' +
 
       '</div>' +
 
       /* ── Modal Container ── */
       '<div id="settings-modal-overlay" class="fury-modal-overlay">' +
-        '<div class="fury-modal" id="settings-modal">' +
-          '<div class="fury-modal-header">' +
-            '<span class="fury-modal-title" id="settings-modal-title">Modal</span>' +
-            '<button class="fury-modal-close" id="settings-modal-close">&times;</button>' +
-          '</div>' +
-          '<div class="fury-modal-body" id="settings-modal-body"></div>' +
-          '<div class="fury-modal-footer" id="settings-modal-footer"></div>' +
-        '</div>' +
+      '<div class="fury-modal" id="settings-modal">' +
+      '<div class="fury-modal-header">' +
+      '<span class="fury-modal-title" id="settings-modal-title">Modal</span>' +
+      '<button class="fury-modal-close" id="settings-modal-close">&times;</button>' +
+      '</div>' +
+      '<div class="fury-modal-body" id="settings-modal-body"></div>' +
+      '<div class="fury-modal-footer" id="settings-modal-footer"></div>' +
+      '</div>' +
       '</div>' +
 
       /* ── Page Styles ── */
       '<style>' +
-        '.settings-section { margin-bottom: 32px; }' +
-        '.settings-section-title { font-size: 14px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }' +
-        '.settings-row { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; }' +
-        '.settings-field { flex: 1; min-width: 200px; }' +
-        '.settings-field label { display: block; font-size: 12px; font-weight: 600; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }' +
-        '.settings-field input, .settings-field textarea, .settings-field select { width: 100%; }' +
-        '.settings-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid #374151; }' +
-        '.settings-table-actions { display: flex; gap: 6px; }' +
-        '.team-expand { cursor: pointer; }' +
-        '.team-expand:hover { color: #00D4FF; }' +
-        '.team-members-row td { padding: 8px 16px !important; background: #0D0D0F; }' +
-        '.team-members-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; }' +
-        '.team-member-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; background: rgba(0,212,255,0.08); border: 1px solid #374151; border-radius: 12px; font-size: 12px; color: #E5E7EB; }' +
-        '.team-member-tag .remove-member { cursor: pointer; color: #6B7280; font-size: 14px; line-height: 1; }' +
-        '.team-member-tag .remove-member:hover { color: #EF4444; }' +
-        '.month-lock-badge { display: inline-flex; align-items: center; gap: 4px; }' +
+      '.settings-section { margin-bottom: 32px; }' +
+      '.settings-section-title { font-size: 14px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }' +
+      '.settings-row { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; }' +
+      '.settings-field { flex: 1; min-width: 200px; }' +
+      '.settings-field label { display: block; font-size: 12px; font-weight: 600; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }' +
+      '.settings-field input, .settings-field textarea, .settings-field select { width: 100%; }' +
+      '.settings-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 24px; padding-top: 16px; border-top: 1px solid #374151; }' +
+      '.settings-table-actions { display: flex; gap: 6px; }' +
+      '.team-expand { cursor: pointer; }' +
+      '.team-expand:hover { color: #00D4FF; }' +
+      '.team-members-row td { padding: 8px 16px !important; background: #0D0D0F; }' +
+      '.team-members-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; }' +
+      '.team-member-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; background: rgba(0,212,255,0.08); border: 1px solid #374151; border-radius: 12px; font-size: 12px; color: #E5E7EB; }' +
+      '.team-member-tag .remove-member { cursor: pointer; color: #6B7280; font-size: 14px; line-height: 1; }' +
+      '.team-member-tag .remove-member:hover { color: #EF4444; }' +
+      '.month-lock-badge { display: inline-flex; align-items: center; gap: 4px; }' +
       '</style>'
     );
   },
@@ -106,88 +106,88 @@ const Settings = {
     return (
       '<div class="fury-card">' +
 
-        /* ── Billed To ── */
-        '<div class="settings-section">' +
-          '<div class="settings-section-title">Billed To (Company Info)</div>' +
-          '<div class="settings-row">' +
-            '<div class="settings-field">' +
-              '<label for="set-billed-name">Company Name</label>' +
-              '<input class="fury-input" id="set-billed-name" type="text" placeholder="Woodenshark LLC" ' +
-                'value="' + this._escapeAttr(billedTo.name || '') + '">' +
-            '</div>' +
-          '</div>' +
-          '<div class="settings-row">' +
-            '<div class="settings-field">' +
-              '<label for="set-billed-address">Address</label>' +
-              '<textarea class="fury-input" id="set-billed-address" rows="3" ' +
-                'placeholder="3411 Silverside Road, Tatnall Building #104, Wilmington, DE 19810">' +
-                this._escapeHtml(billedTo.address || '') +
-              '</textarea>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
+      /* ── Billed To ── */
+      '<div class="settings-section">' +
+      '<div class="settings-section-title">Billed To (Company Info)</div>' +
+      '<div class="settings-row">' +
+      '<div class="settings-field">' +
+      '<label for="set-billed-name">Company Name</label>' +
+      '<input class="fury-input" id="set-billed-name" type="text" placeholder="Woodenshark LLC" ' +
+      'value="' + this._escapeAttr(billedTo.name || '') + '">' +
+      '</div>' +
+      '</div>' +
+      '<div class="settings-row">' +
+      '<div class="settings-field">' +
+      '<label for="set-billed-address">Address</label>' +
+      '<textarea class="fury-input" id="set-billed-address" rows="3" ' +
+      'placeholder="3411 Silverside Road, Tatnall Building #104, Wilmington, DE 19810">' +
+      this._escapeHtml(billedTo.address || '') +
+      '</textarea>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
 
-        /* ── Payment Terms ── */
-        '<div class="settings-section">' +
-          '<div class="settings-section-title">Payment Terms</div>' +
-          '<div class="settings-row">' +
-            '<div class="settings-field">' +
-              '<label for="set-terms-text">Terms Text</label>' +
-              '<textarea class="fury-input" id="set-terms-text" rows="4" ' +
-                'placeholder="Thank you for your business! Please make the payment within 14 days...">' +
-                this._escapeHtml(terms.text || '') +
-              '</textarea>' +
-            '</div>' +
-          '</div>' +
-          '<div class="settings-row">' +
-            '<div class="settings-field" style="max-width:200px;">' +
-              '<label for="set-due-days">Default Due Days</label>' +
-              '<input class="fury-input" id="set-due-days" type="number" min="1" max="365" ' +
-                'value="' + (terms.due_days || 7) + '">' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
+      /* ── Payment Terms ── */
+      '<div class="settings-section">' +
+      '<div class="settings-section-title">Payment Terms</div>' +
+      '<div class="settings-row">' +
+      '<div class="settings-field">' +
+      '<label for="set-terms-text">Terms Text</label>' +
+      '<textarea class="fury-input" id="set-terms-text" rows="4" ' +
+      'placeholder="Thank you for your business! Please make the payment within 14 days...">' +
+      this._escapeHtml(terms.text || '') +
+      '</textarea>' +
+      '</div>' +
+      '</div>' +
+      '<div class="settings-row">' +
+      '<div class="settings-field" style="max-width:200px;">' +
+      '<label for="set-due-days">Default Due Days</label>' +
+      '<input class="fury-input" id="set-due-days" type="number" min="1" max="365" ' +
+      'value="' + (terms.due_days || 7) + '">' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
 
-        /* ── Exchange Rate ── */
-        '<div class="settings-section">' +
-          '<div class="settings-section-title">Exchange Rate</div>' +
-          '<div class="settings-row">' +
-            '<div class="settings-field" style="max-width:200px;">' +
-              '<label for="set-uah-usd">UAH/USD Rate</label>' +
-              '<input class="fury-input" id="set-uah-usd" type="number" step="0.01" min="0" ' +
-                'value="' + (exchangeRate.uah_usd || '') + '" placeholder="41.50">' +
-            '</div>' +
-            '<div class="settings-field" style="max-width:300px;">' +
-              '<label>Last Updated</label>' +
-              '<div style="padding:8px 0;font-size:13px;color:#6B7280;">' +
-                (exchangeRate.updated_at ? new Date(exchangeRate.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Never') +
-              '</div>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
+      /* ── Exchange Rate ── */
+      '<div class="settings-section">' +
+      '<div class="settings-section-title">Exchange Rate</div>' +
+      '<div class="settings-row">' +
+      '<div class="settings-field" style="max-width:200px;">' +
+      '<label for="set-uah-usd">UAH/USD Rate</label>' +
+      '<input class="fury-input" id="set-uah-usd" type="number" step="0.01" min="0" ' +
+      'value="' + (exchangeRate.uah_usd || '') + '" placeholder="41.50">' +
+      '</div>' +
+      '<div class="settings-field" style="max-width:300px;">' +
+      '<label>Last Updated</label>' +
+      '<div style="padding:8px 0;font-size:13px;color:#6B7280;">' +
+      (exchangeRate.updated_at ? new Date(exchangeRate.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Never') +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
 
-        /* ── Working Hours Adjustment ── */
-        '<div class="settings-section">' +
-          '<div class="settings-section-title">Working Hours</div>' +
-          '<div class="settings-row">' +
-            '<div class="settings-field" style="max-width:200px;">' +
-              '<label for="set-subtract-hours">Adjustment Hours</label>' +
-              '<input class="fury-input" id="set-subtract-hours" type="number" min="0" max="40" step="1" ' +
-                'value="' + (workingHours.subtract_hours != null ? workingHours.subtract_hours : 8) + '">' +
-            '</div>' +
-            '<div class="settings-field">' +
-              '<label>&nbsp;</label>' +
-              '<div style="padding:8px 0;font-size:13px;color:#6B7280;">' +
-                'Subtracted from monthly working hours (default: 8)' +
-              '</div>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
+      /* ── Working Hours Adjustment ── */
+      '<div class="settings-section">' +
+      '<div class="settings-section-title">Working Hours</div>' +
+      '<div class="settings-row">' +
+      '<div class="settings-field" style="max-width:200px;">' +
+      '<label for="set-subtract-hours">Adjustment Hours</label>' +
+      '<input class="fury-input" id="set-subtract-hours" type="number" min="0" max="40" step="1" ' +
+      'value="' + (workingHours.subtract_hours != null ? workingHours.subtract_hours : 8) + '">' +
+      '</div>' +
+      '<div class="settings-field">' +
+      '<label>&nbsp;</label>' +
+      '<div style="padding:8px 0;font-size:13px;color:#6B7280;">' +
+      'Subtracted from monthly working hours (default: 8)' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
 
-        /* ── Save ── */
-        '<div class="settings-actions">' +
-          '<button class="fury-btn fury-btn-primary" id="set-save-general">Save Settings</button>' +
-        '</div>' +
+      /* ── Save ── */
+      '<div class="settings-actions">' +
+      '<button class="fury-btn fury-btn-primary" id="set-save-general">Save Settings</button>' +
+      '</div>' +
 
       '</div>'
     );
@@ -216,37 +216,37 @@ const Settings = {
 
         rows +=
           '<tr>' +
-            '<td style="font-weight:600;color:#00D4FF;">' + self._escapeHtml(p.code || '') + '</td>' +
-            '<td>' + self._escapeHtml(p.name || '') + '</td>' +
-            '<td>' + companyBadge + '</td>' +
-            '<td style="text-align:center;">' + activeBadge + '</td>' +
-            '<td class="fury-table-actions">' +
-              '<div class="settings-table-actions">' +
-                '<button class="fury-btn fury-btn-sm fury-btn-secondary set-edit-project" data-id="' + p.id + '">Edit</button>' +
-              '</div>' +
-            '</td>' +
+          '<td style="font-weight:600;color:#00D4FF;">' + self._escapeHtml(p.code || '') + '</td>' +
+          '<td>' + self._escapeHtml(p.name || '') + '</td>' +
+          '<td>' + companyBadge + '</td>' +
+          '<td style="text-align:center;">' + activeBadge + '</td>' +
+          '<td class="fury-table-actions">' +
+          '<div class="settings-table-actions">' +
+          '<button class="fury-btn fury-btn-sm fury-btn-secondary set-edit-project" data-id="' + p.id + '">Edit</button>' +
+          '</div>' +
+          '</td>' +
           '</tr>';
       }
     }
 
     return (
       '<div class="fury-flex-between fury-mb-2">' +
-        '<div style="font-size:13px;color:#6B7280;">' + self.projects.length + ' project(s)</div>' +
-        '<button class="fury-btn fury-btn-sm fury-btn-primary" id="set-add-project">+ Add Project</button>' +
+      '<div style="font-size:13px;color:#6B7280;">' + self.projects.length + ' project(s)</div>' +
+      '<button class="fury-btn fury-btn-sm fury-btn-primary" id="set-add-project">+ Add Project</button>' +
       '</div>' +
       '<div class="fury-card" style="padding:0;overflow:hidden;">' +
-        '<table class="fury-table">' +
-          '<thead>' +
-            '<tr>' +
-              '<th style="width:120px;">Code</th>' +
-              '<th>Name</th>' +
-              '<th style="width:140px;">Company</th>' +
-              '<th style="width:100px;text-align:center;">Status</th>' +
-              '<th style="width:100px;text-align:right;">Actions</th>' +
-            '</tr>' +
-          '</thead>' +
-          '<tbody id="set-projects-tbody">' + rows + '</tbody>' +
-        '</table>' +
+      '<table class="fury-table">' +
+      '<thead>' +
+      '<tr>' +
+      '<th style="width:120px;">Code</th>' +
+      '<th>Name</th>' +
+      '<th style="width:140px;">Company</th>' +
+      '<th style="width:100px;text-align:center;">Status</th>' +
+      '<th style="width:100px;text-align:right;">Actions</th>' +
+      '</tr>' +
+      '</thead>' +
+      '<tbody id="set-projects-tbody">' + rows + '</tbody>' +
+      '</table>' +
       '</div>'
     );
   },
@@ -271,20 +271,20 @@ const Settings = {
 
         rows +=
           '<tr class="team-expand" data-team-id="' + t.id + '">' +
-            '<td style="font-weight:600;">' +
-              '<span style="color:#6B7280;margin-right:6px;font-size:11px;">&#x25B6;</span>' +
-              self._escapeHtml(t.name || '') +
-            '</td>' +
-            '<td>' + self._escapeHtml(t.lead_email || '') + '</td>' +
-            '<td style="text-align:center;">' +
-              '<span class="fury-badge fury-badge-info">' + memberCount + '</span>' +
-            '</td>' +
-            '<td class="fury-table-actions">' +
-              '<div class="settings-table-actions">' +
-                '<button class="fury-btn fury-btn-sm fury-btn-secondary set-edit-team" data-id="' + t.id + '">Edit</button>' +
-                '<button class="fury-btn fury-btn-sm fury-btn-secondary set-manage-members" data-id="' + t.id + '">Members</button>' +
-              '</div>' +
-            '</td>' +
+          '<td style="font-weight:600;">' +
+          '<span style="color:#6B7280;margin-right:6px;font-size:11px;">&#x25B6;</span>' +
+          self._escapeHtml(t.name || '') +
+          '</td>' +
+          '<td>' + self._escapeHtml(t.lead_email || '') + '</td>' +
+          '<td style="text-align:center;">' +
+          '<span class="fury-badge fury-badge-info">' + memberCount + '</span>' +
+          '</td>' +
+          '<td class="fury-table-actions">' +
+          '<div class="settings-table-actions">' +
+          '<button class="fury-btn fury-btn-sm fury-btn-secondary set-edit-team" data-id="' + t.id + '">Edit</button>' +
+          '<button class="fury-btn fury-btn-sm fury-btn-secondary set-manage-members" data-id="' + t.id + '">Members</button>' +
+          '</div>' +
+          '</td>' +
           '</tr>';
 
         // Expandable member row (hidden by default)
@@ -294,7 +294,7 @@ const Settings = {
           var empName = (mem.employees && mem.employees.name) ? mem.employees.name : mem.employee_id;
           memberTags +=
             '<span class="team-member-tag">' +
-              self._escapeHtml(empName) +
+            self._escapeHtml(empName) +
             '</span>';
         }
         if (memberTags === '') {
@@ -303,30 +303,30 @@ const Settings = {
 
         rows +=
           '<tr class="team-members-row" data-team-members="' + t.id + '" style="display:none;">' +
-            '<td colspan="4">' +
-              '<div class="team-members-list">' + memberTags + '</div>' +
-            '</td>' +
+          '<td colspan="4">' +
+          '<div class="team-members-list">' + memberTags + '</div>' +
+          '</td>' +
           '</tr>';
       }
     }
 
     return (
       '<div class="fury-flex-between fury-mb-2">' +
-        '<div style="font-size:13px;color:#6B7280;">' + self.teams.length + ' team(s)</div>' +
-        '<button class="fury-btn fury-btn-sm fury-btn-primary" id="set-add-team">+ Add Team</button>' +
+      '<div style="font-size:13px;color:#6B7280;">' + self.teams.length + ' team(s)</div>' +
+      '<button class="fury-btn fury-btn-sm fury-btn-primary" id="set-add-team">+ Add Team</button>' +
       '</div>' +
       '<div class="fury-card" style="padding:0;overflow:hidden;">' +
-        '<table class="fury-table">' +
-          '<thead>' +
-            '<tr>' +
-              '<th>Team Name</th>' +
-              '<th>Lead (Email)</th>' +
-              '<th style="width:100px;text-align:center;">Members</th>' +
-              '<th style="width:160px;text-align:right;">Actions</th>' +
-            '</tr>' +
-          '</thead>' +
-          '<tbody id="set-teams-tbody">' + rows + '</tbody>' +
-        '</table>' +
+      '<table class="fury-table">' +
+      '<thead>' +
+      '<tr>' +
+      '<th>Team Name</th>' +
+      '<th>Lead (Email)</th>' +
+      '<th style="width:100px;text-align:center;">Members</th>' +
+      '<th style="width:160px;text-align:right;">Actions</th>' +
+      '</tr>' +
+      '</thead>' +
+      '<tbody id="set-teams-tbody">' + rows + '</tbody>' +
+      '</table>' +
       '</div>'
     );
   },
@@ -358,7 +358,7 @@ const Settings = {
         // Role select
         var roleSelect =
           '<select class="fury-select fury-btn-sm set-change-role" data-id="' + u.id + '" ' +
-            'style="width:auto;padding:4px 28px 4px 8px;height:28px;font-size:12px;">';
+          'style="width:auto;padding:4px 28px 4px 8px;height:28px;font-size:12px;">';
         for (var r = 0; r < self.ROLES.length; r++) {
           var selected = self.ROLES[r] === u.role ? ' selected' : '';
           roleSelect += '<option value="' + self.ROLES[r] + '"' + selected + '>' +
@@ -369,31 +369,31 @@ const Settings = {
 
         rows +=
           '<tr>' +
-            '<td>' + self._escapeHtml(u.email || '') + '</td>' +
-            '<td>' + self._escapeHtml(u.full_name || u.email || '') + '</td>' +
-            '<td>' + roleBadge + '</td>' +
-            '<td class="fury-table-actions">' + roleSelect + '</td>' +
+          '<td>' + self._escapeHtml(u.email || '') + '</td>' +
+          '<td>' + self._escapeHtml(u.full_name || u.email || '') + '</td>' +
+          '<td>' + roleBadge + '</td>' +
+          '<td class="fury-table-actions">' + roleSelect + '</td>' +
           '</tr>';
       }
     }
 
     return (
       '<div class="fury-flex-between fury-mb-2">' +
-        '<div style="font-size:13px;color:#6B7280;">' + self.profiles.length + ' user(s)</div>' +
-        '<button class="fury-btn fury-btn-sm fury-btn-primary" id="set-add-user">+ Add User</button>' +
+      '<div style="font-size:13px;color:#6B7280;">' + self.profiles.length + ' user(s)</div>' +
+      '<button class="fury-btn fury-btn-sm fury-btn-primary" id="set-add-user">+ Add User</button>' +
       '</div>' +
       '<div class="fury-card" style="padding:0;overflow:hidden;">' +
-        '<table class="fury-table">' +
-          '<thead>' +
-            '<tr>' +
-              '<th>Email</th>' +
-              '<th>Name</th>' +
-              '<th style="width:100px;">Role</th>' +
-              '<th style="width:140px;text-align:right;">Change Role</th>' +
-            '</tr>' +
-          '</thead>' +
-          '<tbody id="set-users-tbody">' + rows + '</tbody>' +
-        '</table>' +
+      '<table class="fury-table">' +
+      '<thead>' +
+      '<tr>' +
+      '<th>Email</th>' +
+      '<th>Name</th>' +
+      '<th style="width:100px;">Role</th>' +
+      '<th style="width:140px;text-align:right;">Change Role</th>' +
+      '</tr>' +
+      '</thead>' +
+      '<tbody id="set-users-tbody">' + rows + '</tbody>' +
+      '</table>' +
       '</div>'
     );
   },
@@ -457,30 +457,30 @@ const Settings = {
 
       rows +=
         '<tr' + rowStyle + '>' +
-          '<td style="font-weight:600;">' + monthNames[entry.month - 1] + '</td>' +
-          '<td>' + entry.year + '</td>' +
-          '<td style="text-align:center;">' + statusBadge + '</td>' +
-          '<td>' + lockedBy + '</td>' +
-          '<td>' + lockedDate + '</td>' +
-          '<td class="fury-table-actions">' + actionBtn + '</td>' +
+        '<td style="font-weight:600;">' + monthNames[entry.month - 1] + '</td>' +
+        '<td>' + entry.year + '</td>' +
+        '<td style="text-align:center;">' + statusBadge + '</td>' +
+        '<td>' + lockedBy + '</td>' +
+        '<td>' + lockedDate + '</td>' +
+        '<td class="fury-table-actions">' + actionBtn + '</td>' +
         '</tr>';
     }
 
     return (
       '<div class="fury-card" style="padding:0;overflow:hidden;">' +
-        '<table class="fury-table">' +
-          '<thead>' +
-            '<tr>' +
-              '<th>Month</th>' +
-              '<th style="width:80px;">Year</th>' +
-              '<th style="width:100px;text-align:center;">Status</th>' +
-              '<th>Locked By</th>' +
-              '<th>Date</th>' +
-              '<th style="width:100px;text-align:right;">Action</th>' +
-            '</tr>' +
-          '</thead>' +
-          '<tbody id="set-months-tbody">' + rows + '</tbody>' +
-        '</table>' +
+      '<table class="fury-table">' +
+      '<thead>' +
+      '<tr>' +
+      '<th>Month</th>' +
+      '<th style="width:80px;">Year</th>' +
+      '<th style="width:100px;text-align:center;">Status</th>' +
+      '<th>Locked By</th>' +
+      '<th>Date</th>' +
+      '<th style="width:100px;text-align:right;">Action</th>' +
+      '</tr>' +
+      '</thead>' +
+      '<tbody id="set-months-tbody">' + rows + '</tbody>' +
+      '</table>' +
       '</div>'
     );
   },
@@ -494,14 +494,14 @@ const Settings = {
 
     var html = '';
     switch (this.activeTab) {
-      case 'general':  html = this.renderGeneral();  break;
+      case 'general': html = this.renderGeneral(); break;
       case 'projects': html = this.renderProjects(); break;
-      case 'teams':    html = this.renderTeams();    break;
-      case 'users':    html = this.renderUsers();    break;
-      case 'months':          html = this.renderMonths();         break;
-      case 'email_requests':  html = this.renderEmailRequests();  break;
-      case 'working_hours':   html = this.renderWorkingHours();   break;
-      default:                html = this.renderGeneral();        break;
+      case 'teams': html = this.renderTeams(); break;
+      case 'users': html = this.renderUsers(); break;
+      case 'months': html = this.renderMonths(); break;
+      case 'email_requests': html = this.renderEmailRequests(); break;
+      case 'working_hours': html = this.renderWorkingHours(); break;
+      default: html = this.renderGeneral(); break;
     }
 
     contentEl.innerHTML = html;
@@ -868,26 +868,26 @@ const Settings = {
 
     var bodyHtml =
       '<div class="fury-form-group">' +
-        '<label class="fury-label" for="modal-project-code">Project Code</label>' +
-        '<input class="fury-input" id="modal-project-code" type="text" placeholder="FURY" ' +
-          'value="' + self._escapeAttr((project && project.code) || '') + '"' +
-          (isEdit ? ' disabled' : '') + '>' +
+      '<label class="fury-label" for="modal-project-code">Project Code</label>' +
+      '<input class="fury-input" id="modal-project-code" type="text" placeholder="FURY" ' +
+      'value="' + self._escapeAttr((project && project.code) || '') + '"' +
+      (isEdit ? ' disabled' : '') + '>' +
       '</div>' +
       '<div class="fury-form-group">' +
-        '<label class="fury-label" for="modal-project-name">Project Name</label>' +
-        '<input class="fury-input" id="modal-project-name" type="text" placeholder="Fury UAV Platform" ' +
-          'value="' + self._escapeAttr((project && project.name) || '') + '">' +
+      '<label class="fury-label" for="modal-project-name">Project Name</label>' +
+      '<input class="fury-input" id="modal-project-name" type="text" placeholder="Fury UAV Platform" ' +
+      'value="' + self._escapeAttr((project && project.name) || '') + '">' +
       '</div>' +
       '<div class="fury-form-group">' +
-        '<label class="fury-label" for="modal-project-company">Company</label>' +
-        '<select class="fury-select" id="modal-project-company">' + companyOptions + '</select>' +
+      '<label class="fury-label" for="modal-project-company">Company</label>' +
+      '<select class="fury-select" id="modal-project-company">' + companyOptions + '</select>' +
       '</div>' +
       '<div class="fury-form-group">' +
-        '<label class="fury-checkbox">' +
-          '<input type="checkbox" id="modal-project-active"' +
-            ((!project || project.is_active) ? ' checked' : '') + '>' +
-          ' Active' +
-        '</label>' +
+      '<label class="fury-checkbox">' +
+      '<input type="checkbox" id="modal-project-active"' +
+      ((!project || project.is_active) ? ' checked' : '') + '>' +
+      ' Active' +
+      '</label>' +
       '</div>';
 
     var footerHtml =
@@ -966,14 +966,14 @@ const Settings = {
 
     var bodyHtml =
       '<div class="fury-form-group">' +
-        '<label class="fury-label" for="modal-team-name">Team Name</label>' +
-        '<input class="fury-input" id="modal-team-name" type="text" placeholder="Engineering" ' +
-          'value="' + self._escapeAttr((team && team.name) || '') + '">' +
+      '<label class="fury-label" for="modal-team-name">Team Name</label>' +
+      '<input class="fury-input" id="modal-team-name" type="text" placeholder="Engineering" ' +
+      'value="' + self._escapeAttr((team && team.name) || '') + '">' +
       '</div>' +
       '<div class="fury-form-group">' +
-        '<label class="fury-label" for="modal-team-lead">Lead Email</label>' +
-        '<input class="fury-input" id="modal-team-lead" type="email" placeholder="lead@omdsystems.com" ' +
-          'value="' + self._escapeAttr((team && team.lead_email) || '') + '">' +
+      '<label class="fury-label" for="modal-team-lead">Lead Email</label>' +
+      '<input class="fury-input" id="modal-team-lead" type="email" placeholder="lead@omdsystems.com" ' +
+      'value="' + self._escapeAttr((team && team.lead_email) || '') + '">' +
       '</div>';
 
     var footerHtml =
@@ -1052,8 +1052,8 @@ const Settings = {
       var empName = (mem.employees && mem.employees.name) ? mem.employees.name : mem.employee_id;
       memberListHtml +=
         '<div class="team-member-tag" style="margin-bottom:4px;">' +
-          self._escapeHtml(empName) +
-          ' <span class="remove-member" data-member-id="' + mem.id + '" data-employee-id="' + mem.employee_id + '" title="Remove">&times;</span>' +
+        self._escapeHtml(empName) +
+        ' <span class="remove-member" data-member-id="' + mem.id + '" data-employee-id="' + mem.employee_id + '" title="Remove">&times;</span>' +
         '</div>';
     }
     if (!memberListHtml) {
@@ -1075,20 +1075,20 @@ const Settings = {
 
     var bodyHtml =
       '<div style="margin-bottom:16px;">' +
-        '<div class="settings-section-title" style="margin-bottom:8px;">Current Members</div>' +
-        '<div id="modal-members-list" class="team-members-list" style="flex-wrap:wrap;">' + memberListHtml + '</div>' +
+      '<div class="settings-section-title" style="margin-bottom:8px;">Current Members</div>' +
+      '<div id="modal-members-list" class="team-members-list" style="flex-wrap:wrap;">' + memberListHtml + '</div>' +
       '</div>' +
       '<div class="fury-divider"></div>' +
       '<div>' +
-        '<div class="settings-section-title" style="margin-bottom:8px;">Add Member</div>' +
-        '<div style="display:flex;gap:8px;align-items:flex-end;">' +
-          '<div style="flex:1;">' +
-            '<select class="fury-select" id="modal-add-member-select">' +
-              '<option value="">Loading employees...</option>' +
-            '</select>' +
-          '</div>' +
-          '<button class="fury-btn fury-btn-sm fury-btn-primary" id="modal-add-member-btn">Add</button>' +
-        '</div>' +
+      '<div class="settings-section-title" style="margin-bottom:8px;">Add Member</div>' +
+      '<div style="display:flex;gap:8px;align-items:flex-end;">' +
+      '<div style="flex:1;">' +
+      '<select class="fury-select" id="modal-add-member-select">' +
+      '<option value="">Loading employees...</option>' +
+      '</select>' +
+      '</div>' +
+      '<button class="fury-btn fury-btn-sm fury-btn-primary" id="modal-add-member-btn">Add</button>' +
+      '</div>' +
       '</div>';
 
     var footerHtml =
@@ -1228,16 +1228,16 @@ const Settings = {
 
     var bodyHtml =
       '<div class="fury-form-group">' +
-        '<label class="fury-label" for="modal-user-email">Email</label>' +
-        '<input class="fury-input" id="modal-user-email" type="email" placeholder="user@omdsystems.com">' +
+      '<label class="fury-label" for="modal-user-email">Email</label>' +
+      '<input class="fury-input" id="modal-user-email" type="email" placeholder="user@omdsystems.com">' +
       '</div>' +
       '<div class="fury-form-group">' +
-        '<label class="fury-label" for="modal-user-name">Full Name</label>' +
-        '<input class="fury-input" id="modal-user-name" type="text" placeholder="John Doe">' +
+      '<label class="fury-label" for="modal-user-name">Full Name</label>' +
+      '<input class="fury-input" id="modal-user-name" type="text" placeholder="John Doe">' +
       '</div>' +
       '<div class="fury-form-group">' +
-        '<label class="fury-label" for="modal-user-role">Role</label>' +
-        '<select class="fury-select" id="modal-user-role">' + roleOptions + '</select>' +
+      '<label class="fury-label" for="modal-user-role">Role</label>' +
+      '<select class="fury-select" id="modal-user-role">' + roleOptions + '</select>' +
       '</div>';
 
     var footerHtml =
@@ -1269,20 +1269,21 @@ const Settings = {
       saveBtn.textContent = 'Creating...';
 
       try {
-        var result = await DB.client
-          .from('profiles')
-          .insert({
-            email: email,
-            full_name: fullName,
-            role: role
-          })
-          .select()
-          .single();
+        var tempPassword = Math.random().toString(36).slice(-6) + 'Ac1!';
+        var result = await DB.client.rpc('admin_create_user', {
+          p_email: email,
+          p_password: tempPassword,
+          p_full_name: fullName,
+          p_role: role
+        });
 
         if (result.error) throw result.error;
 
         self._closeModal();
-        showToast('User profile created.', 'success');
+        showToast('User created! Temp password: ' + tempPassword, 'success');
+
+        // Show alert so admin can copy the password
+        alert('User created successfully.\n\nEmail: ' + email + '\nTemporary Password: ' + tempPassword + '\n\nPlease share this password with the user.');
 
         // Reload profiles
         var profileResult = await DB.client
@@ -1432,15 +1433,15 @@ const Settings = {
 
     var html =
       '<div class="fury-card">' +
-        '<div class="fury-card-header" style="margin-bottom:16px">' +
-          '<h3 style="font-size:15px;font-weight:600">Email Requests</h3>' +
-        '</div>' +
-        '<p style="color:var(--fury-text-secondary);font-size:13px;margin-bottom:16px">' +
-          'Manage corporate email provisioning requests. When a request is approved and marked as "created", the email is auto-synced to the employee record.' +
-        '</p>' +
-        '<table class="fury-table"><thead><tr>' +
-          '<th>Employee</th><th>Status</th><th>Requested</th><th>Note/Email</th><th style="width:200px">Actions</th>' +
-        '</tr></thead><tbody id="set-email-tbody">';
+      '<div class="fury-card-header" style="margin-bottom:16px">' +
+      '<h3 style="font-size:15px;font-weight:600">Email Requests</h3>' +
+      '</div>' +
+      '<p style="color:var(--fury-text-secondary);font-size:13px;margin-bottom:16px">' +
+      'Manage corporate email provisioning requests. When a request is approved and marked as "created", the email is auto-synced to the employee record.' +
+      '</p>' +
+      '<table class="fury-table"><thead><tr>' +
+      '<th>Employee</th><th>Status</th><th>Requested</th><th>Note/Email</th><th style="width:200px">Actions</th>' +
+      '</tr></thead><tbody id="set-email-tbody">';
 
     if (requests.length === 0) {
       html += '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--fury-text-muted)">No email requests found.</td></tr>';
@@ -1598,51 +1599,51 @@ const Settings = {
 
     return '' +
       '<div class="fury-card">' +
-        '<div class="fury-card-header" style="margin-bottom:16px">' +
-          '<h3 style="font-size:15px;font-weight:600">Working Hours Configuration</h3>' +
-        '</div>' +
-        '<p style="color:var(--fury-text-secondary);font-size:13px;margin-bottom:16px">' +
-          'Configure working days and hours per month. Auto-calculated values are used as defaults if no override is set.' +
-        '</p>' +
+      '<div class="fury-card-header" style="margin-bottom:16px">' +
+      '<h3 style="font-size:15px;font-weight:600">Working Hours Configuration</h3>' +
+      '</div>' +
+      '<p style="color:var(--fury-text-secondary);font-size:13px;margin-bottom:16px">' +
+      'Configure working days and hours per month. Auto-calculated values are used as defaults if no override is set.' +
+      '</p>' +
 
-        '<div class="fury-flex fury-gap-3 fury-mb-3">' +
-          '<select class="fury-select" id="set-wh-month" style="width:auto">' + monthOpts + '</select>' +
-          '<select class="fury-select" id="set-wh-year" style="width:auto">' + yearOpts + '</select>' +
-          '<span style="color:var(--fury-text-muted);font-size:12px;align-self:center">' +
-            'Auto-calculated: ' + autoDays + ' working days' +
-          '</span>' +
-        '</div>' +
+      '<div class="fury-flex fury-gap-3 fury-mb-3">' +
+      '<select class="fury-select" id="set-wh-month" style="width:auto">' + monthOpts + '</select>' +
+      '<select class="fury-select" id="set-wh-year" style="width:auto">' + yearOpts + '</select>' +
+      '<span style="color:var(--fury-text-muted);font-size:12px;align-self:center">' +
+      'Auto-calculated: ' + autoDays + ' working days' +
+      '</span>' +
+      '</div>' +
 
-        '<div class="fury-form-row fury-mb-3">' +
-          '<div class="fury-form-group">' +
-            '<label class="fury-label">Working Days</label>' +
-            '<input type="number" class="fury-input" id="set-wh-days" min="0" max="31" value="' + workingDays + '" />' +
-          '</div>' +
-          '<div class="fury-form-group">' +
-            '<label class="fury-label">Hours per Day</label>' +
-            '<input type="number" class="fury-input" id="set-wh-hpd" min="0" max="24" step="0.5" value="' + hpd + '" />' +
-          '</div>' +
-          '<div class="fury-form-group">' +
-            '<label class="fury-label">Adjustment Hours</label>' +
-            '<input type="number" class="fury-input" id="set-wh-adj" step="0.5" value="' + adj + '" />' +
-          '</div>' +
-        '</div>' +
+      '<div class="fury-form-row fury-mb-3">' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label">Working Days</label>' +
+      '<input type="number" class="fury-input" id="set-wh-days" min="0" max="31" value="' + workingDays + '" />' +
+      '</div>' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label">Hours per Day</label>' +
+      '<input type="number" class="fury-input" id="set-wh-hpd" min="0" max="24" step="0.5" value="' + hpd + '" />' +
+      '</div>' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label">Adjustment Hours</label>' +
+      '<input type="number" class="fury-input" id="set-wh-adj" step="0.5" value="' + adj + '" />' +
+      '</div>' +
+      '</div>' +
 
-        '<div class="fury-flex fury-gap-3 fury-mb-3" style="align-items:center">' +
-          '<span style="font-size:14px;font-weight:600;color:var(--fury-accent)">' +
-            'Total: ' + totalHours.toFixed(1) + ' hours' +
-          '</span>' +
-          '<span style="font-size:12px;color:var(--fury-text-muted)">' +
-            '(' + workingDays + ' &times; ' + hpd + 'h' + (adj !== 0 ? ' ' + (adj > 0 ? '+' : '') + adj + 'h adj' : '') + ')' +
-          '</span>' +
-        '</div>' +
+      '<div class="fury-flex fury-gap-3 fury-mb-3" style="align-items:center">' +
+      '<span style="font-size:14px;font-weight:600;color:var(--fury-accent)">' +
+      'Total: ' + totalHours.toFixed(1) + ' hours' +
+      '</span>' +
+      '<span style="font-size:12px;color:var(--fury-text-muted)">' +
+      '(' + workingDays + ' &times; ' + hpd + 'h' + (adj !== 0 ? ' ' + (adj > 0 ? '+' : '') + adj + 'h adj' : '') + ')' +
+      '</span>' +
+      '</div>' +
 
-        '<div class="fury-form-group fury-mb-3">' +
-          '<label class="fury-label">Notes</label>' +
-          '<input type="text" class="fury-input" id="set-wh-notes" placeholder="e.g. Public holidays included" value="' + self._escapeAttr((config.notes || '')) + '" />' +
-        '</div>' +
+      '<div class="fury-form-group fury-mb-3">' +
+      '<label class="fury-label">Notes</label>' +
+      '<input type="text" class="fury-input" id="set-wh-notes" placeholder="e.g. Public holidays included" value="' + self._escapeAttr((config.notes || '')) + '" />' +
+      '</div>' +
 
-        '<button class="fury-btn fury-btn-primary" id="set-wh-save">Save Configuration</button>' +
+      '<button class="fury-btn fury-btn-primary" id="set-wh-save">Save Configuration</button>' +
       '</div>';
   },
 

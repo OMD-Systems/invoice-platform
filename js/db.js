@@ -839,11 +839,18 @@ const DB = {
         return { data: null, error: { message: 'Invoice already exists for this employee/period. Delete the existing invoice first or edit it on the Invoices page.' } };
       }
 
+      // Get working hours configuration to determine standard hours for monthly employees
+      var whRet = await this.getWorkingHoursConfig(month, year);
+      var config = whRet && whRet.data ? whRet.data : null;
+      var expectedHours = config ? (config.working_days || 21) * (config.hours_per_day || 8) : 21 * 8; // default 168 hours
+
       // Calculate total hours and build line items
       var totalHours = 0;
       var items = [];
       var order = 1;
-      var rate = parseFloat(emp.rate_usd) || 0;
+      var rate = parseFloat(emp.rate_usd) || parseFloat(emp.hourly_rate) || 0;
+      var empType = emp.employee_type || 'monthly';
+      var isHourly = empType === 'Hourly Contractor' || empType === 'hourly';
 
       for (var i = 0; i < (timesheets || []).length; i++) {
         var ts = timesheets[i];
@@ -852,12 +859,28 @@ const DB = {
 
         totalHours += hours;
         var projectName = ts.projects ? ts.projects.name : ('Project ' + ts.project_id);
+
+        var itemTotal = 0;
+        var itemPrice = rate;
+
+        if (isHourly) {
+          // Pure hourly
+          itemTotal = hours * rate;
+        } else {
+          // Monthly fractional
+          if (expectedHours > 0) {
+            itemTotal = rate * (hours / expectedHours);
+          } else {
+            itemTotal = rate; // fallback if expectedHours = 0
+          }
+        }
+
         items.push({
           item_order: order++,
           description: projectName + ' — ' + hours + ' hours',
-          price_usd: rate,
-          qty: 1,
-          total_usd: Math.round(hours * rate * 100) / 100
+          price_usd: itemPrice,
+          qty: isHourly ? hours : (expectedHours > 0 ? (hours / expectedHours) : 1), // Optional: represent fractional or direct hours
+          total_usd: Math.round(itemTotal * 100) / 100
         });
       }
 

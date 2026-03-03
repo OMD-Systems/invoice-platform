@@ -33,7 +33,7 @@ var InvoicePreview = {
     var overlay = document.createElement('div');
     overlay.className = 'fury-modal-overlay active invoice-preview-overlay';
 
-    var mainContainer = document.querySelector('.fury-main');
+    var mainContainer = document.querySelector('#main-app');
     if (mainContainer) mainContainer.setAttribute('data-print', 'hide');
 
     overlay.innerHTML =
@@ -99,7 +99,7 @@ var InvoicePreview = {
     if (!overlay) return;
     overlay.classList.remove('active');
 
-    var mainContainer = document.querySelector('.fury-main');
+    var mainContainer = document.querySelector('#main-app');
     if (mainContainer) mainContainer.removeAttribute('data-print');
 
     setTimeout(function () {
