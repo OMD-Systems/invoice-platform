@@ -402,21 +402,31 @@
   /* --- Footer: Bank + Terms two-column layout --- */
   .invoice-footer-columns {
     display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
     justify-content: space-between !important;
+    align-items: flex-start !important;
     gap: 24pt !important;
-    margin-top: 12pt;
+    margin-top: 16pt !important;
     page-break-inside: avoid;
+    width: 100% !important;
   }
 
   .invoice-footer-columns > .invoice-payment {
-    flex: 1 !important;
-    min-width: 0;
+    flex: 1 1 45% !important;
+    min-width: 0 !important;
+    margin-bottom: 0 !important;
+    padding: 10pt 12pt !important;
+    border: 1px solid #ccc !important;
+    border-left: 3pt solid #205968 !important;
+    background: #f9fafb !important;
   }
 
   .invoice-footer-columns > .invoice-terms {
-    flex: 1 !important;
-    min-width: 0;
+    flex: 1 1 45% !important;
+    min-width: 0 !important;
     margin-top: 0 !important;
+    margin-bottom: 0 !important;
     padding-top: 0 !important;
     border-top: none !important;
   }
@@ -832,18 +842,22 @@
 
   .invoice-footer-columns {
     display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     justify-content: space-between;
+    align-items: flex-start;
     gap: 24pt;
-    margin-top: 12pt;
+    margin-top: 16pt;
   }
 
   .invoice-footer-columns > .invoice-payment {
-    flex: 1;
+    flex: 1 1 45%;
     min-width: 0;
+    margin-bottom: 0;
   }
 
   .invoice-footer-columns > .invoice-terms {
-    flex: 1;
+    flex: 1 1 45%;
     min-width: 0;
     margin-top: 0;
     padding-top: 0;

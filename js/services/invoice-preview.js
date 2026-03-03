@@ -300,8 +300,8 @@ var InvoicePreview = {
       '</div>' +
 
       /* ═════ SECTION 5: Footer (Bank + Terms) ═════ */
-      '<div class="invoice-footer-columns" style="display: flex; justify-content: space-between; gap: 24pt; margin-top: 12pt;">' +
-      '<div class="invoice-payment" style="flex: 1;">' +
+      '<div class="invoice-footer-columns">' +
+      '<div class="invoice-payment">' +
       '<div class="invoice-payment-title">BANK ACCOUNT</div>' +
       '<div class="invoice-payment-details">' +
       (emp.iban ? '<strong>IBAN:</strong> ' + this._esc(emp.iban) + '<br>' : '') +
@@ -311,7 +311,7 @@ var InvoicePreview = {
       '</div>' +
       '</div>' +
       (terms ?
-        '<div class="invoice-terms" style="flex: 1; margin-top: 0; padding-top: 0; border-top: none;">' +
+        '<div class="invoice-terms">' +
         '<div class="invoice-terms-title">TERMS AND CONDITIONS</div>' +
         '<div class="invoice-terms-text">' + this._nlToBr(this._esc(terms)) + '</div>' +
         '</div>'

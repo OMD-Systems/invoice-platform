@@ -104,7 +104,7 @@ const Settlements = {
       // Priority: invoice total_usd > expected math
       var totalPaid = 0;
       var empType = emp.employee_type || 'monthly';
-      var rate = parseFloat(emp.rate_usd) || parseFloat(emp.hourly_rate) || 0;
+      var rate = parseFloat(emp.rate_usd) || 0;
 
       if (invoice && invoice.total_usd != null) {
         totalPaid = parseFloat(invoice.total_usd) || 0;

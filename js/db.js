@@ -91,7 +91,7 @@ const DB = {
     try {
       const { data, error } = await this.client
         .from('employees')
-        .select('id, pin, name, full_name_lat, employee_type, contract_type, is_active, work_email, email, invoice_format, invoice_prefix, next_invoice_number, service_description, rate_usd, hourly_rate, address, phone, iban, swift, bank_name, receiver_name, contract_uploaded_at, nda_uploaded_at, created_at')
+        .select('id, pin, name, full_name_lat, employee_type, contract_type, is_active, work_email, email, invoice_format, invoice_prefix, next_invoice_number, service_description, rate_usd, address, phone, iban, swift, bank_name, receiver_name, contract_uploaded_at, nda_uploaded_at, created_at')
         .eq('is_active', true)
         .order('name', { ascending: true });
 
@@ -182,7 +182,7 @@ const DB = {
       // Fetch the actual employee records
       const { data, error } = await this.client
         .from('employees')
-        .select('id, pin, name, full_name_lat, employee_type, contract_type, is_active, work_email, email, invoice_format, invoice_prefix, next_invoice_number, service_description, rate_usd, hourly_rate, address, phone, iban, swift, bank_name, receiver_name, contract_uploaded_at, nda_uploaded_at, created_at')
+        .select('id, pin, name, full_name_lat, employee_type, contract_type, is_active, work_email, email, invoice_format, invoice_prefix, next_invoice_number, service_description, rate_usd, address, phone, iban, swift, bank_name, receiver_name, contract_uploaded_at, nda_uploaded_at, created_at')
         .in('id', employeeIds)
         .eq('is_active', true)
         .order('name', { ascending: true });
