@@ -58,6 +58,10 @@ body {
   min-height: 100vh;
 }
 
+body.fury-modal-open {
+  overflow: hidden;
+}
+
 ::selection {
   background: rgba(0, 212, 255, 0.3);
   color: #fff;
@@ -431,6 +435,25 @@ img {
   border-color: #16A34A;
 }
 
+.fury-btn-success:active {
+  background: #15803D;
+  transform: translateY(1px);
+}
+
+/* Accent */
+.fury-btn-accent {
+  background: var(--fury-accent);
+  color: var(--fury-bg);
+  font-weight: 600;
+}
+.fury-btn-accent:hover {
+  background: #00b8d4;
+}
+.fury-btn-accent:active {
+  background: #0097a7;
+  transform: translateY(1px);
+}
+
 /* Ghost */
 .fury-btn-ghost {
   background: transparent;
@@ -564,6 +587,15 @@ img {
   margin-top: 4px;
 }
 
+.validation-error-field {
+  border-color: var(--fury-danger) !important;
+}
+.validation-error {
+  color: var(--fury-danger);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
 /* Textarea (on .fury-input) */
 textarea.fury-input {
   height: auto;
@@ -684,6 +716,15 @@ textarea.fury-input {
   user-select: none;
 }
 
+.fury-input[type="number"]::-webkit-outer-spin-button,
+.fury-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.fury-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 /* Search input */
 .fury-search {
   position: relative;
@@ -783,6 +824,18 @@ textarea.fury-input {
   background: var(--fury-accent);
 }
 
+.role-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(0, 212, 255, 0.15);
+  color: var(--fury-accent);
+}
+
 /* ============================================================
    7. MODAL
    ============================================================ */
@@ -861,6 +914,11 @@ textarea.fury-input {
   color: var(--fury-text);
 }
 
+.fury-modal-close:focus-visible {
+  outline: 2px solid var(--fury-accent);
+  outline-offset: 2px;
+}
+
 .fury-modal-body {
   padding: 24px;
   overflow-y: auto;
@@ -883,6 +941,20 @@ textarea.fury-input {
 
 .fury-modal-lg {
   max-width: 720px;
+}
+
+.fury-modal-section {
+  margin-bottom: 20px;
+}
+.fury-modal-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fury-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--fury-border);
 }
 
 /* ============================================================
@@ -921,6 +993,11 @@ textarea.fury-input {
   color: var(--fury-accent);
   border-bottom-color: var(--fury-accent);
   font-weight: 600;
+}
+
+.fury-tab:focus-visible {
+  box-shadow: 0 0 0 2px var(--fury-accent);
+  outline: none;
 }
 
 .fury-tab-content {
@@ -1184,6 +1261,10 @@ textarea.fury-input {
   display: none !important;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .fury-sr-only {
   position: absolute;
   width: 1px;
@@ -1262,6 +1343,13 @@ textarea.fury-input {
   border-width: 3px;
 }
 
+.loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--fury-text-secondary);
+  font-size: 14px;
+}
+
 /* Full-page loading */
 .fury-loading-page {
   position: fixed;
@@ -1312,13 +1400,16 @@ textarea.fury-input {
 
 .fury-toast-container {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  top: 16px;
+  right: 16px;
+  z-index: 2000;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 2000;
   pointer-events: none;
+}
+.fury-toast-container .fury-toast {
+  pointer-events: auto;
 }
 
 .fury-toast {
@@ -2246,6 +2337,12 @@ textarea.fury-input {
   gap: 14px;
 }
 
+.td-header-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .td-avatar {
   width: 44px;
   height: 44px;
@@ -2750,6 +2847,63 @@ textarea.fury-input {
 .fury-table-compact th,
 .fury-table-compact td {
   padding: 6px 12px;
+}
+
+/* ── Settings Section ── */
+.settings-section {
+  margin-bottom: 32px;
+}
+.settings-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fury-text);
+  margin-bottom: 16px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.settings-field {
+  flex: 1;
+}
+.settings-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ── Team Expand / Members ── */
+.team-expand {
+  cursor: pointer;
+  user-select: none;
+}
+.team-members-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.team-member-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: var(--fury-elevated);
+  border: 1px solid var(--fury-border);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--fury-text-secondary);
+}
+.remove-member {
+  cursor: pointer;
+  color: var(--fury-danger);
+  font-weight: bold;
+  margin-left: 4px;
+}
+.remove-member:hover {
+  color: #FCA5A5;
 }
 
 /* ── Small Input ── */

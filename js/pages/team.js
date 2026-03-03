@@ -4,23 +4,7 @@
    Replaces: Dashboard, Timesheet, Employees
    ============================================================= */
 
-/* ── Ensure showToast is available ── */
-if (typeof showToast === 'undefined') {
-  function showToast(message, type) {
-    type = type || 'success';
-    var existing = document.querySelectorAll('.fury-toast');
-    for (var i = 0; i < existing.length; i++) existing[i].remove();
-    var toast = document.createElement('div');
-    toast.className = 'fury-toast fury-toast-' + type;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-    setTimeout(function () { toast.classList.add('show'); }, 10);
-    setTimeout(function () {
-      toast.classList.remove('show');
-      setTimeout(function () { toast.remove(); }, 300);
-    }, 3000);
-  }
-}
+/* showToast is defined globally in utils.js */
 
 const Team = {
   title: 'Team',
@@ -285,7 +269,7 @@ const Team = {
 
       // Rate display
       var rate = parseFloat(emp.rate_usd) || 0;
-      var rateStr = rate > 0 ? '$' + rate.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '';
+      var rateStr = rate > 0 ? '$' + rate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
 
       // Invoice status indicator
       var invIndicator = '';
@@ -956,6 +940,7 @@ const Team = {
     }
 
     var btn = container.querySelector('#team-btn-save-hours');
+    var btnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
 
     try {
@@ -978,7 +963,7 @@ const Team = {
       console.error('[Team] save hours error:', err);
       showToast('Failed to save hours. Please try again.', 'error');
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Save Hours'; }
+      if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
     }
   },
 
@@ -989,6 +974,7 @@ const Team = {
     if (!emp) return;
 
     var btn = container.querySelector('#team-btn-generate');
+    var btnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
 
     try {
@@ -1009,7 +995,7 @@ const Team = {
       console.error('[Team] generate invoice error:', err);
       showToast('Failed to generate invoice. Please try again.', 'error');
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Generate Invoice'; }
+      if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
     }
   },
 
@@ -1026,6 +1012,7 @@ const Team = {
     }
 
     var btn = container.querySelector('#team-btn-delete-invoice');
+    var btnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Deleting...'; }
 
     try {
@@ -1046,7 +1033,7 @@ const Team = {
       console.error('[Team] delete invoice error:', err);
       showToast('Failed to delete invoice. Please try again.', 'error');
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Delete'; }
+      if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
     }
   },
 
@@ -1103,8 +1090,10 @@ const Team = {
       var overlay = container.querySelector('#team-modal-overlay');
       var modal = container.querySelector('#team-modal');
       if (overlay && modal) {
+        var furyModal = modal.querySelector('.fury-modal') || modal;
+        furyModal.classList.add('fury-modal-lg');
         modal.innerHTML =
-          '<div style="padding:0;max-width:800px;width:100%;max-height:90vh;overflow:auto;background:white;border-radius:8px">' +
+          '<div style="padding:0;max-width:800px;width:100%;max-height:90vh;overflow:auto;background:#fff;border-radius:8px">' +
           '<div style="display:flex;justify-content:flex-end;padding:8px;background:#111114;border-radius:8px 8px 0 0">' +
           '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-preview-close">&times; Close</button>' +
           '</div>' +
@@ -1118,6 +1107,7 @@ const Team = {
         if (closeBtn) {
           closeBtn.addEventListener('click', function () {
             overlay.classList.remove('active');
+            furyModal.classList.remove('fury-modal-lg');
           });
         }
       }
@@ -1432,6 +1422,11 @@ const Team = {
 
     overlay.classList.add('active');
 
+    setTimeout(function() {
+      var firstInput = document.querySelector('#team-modal input:not([readonly]):not([disabled])');
+      if (firstInput) firstInput.focus();
+    }, 100);
+
     // Bind modal buttons
     modal.querySelector('#team-modal-close').addEventListener('click', function () { overlay.classList.remove('active'); });
     modal.querySelector('#team-modal-cancel').addEventListener('click', function () { overlay.classList.remove('active'); });
@@ -1595,8 +1590,8 @@ const Team = {
     if (!dateStr) return '';
     var d = new Date(dateStr + 'T00:00:00');
     if (isNaN(d.getTime())) return dateStr;
-    var months = ['January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'];
+    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
   },
 

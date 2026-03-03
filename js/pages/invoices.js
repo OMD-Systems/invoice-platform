@@ -342,7 +342,7 @@ const Invoices = {
           '<tr><td style="color:var(--fury-text-muted)">' + (r + 1) + '</td>' +
           '<td style="font-weight:500">' + self._escHtml(empName) + '</td>' +
           '<td><span class="fury-badge fury-badge-info">' + self._escHtml(invNum) + '</span></td>' +
-          '<td style="color:var(--fury-text-secondary)">' + self._escHtml(inv.invoice_date || '') + '</td>' +
+          '<td style="color:var(--fury-text-secondary)">' + self._escHtml(inv.invoice_date ? self._formatDate(inv.invoice_date) : '') + '</td>' +
           '<td style="text-align:right;font-variant-numeric:tabular-nums">' + self._formatCurrency(subtotal) + '</td>' +
           '<td style="text-align:right;color:var(--fury-text-secondary)">' + (discount > 0 ? '-' + self._formatCurrency(discount) : '$0.00') + '</td>' +
           '<td style="text-align:right;font-weight:600">' + self._formatCurrency(invTotal) + '</td>' +
@@ -533,7 +533,7 @@ const Invoices = {
   },
   _exportSummaryXlsx() {
     var self = this;
-    if (typeof XLSX === 'undefined') { alert('XLSX not loaded'); return; }
+    if (typeof XLSX === 'undefined') { showToast('XLSX library not loaded', 'error'); return; }
     if (self.invoices.length === 0) { showToast('No data to export', 'error'); return; }
     try {
       var header = ['#', 'Employee', 'Invoice #', 'Date', 'Subtotal ($)', 'Discount ($)', 'Total ($)', 'Status'];
@@ -619,7 +619,7 @@ const Invoices = {
       var empName = emp.full_name_lat || emp.name || 'Unknown';
       var items = inv.invoice_items || [];
       var itemCount = items.length;
-      var total = inv.total_usd || inv.total || 0;
+      var total = inv.total_usd != null ? inv.total_usd : (inv.total != null ? inv.total : 0);
       var invNumber = inv.invoice_number || '—';
       var invDate = inv.invoice_date ? this._formatDate(inv.invoice_date) : '—';
       var status = inv.status || 'draft';
@@ -902,7 +902,7 @@ const Invoices = {
               await self._reload(container, ctx);
             } catch (err) {
               console.error('[Invoices] delete error:', err);
-              alert('Failed to delete invoice. Please try again.');
+              showToast('Failed to delete invoice. Please try again.', 'error');
               btnDel.innerHTML = btnOriginalHtml;
               btnDel.disabled = false;
             }
@@ -961,7 +961,7 @@ const Invoices = {
   _handlePreview: function (invoiceId) {
     var inv = this._findInvoice(invoiceId);
     if (!inv) {
-      alert('Invoice not found.');
+      showToast('Invoice not found', 'error');
       return;
     }
 
@@ -973,7 +973,7 @@ const Invoices = {
   _handleDownload: function (invoiceId) {
     var inv = this._findInvoice(invoiceId);
     if (!inv) {
-      alert('Invoice not found.');
+      showToast('Invoice not found', 'error');
       return;
     }
 
@@ -990,11 +990,13 @@ const Invoices = {
 
   /* ── Status change ── */
   async _handleStatusChange(invoiceId, newStatus, container, ctx) {
+    var target = container.querySelector('.inv-act-status[data-invoice-id="' + invoiceId + '"]');
+    if (target) target.disabled = true;
     try {
       var result = await DB.updateInvoiceStatus(invoiceId, newStatus);
       if (!result || result.error) {
         console.error('[Invoices] Status change error:', result.error);
-        alert('Failed to update status. Please try again.');
+        showToast('Failed to update status. Please try again.', 'error');
         return;
       }
       // Update local data
@@ -1007,7 +1009,9 @@ const Invoices = {
       this.updateTable(container);
     } catch (err) {
       console.error('[Invoices] Status change error:', err);
-      alert('Failed to update status. Please try again.');
+      showToast('Failed to update status. Please try again.', 'error');
+    } finally {
+      if (target) target.disabled = false;
     }
   },
 
@@ -1015,7 +1019,7 @@ const Invoices = {
   async _handleGenerate(employeeId, employeeName, container, ctx) {
     var emp = this._findEmployee(employeeId);
     if (!emp) {
-      alert('Employee not found.');
+      showToast('Employee not found', 'error');
       return;
     }
     this.showGenerateModal(emp, container, ctx);
@@ -1025,7 +1029,7 @@ const Invoices = {
   async _handleGenerateSelected(container, ctx) {
     var checks = container.querySelectorAll('.inv-pending-check:checked');
     if (checks.length === 0) {
-      alert('Please select at least one pending employee.');
+      showToast('Please select at least one pending employee', 'error');
       return;
     }
 
@@ -1055,7 +1059,7 @@ const Invoices = {
     }
 
     if (errors.length > 0) {
-      alert('Some invoices failed:\n\n' + errors.join('\n'));
+      showToast('Some invoices failed to generate', 'error');
     }
 
     if (btn) {
@@ -1096,7 +1100,7 @@ const Invoices = {
     }
 
     if (errors.length > 0) {
-      alert('Some deletions failed:\n\n' + errors.join('\n'));
+      showToast('Some deletions failed', 'error');
     } else if (deletedCount > 0) {
       showToast(deletedCount + ' invoice(s) deleted', 'success');
     }
@@ -1125,7 +1129,7 @@ const Invoices = {
       }
     } catch (err) {
       console.error('[Invoices] batch download error:', err);
-      alert('Batch download failed. Please try again.');
+      showToast('Batch download failed. Please try again.', 'error');
     }
   },
 
@@ -1168,7 +1172,7 @@ const Invoices = {
 
     // Build modal
     var overlay = document.createElement('div');
-    overlay.className = 'fury-modal-overlay active invoice-generate-overlay';
+    overlay.className = 'fury-modal-overlay invoice-generate-overlay';
 
     overlay.innerHTML =
       '<div class="fury-modal" style="max-width: 680px; max-height: 92vh;">' +
@@ -1250,14 +1254,25 @@ const Invoices = {
       '</div>';
 
     document.body.appendChild(overlay);
+    document.body.classList.add('fury-modal-open');
+    requestAnimationFrame(function () { overlay.classList.add('active'); });
 
     // ── Modal event bindings ──
 
     // Close
+    var escHandler = function (e) {
+      if (e.key === 'Escape') {
+        document.removeEventListener('keydown', escHandler);
+        closeModal();
+      }
+    };
     var closeModal = function () {
+      document.removeEventListener('keydown', escHandler);
+      document.body.classList.remove('fury-modal-open');
       overlay.classList.remove('active');
       setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 260);
     };
+    document.addEventListener('keydown', escHandler);
 
     overlay.querySelector('#gen-close').addEventListener('click', closeModal);
     overlay.querySelector('#gen-cancel').addEventListener('click', closeModal);
@@ -1559,7 +1574,7 @@ const Invoices = {
       var result = await DB.createInvoice(invoicePayload, itemsPayload);
       if (!result || result.error) {
         console.error('[Invoices] Save error:', result && result.error);
-        alert('Failed to save invoice. Please try again.');
+        showToast('Failed to save invoice. Please try again.', 'error');
         return null;
       }
 
@@ -1569,7 +1584,7 @@ const Invoices = {
       return result.data;
     } catch (err) {
       console.error('[Invoices] Save error:', err);
-      alert('Failed to save invoice. Please try again.');
+      showToast('Failed to save invoice. Please try again.', 'error');
       return null;
     } finally {
       if (saveBtn) {
@@ -1644,7 +1659,7 @@ const Invoices = {
       var result = await DB.createInvoice(invoicePayload, itemsPayload);
       if (!result || result.error) {
         console.error('[Invoices] Generate & download save error:', result && result.error);
-        alert('Failed to save invoice. Please try again.');
+        showToast('Failed to save invoice. Please try again.', 'error');
         return;
       }
 
@@ -1664,7 +1679,7 @@ const Invoices = {
       await this._reload(container, ctx);
     } catch (err) {
       console.error('[Invoices] Generate & download error:', err);
-      alert('Failed to generate invoice. Please try again.');
+      showToast('Failed to generate invoice. Please try again.', 'error');
     } finally {
       if (dlBtn) {
         dlBtn.disabled = false;
@@ -1762,7 +1777,7 @@ const Invoices = {
     var subtotal = inv.subtotal_usd || 0;
     var discount = inv.discount_usd || 0;
     var tax = inv.tax_usd || 0;
-    var total = inv.total_usd || inv.total || 0;
+    var total = inv.total_usd != null ? inv.total_usd : (inv.total != null ? inv.total : 0);
 
     // Recalculate subtotal from items if not stored
     if (!subtotal && items.length > 0) {

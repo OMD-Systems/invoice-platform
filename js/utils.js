@@ -3,6 +3,30 @@
 // utils.js — Centralized security & formatting functions
 // ============================================================
 
+/* ── Global Toast ── */
+function showToast(message, type) {
+    type = type || 'success';
+    var container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'fury-toast-container';
+        document.body.appendChild(container);
+    }
+    var toast = document.createElement('div');
+    toast.className = 'fury-toast fury-toast-' + type;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(function () { toast.classList.add('show'); }, 10);
+    setTimeout(function () {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(function () {
+            if (toast.parentNode) toast.remove();
+        }, 300);
+    }, 4000);
+}
+
 const Utils = {
 
     /**

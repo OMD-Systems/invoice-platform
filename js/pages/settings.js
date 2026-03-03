@@ -845,11 +845,47 @@ const Settings = {
     if (bodyEl) bodyEl.innerHTML = bodyHtml;
     if (footerEl) footerEl.innerHTML = footerHtml;
     if (overlay) overlay.classList.add('active');
+
+    // Escape to close
+    var self = this;
+    var escHandler = function(e) {
+      if (e.key === 'Escape') self._closeModal();
+    };
+    document.addEventListener('keydown', escHandler);
+    this._currentEscHandler = escHandler;
+
+    // Enter to submit
+    var enterHandler = function(e) {
+      if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        var saveBtn = overlay.querySelector('.fury-btn-primary');
+        if (saveBtn && !saveBtn.disabled) saveBtn.click();
+      }
+    };
+    overlay.addEventListener('keydown', enterHandler);
+
+    // Body scroll lock
+    document.body.classList.add('fury-modal-open');
+
+    // Focus first input
+    setTimeout(function() {
+      var firstInput = bodyEl.querySelector('input:not([readonly]):not([disabled]), select, textarea');
+      if (firstInput) firstInput.focus();
+    }, 100);
   },
 
   _closeModal() {
     var overlay = document.querySelector('#settings-modal-overlay');
     if (overlay) overlay.classList.remove('active');
+
+    // Cleanup Escape handler
+    if (this._currentEscHandler) {
+      document.removeEventListener('keydown', this._currentEscHandler);
+      this._currentEscHandler = null;
+    }
+
+    // Remove body scroll lock
+    document.body.classList.remove('fury-modal-open');
   },
 
   /* ═══════════════════════════════════════════════════
@@ -1123,6 +1159,9 @@ const Settings = {
         var memberId = removeBtn.getAttribute('data-member-id');
         if (!confirm('Remove this member from the team?')) return;
 
+        removeBtn.style.pointerEvents = 'none';
+        removeBtn.style.opacity = '0.5';
+
         try {
           var result = await DB.client
             .from('team_members')
@@ -1142,6 +1181,8 @@ const Settings = {
         } catch (err) {
           console.error('[Settings] remove member error:', err);
           showToast('Failed to remove member. Please try again.', 'error');
+          removeBtn.style.pointerEvents = '';
+          removeBtn.style.opacity = '';
         }
       });
     }
@@ -1481,7 +1522,7 @@ const Settings = {
         var empName = (req.employees && req.employees.name) || 'Unknown';
         var currentEmail = (req.employees && req.employees.work_email) || '';
         var statusBadge = self._emailStatusBadge(req.status);
-        var dateStr = req.created_at ? new Date(req.created_at).toLocaleDateString() : '—';
+        var dateStr = req.created_at ? new Date(req.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
 
         html += '<tr data-req-id="' + req.id + '">' +
           '<td style="font-weight:500">' + self._escapeHtml(empName) + (currentEmail ? '<br><span style="font-size:11px;color:var(--fury-text-muted)">' + self._escapeHtml(currentEmail) + '</span>' : '') + '</td>' +
@@ -1546,7 +1587,9 @@ const Settings = {
     var approveBtns = container.querySelectorAll('.set-email-approve');
     for (var a = 0; a < approveBtns.length; a++) {
       approveBtns[a].addEventListener('click', function () {
-        var id = this.getAttribute('data-id');
+        var btn = this;
+        btn.disabled = true;
+        var id = btn.getAttribute('data-id');
         var noteInput = container.querySelector('.set-email-note[data-id="' + id + '"]');
         var note = noteInput ? noteInput.value.trim() : '';
         DB.updateEmailRequest(id, { status: 'approved', admin_note: note }).then(function () {
@@ -1555,6 +1598,7 @@ const Settings = {
         }).catch(function (err) {
           console.error('[Settings] approve error:', err);
           showToast('Failed to approve request. Please try again.', 'error');
+          btn.disabled = false;
         });
       });
     }
@@ -1563,13 +1607,16 @@ const Settings = {
     var rejectBtns = container.querySelectorAll('.set-email-reject');
     for (var r = 0; r < rejectBtns.length; r++) {
       rejectBtns[r].addEventListener('click', function () {
-        var id = this.getAttribute('data-id');
+        var btn = this;
+        btn.disabled = true;
+        var id = btn.getAttribute('data-id');
         DB.updateEmailRequest(id, { status: 'rejected' }).then(function () {
           showToast('Request rejected', 'success');
           self._bindEmailRequestEvents(container);
         }).catch(function (err) {
           console.error('[Settings] reject error:', err);
           showToast('Failed to reject request. Please try again.', 'error');
+          btn.disabled = false;
         });
       });
     }
@@ -1578,19 +1625,22 @@ const Settings = {
     var createBtns = container.querySelectorAll('.set-email-create');
     for (var c = 0; c < createBtns.length; c++) {
       createBtns[c].addEventListener('click', function () {
-        var id = this.getAttribute('data-id');
+        var btn = this;
+        var id = btn.getAttribute('data-id');
         var noteInput = container.querySelector('.set-email-note[data-id="' + id + '"]');
         var note = noteInput ? noteInput.value.trim() : '';
         if (!note || !Validation.isValidEmail(note)) {
           showToast('Please enter the created email address', 'error');
           return;
         }
+        btn.disabled = true;
         DB.updateEmailRequest(id, { status: 'created', admin_note: note }).then(function () {
           showToast('Email created and synced!', 'success');
           self._bindEmailRequestEvents(container);
         }).catch(function (err) {
           console.error('[Settings] update email error:', err);
           showToast('Failed to update request. Please try again.', 'error');
+          btn.disabled = false;
         });
       });
     }

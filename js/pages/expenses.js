@@ -326,7 +326,7 @@ const Expenses = {
             '<span style="font-weight:500">' + self.escapeHtml(catInfo.label) + '</span>' +
           '</span>' +
         '</td>' +
-        '<td>' + self.escapeHtml(expense.description || '') + '</td>' +
+        '<td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + self.escapeAttr(expense.description || '') + '">' + self.escapeHtml(expense.description || '') + '</td>' +
         '<td style="text-align:right;font-variant-numeric:tabular-nums">' +
           amountUah.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) +
         '</td>' +
@@ -460,11 +460,7 @@ const Expenses = {
 
     var newRate = parseFloat(rateInput.value);
     if (!newRate || newRate <= 0) {
-      if (typeof showToast === 'function') {
-        showToast('Please enter a valid exchange rate.', 'error');
-      } else {
-        alert('Please enter a valid exchange rate.');
-      }
+      showToast('Please enter a valid exchange rate.', 'error');
       return;
     }
 
@@ -490,14 +486,10 @@ const Expenses = {
         infoEl.textContent = 'Rate updated: ' + newRate.toFixed(2) + ' UAH/USD at ' + new Date().toLocaleTimeString();
       }
 
-      if (typeof showToast === 'function') {
-        showToast('Exchange rate updated to ' + newRate.toFixed(2) + ' UAH/USD', 'success');
-      }
+      showToast('Exchange rate updated to ' + newRate.toFixed(2) + ' UAH/USD', 'success');
     } catch (err) {
       console.error('[Expenses] updateRate error:', err);
-      if (typeof showToast === 'function') {
-        showToast('Failed to update rate. Please try again.', 'error');
-      }
+      showToast('Failed to update rate. Please try again.', 'error');
     } finally {
       if (rateBtn) {
         rateBtn.disabled = false;
@@ -512,6 +504,9 @@ const Expenses = {
     var confirmMsg = 'Delete expense' + (description ? ' "' + description + '"' : '') + '?';
     if (!confirm(confirmMsg)) return;
 
+    var btn = container.querySelector('.exp-delete-btn[data-expense-id="' + expenseId + '"]');
+    if (btn) btn.disabled = true;
+
     try {
       var result = await DB.deleteExpense(expenseId);
       if (result && result.error) {
@@ -525,16 +520,12 @@ const Expenses = {
 
       self.updateUI(container);
 
-      if (typeof showToast === 'function') {
-        showToast('Expense deleted.', 'success');
-      }
+      showToast('Expense deleted.', 'success');
     } catch (err) {
       console.error('[Expenses] delete error:', err);
-      if (typeof showToast === 'function') {
-        showToast('Failed to delete expense. Please try again.', 'error');
-      } else {
-        alert('Failed to delete expense. Please try again.');
-      }
+      showToast('Failed to delete expense. Please try again.', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
     }
   },
 
@@ -631,6 +622,7 @@ const Expenses = {
 
     document.body.appendChild(overlay);
     self.modalOverlay = overlay;
+    document.body.classList.add('fury-modal-open');
 
     // Activate with slight delay for animation
     requestAnimationFrame(function () {
@@ -693,6 +685,7 @@ const Expenses = {
     // ── Close handlers ──
     var closeModal = function () {
       overlay.classList.remove('active');
+      document.body.classList.remove('fury-modal-open');
       setTimeout(function () {
         if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
         self.modalOverlay = null;
@@ -753,49 +746,33 @@ const Expenses = {
 
     // Validation
     if (!description) {
-      if (typeof showToast === 'function') {
-        showToast('Please enter a description.', 'error');
-      } else {
-        alert('Please enter a description.');
-      }
+      showToast('Please enter a description.', 'error');
       overlay.querySelector('#modal-description').focus();
       return;
     }
 
     if (description.length > 500) {
-      if (typeof showToast === 'function') {
-        showToast('Description must be 500 characters or less.', 'error');
-      }
+      showToast('Description must be 500 characters or less.', 'error');
       return;
     }
 
     if (amountUah < 0) {
-      if (typeof showToast === 'function') {
-        showToast('Amount UAH cannot be negative.', 'error');
-      }
+      showToast('Amount UAH cannot be negative.', 'error');
       return;
     }
 
     if (amountUsd < 0) {
-      if (typeof showToast === 'function') {
-        showToast('Amount USD cannot be negative.', 'error');
-      }
+      showToast('Amount USD cannot be negative.', 'error');
       return;
     }
 
     if (amountUah <= 0 && amountUsd <= 0) {
-      if (typeof showToast === 'function') {
-        showToast('Please enter an amount in UAH or USD.', 'error');
-      } else {
-        alert('Please enter an amount in UAH or USD.');
-      }
+      showToast('Please enter an amount in UAH or USD.', 'error');
       return;
     }
 
     if (rate <= 0) {
-      if (typeof showToast === 'function') {
-        showToast('Exchange rate must be positive.', 'error');
-      }
+      showToast('Exchange rate must be positive.', 'error');
       return;
     }
 
@@ -842,19 +819,13 @@ const Expenses = {
       await self.loadData(ctx);
       self.updateUI(container);
 
-      if (typeof showToast === 'function') {
-        showToast(
-          existingExpense ? 'Expense updated successfully.' : 'Expense added successfully.',
-          'success'
-        );
-      }
+      showToast(
+        existingExpense ? 'Expense updated successfully.' : 'Expense added successfully.',
+        'success'
+      );
     } catch (err) {
       console.error('[Expenses] save error:', err);
-      if (typeof showToast === 'function') {
-        showToast('Failed to save expense. Please try again.', 'error');
-      } else {
-        alert('Failed to save expense. Please try again.');
-      }
+      showToast('Failed to save expense. Please try again.', 'error');
     } finally {
       if (saveBtn) {
         saveBtn.disabled = false;
@@ -909,35 +880,7 @@ const Expenses = {
     if (this.modalOverlay && this.modalOverlay.parentNode) {
       this.modalOverlay.parentNode.removeChild(this.modalOverlay);
       this.modalOverlay = null;
+      document.body.classList.remove('fury-modal-open');
     }
   },
 };
-
-
-/* ── Global Toast Notification (safe re-declaration) ── */
-if (typeof showToast === 'undefined') {
-  function showToast(message, type) {
-    type = type || 'success';
-
-    var existing = document.querySelectorAll('.fury-toast');
-    for (var i = 0; i < existing.length; i++) {
-      existing[i].remove();
-    }
-
-    var toast = document.createElement('div');
-    toast.className = 'fury-toast fury-toast-' + type;
-    toast.textContent = message;
-    document.body.appendChild(toast);
-
-    setTimeout(function () {
-      toast.classList.add('show');
-    }, 10);
-
-    setTimeout(function () {
-      toast.classList.remove('show');
-      setTimeout(function () {
-        if (toast.parentNode) toast.remove();
-      }, 300);
-    }, 3000);
-  }
-}
