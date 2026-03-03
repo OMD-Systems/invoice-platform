@@ -689,7 +689,18 @@ const Invoices = {
       var ts = this.timesheetMap[pe.id];
       var hours = ts ? ts.total_hours : 0;
       var rate = pe.rate_usd || pe.hourly_rate || 0;
-      var estAmount = hours * rate;
+      var empType = pe.employee_type || 'monthly';
+      var estAmount = 0;
+      if (empType === 'hourly' || empType === 'Hourly Contractor') {
+        estAmount = hours * rate;
+      } else {
+        var expectedHours = (this.workingDays || 21) * (this.hoursPerDay || 8);
+        if (ts && expectedHours > 0) {
+          estAmount = rate * (hours / expectedHours);
+        } else {
+          estAmount = rate;
+        }
+      }
 
       html +=
         '<tr data-employee-id="' + pe.id + '">' +
