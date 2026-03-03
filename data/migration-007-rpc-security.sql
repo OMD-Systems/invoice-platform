@@ -213,6 +213,8 @@ GRANT EXECUTE ON FUNCTION increment_invoice_number(UUID) TO authenticated;
 --    separate admin (any) and lead (team-scoped) policies
 -- ────────────────────────────────────────────────────────────
 DROP POLICY IF EXISTS "invoices_delete_policy" ON public.invoices;
+DROP POLICY IF EXISTS "invoices_delete_admin" ON public.invoices;
+DROP POLICY IF EXISTS "invoices_delete_lead" ON public.invoices;
 
 -- Admin can delete any invoice
 CREATE POLICY "invoices_delete_admin" ON public.invoices
