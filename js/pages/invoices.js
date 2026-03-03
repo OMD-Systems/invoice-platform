@@ -28,7 +28,7 @@ const Invoices = {
     container.innerHTML = this.template();
     this.bindEvents(container, ctx);
     await this.loadData(ctx);
-    this.renderActiveTab(container);
+    await this.renderActiveTab(container);
   },
 
   /* ═══════════════════════════════════════════════════════
@@ -240,14 +240,14 @@ const Invoices = {
   /* ═══════════════════════════════════════════════════════
      RENDER ACTIVE TAB
      ═══════════════════════════════════════════════════════ */
-  renderActiveTab(container) {
+  async renderActiveTab(container) {
     var tabContent = container.querySelector('#inv-tab-content');
     if (!tabContent) return;
 
     switch (this.activeTab) {
       case 'summary':
         tabContent.innerHTML = '';
-        this._renderSummaryTab(tabContent);
+        await this._renderSummaryTab(tabContent);
         break;
       case 'settlements':
         tabContent.innerHTML = '';
@@ -263,10 +263,17 @@ const Invoices = {
   /* ═══════════════════════════════════════════════════════
      SUMMARY TAB (from reports.js)
      ═══════════════════════════════════════════════════════ */
-  _renderSummaryTab(content) {
+  async _renderSummaryTab(content) {
     var self = this;
-    // Use all invoices for this period (ignore status filter for summary)
+    // Use unfiltered invoices for summary (load all if currently filtered)
     var invoices = self.invoices;
+    if (self.statusFilter !== 'all' || self.employeeFilter !== 'all') {
+      // Fetch all invoices for accurate summary
+      try {
+        var allResult = await DB.getInvoices({ month: self.month, year: self.year });
+        invoices = (allResult && allResult.data) || self.invoices;
+      } catch (e) { /* fallback to filtered */ }
+    }
 
     // Calculate KPIs
     var totalInvoiced = 0;
@@ -538,7 +545,9 @@ const Invoices = {
       for (var i = 0; i < sorted.length; i++) {
         var inv = sorted[i];
         var t = parseFloat(inv.total_usd) || 0; gt += t;
-        wsData.push([i + 1, (inv.employees && inv.employees.name) || '', ((inv.employees && inv.employees.invoice_prefix) || '') + '-' + inv.invoice_number,
+        var prefix = (inv.employees && inv.employees.invoice_prefix) || '';
+        var invNum = prefix ? prefix + '-' + inv.invoice_number : String(inv.invoice_number);
+        wsData.push([i + 1, (inv.employees && inv.employees.name) || '', invNum,
         inv.invoice_date || '', parseFloat(inv.subtotal_usd) || 0, parseFloat(inv.discount_usd) || 0, t, (inv.status || 'draft')]);
       }
       wsData.push([]); wsData.push(['', 'GRAND TOTAL', '', '', '', '', gt, '']);
@@ -768,7 +777,7 @@ const Invoices = {
 
         for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove('active');
         this.classList.add('active');
-        self.renderActiveTab(container);
+        await self.renderActiveTab(container);
       });
     }
 
@@ -941,7 +950,7 @@ const Invoices = {
     if (pendingSection) pendingSection.style.display = 'none';
 
     await this.loadData(ctx);
-    this.renderActiveTab(container);
+    await this.renderActiveTab(container);
   },
 
   /* ═══════════════════════════════════════════════════════
@@ -995,6 +1004,7 @@ const Invoices = {
           break;
         }
       }
+      this.updateTable(container);
     } catch (err) {
       console.error('[Invoices] Status change error:', err);
       alert('Failed to update status. Please try again.');
@@ -1312,7 +1322,7 @@ const Invoices = {
         '</select>' +
         '<input class="fury-input gen-exp-desc" type="text" placeholder="Description">' +
         '<input class="fury-input gen-exp-uah" type="number" step="0.01" placeholder="UAH" value="0">' +
-        '<input class="fury-input gen-exp-rate" type="number" step="0.0001" placeholder="Rate" value="41.50">' +
+        '<input class="fury-input gen-exp-rate" type="number" step="0.0001" placeholder="Rate" value="' + self.exchangeRate + '">' +
         '<input class="fury-input gen-exp-usd" type="text" readonly value="0.00" style="text-align: right; opacity: 0.7;">' +
         '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon gen-remove-expense" ' +
         'style="color: var(--fury-danger); font-size: 16px;" title="Remove">&times;</button>';
@@ -1554,6 +1564,7 @@ const Invoices = {
       }
 
       if (closeCallback) closeCallback();
+      showToast('Invoice saved!', 'success');
       await this._reload(container, ctx);
       return result.data;
     } catch (err) {
@@ -1869,7 +1880,7 @@ const Invoices = {
   /* ── Cleanup on page leave ── */
   destroy() {
     // Remove any generate modal overlays left in document.body
-    var overlays = document.querySelectorAll('.fury-modal-overlay');
+    var overlays = document.querySelectorAll('.invoice-generate-overlay, .invoice-preview-overlay');
     for (var i = 0; i < overlays.length; i++) {
       if (overlays[i].parentNode === document.body) {
         overlays[i].remove();

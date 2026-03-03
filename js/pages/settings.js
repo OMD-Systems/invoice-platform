@@ -1005,7 +1005,7 @@ const Settings = {
         showToast('Team name is required.', 'error');
         return;
       }
-      if (leadEmail && typeof Validation !== 'undefined' && !Validation.isValidEmail(leadEmail)) {
+      if (leadEmail && !Validation.isValidEmail(leadEmail)) {
         showToast('Please enter a valid lead email.', 'error');
         return;
       }
@@ -1270,7 +1270,7 @@ const Settings = {
         showToast('Email is required.', 'error');
         return;
       }
-      if (typeof Validation !== 'undefined' && !Validation.isValidEmail(email)) {
+      if (!Validation.isValidEmail(email)) {
         showToast('Please enter a valid email address.', 'error');
         return;
       }
@@ -1279,7 +1279,13 @@ const Settings = {
       saveBtn.textContent = 'Creating...';
 
       try {
-        var tempPassword = Math.random().toString(36).slice(-6) + 'Ac1!';
+        var arr = new Uint8Array(12);
+        crypto.getRandomValues(arr);
+        var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+        var tempPassword = '';
+        for (var ci = 0; ci < 12; ci++) {
+          tempPassword += chars[arr[ci] % chars.length];
+        }
         var result = await DB.client.rpc('admin_create_user', {
           p_email: email,
           p_password: tempPassword,
@@ -1295,6 +1301,8 @@ const Settings = {
         if (navigator.clipboard) {
           navigator.clipboard.writeText(tempPassword).then(function() {
             showToast('User created! Password copied to clipboard.', 'success');
+          }).catch(function() {
+            prompt('User created. Copy the temporary password:', tempPassword);
           });
         } else {
           prompt('User created. Copy the temporary password:', tempPassword);
@@ -1322,6 +1330,13 @@ const Settings = {
      ═══════════════════════════════════════════════════ */
   async _changeUserRole(userId, newRole, container) {
     var self = this;
+
+    // Prevent self-demotion
+    if (App.user && App.user.id === userId && newRole !== 'admin') {
+      showToast('You cannot change your own role.', 'error');
+      self.renderActiveTab(container);
+      return;
+    }
 
     try {
       var result = await DB.client
@@ -1566,7 +1581,7 @@ const Settings = {
         var id = this.getAttribute('data-id');
         var noteInput = container.querySelector('.set-email-note[data-id="' + id + '"]');
         var note = noteInput ? noteInput.value.trim() : '';
-        if (!note || (typeof Validation !== 'undefined' && !Validation.isValidEmail(note))) {
+        if (!note || !Validation.isValidEmail(note)) {
           showToast('Please enter the created email address', 'error');
           return;
         }
@@ -1731,6 +1746,14 @@ const Settings = {
           saveBtn.textContent = 'Save Configuration';
         }
       });
+    }
+  },
+
+  destroy() {
+    // Remove any lingering settings modals
+    var modals = document.querySelectorAll('#settings-modal-overlay');
+    for (var i = 0; i < modals.length; i++) {
+      modals[i].remove();
     }
   }
 };

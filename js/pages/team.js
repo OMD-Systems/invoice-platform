@@ -195,14 +195,22 @@ const Team = {
       // Load billed_to
       var btResult = await DB.getSetting('billed_to');
       if (btResult && btResult.data) {
-        self.billedTo = typeof btResult.data === 'string' ? JSON.parse(btResult.data) : btResult.data;
+        try {
+          self.billedTo = typeof btResult.data === 'string' ? JSON.parse(btResult.data) : btResult.data;
+        } catch (e) {
+          console.error('[Team] Failed to parse billed_to:', e);
+        }
       }
 
       // Load payment terms
       var ptResult = await DB.getSetting('payment_terms');
       if (ptResult && ptResult.data) {
-        var ptData = typeof ptResult.data === 'string' ? JSON.parse(ptResult.data) : ptResult.data;
-        self.defaultTerms = ptData.text || '';
+        try {
+          var ptData = typeof ptResult.data === 'string' ? JSON.parse(ptResult.data) : ptResult.data;
+          self.defaultTerms = ptData.text || '';
+        } catch (e) {
+          console.error('[Team] Failed to parse payment_terms:', e);
+        }
       }
 
       // Data loaded
@@ -1009,8 +1017,9 @@ const Team = {
   async handleDeleteInvoice(container) {
     var self = this;
     var emp = self.findEmployee(self.selectedId);
+    if (!emp) return;
     var invoice = self.getEmployeeInvoice(emp.id);
-    if (!invoice || !emp) return;
+    if (!invoice) return;
 
     if (!confirm('Are you sure you want to delete this invoice? The hours will remain, and you can re-generate the invoice again.')) {
       return;
@@ -1079,7 +1088,7 @@ const Team = {
         },
         billedTo: self.billedTo || { name: '', address: '' },
         invoiceNumber: invoice.invoice_number || '',
-        invoiceDate: invoice.invoice_date || '',
+        invoiceDate: self._formatInvoiceDate(invoice.invoice_date) || '',
         dueDays: 15,
         items: items,
         subtotal: invoice.subtotal_usd || 0,
@@ -1152,15 +1161,15 @@ const Team = {
         invoice_prefix: fullEmp.invoice_prefix || ''
       },
       invoiceNumber: invoice.invoice_number || '',
-      invoiceDate: invoice.invoice_date || '',
+      invoiceDate: self._formatInvoiceDate(invoice.invoice_date) || '',
       dueDays: 15,
       items: items,
       subtotal: invoice.subtotal_usd || 0,
       discount: invoice.discount_usd || 0,
       tax: invoice.tax_usd || 0,
-      taxRate: invoice.tax_rate || 0,
+      taxRate: invoice.tax_rate || '0',
       total: invoice.total_usd || 0,
-      billedTo: self.billedTo || {},
+      billedTo: self.billedTo || { name: '', address: '' },
       terms: self.defaultTerms || '',
       status: invoice.status || 'draft'
     };
@@ -1179,6 +1188,7 @@ const Team = {
   async handleStatusChange(newStatus, container) {
     var self = this;
     var emp = self.findEmployee(self.selectedId);
+    if (!emp) return;
     var invoice = self.getEmployeeInvoice(emp.id);
     if (!invoice) return;
 
@@ -1462,7 +1472,7 @@ const Team = {
       return;
     }
 
-    if (data.work_email && typeof Validation !== 'undefined' && !Validation.isValidEmail(data.work_email)) {
+    if (data.work_email && !Validation.isValidEmail(data.work_email)) {
       showToast('Invalid email format', 'error');
       return;
     }
@@ -1472,12 +1482,12 @@ const Team = {
       return;
     }
 
-    if (data.iban && typeof Validation !== 'undefined' && !Validation.isValidIBAN(data.iban)) {
+    if (data.iban && !Validation.isValidIBAN(data.iban)) {
       showToast('Invalid IBAN format', 'error');
       return;
     }
 
-    if (data.swift && typeof Validation !== 'undefined' && !Validation.isValidSWIFT(data.swift)) {
+    if (data.swift && !Validation.isValidSWIFT(data.swift)) {
       showToast('Invalid SWIFT/BIC format', 'error');
       return;
     }
@@ -1532,11 +1542,16 @@ const Team = {
   },
 
   updateEmployeeInCache(updatedEmp) {
+    var found = false;
     for (var i = 0; i < this.allEmployees.length; i++) {
       if (this.allEmployees[i].id === updatedEmp.id) {
         this.allEmployees[i] = updatedEmp;
+        found = true;
         break;
       }
+    }
+    if (!found) {
+      this.allEmployees.push(updatedEmp);
     }
     this.applySearch();
   },
@@ -1559,7 +1574,8 @@ const Team = {
     if (this.hoursConfig) {
       var hpd = parseFloat(this.hoursConfig.hours_per_day) || 8;
       var adj = parseFloat(this.hoursConfig.adjustment_hours) || 0;
-      return (this.hoursConfig.working_days * hpd) + adj;
+      var wd = this.hoursConfig.working_days || this.getWorkingDays();
+      return (wd * hpd) + adj;
     }
     return this.getWorkingDays() * 8;
   },
@@ -1573,6 +1589,15 @@ const Team = {
     };
     var info = map[status] || map['draft'];
     return '<span class="' + info.cls + '">' + info.label + '</span>';
+  },
+
+  _formatInvoiceDate(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return dateStr;
+    var months = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
   },
 
   escapeHtml(str) {

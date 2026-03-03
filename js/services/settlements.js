@@ -97,14 +97,14 @@ const Settlements = {
         totalHours += parseFloat(empTimesheets[h].hours) || 0;
       }
 
-      if (totalHours === 0) continue;
+      var invoice = invoiceMap[emp.id] || null;
+      if (totalHours === 0 && !invoice) continue;
 
       // Determine total paid amount
       // Priority: invoice total_usd > expected math
-      var invoice = invoiceMap[emp.id] || null;
       var totalPaid = 0;
       var empType = emp.employee_type || 'monthly';
-      var rate = parseFloat(emp.rate_usd) || 0;
+      var rate = parseFloat(emp.rate_usd) || parseFloat(emp.hourly_rate) || 0;
 
       if (invoice && invoice.total_usd != null) {
         totalPaid = parseFloat(invoice.total_usd) || 0;

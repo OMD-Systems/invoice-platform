@@ -19,6 +19,7 @@ const App = {
   currentPage: null,
   user: null,
   role: null, // 'admin' | 'lead' | 'viewer'
+  _navId: 0,
 
   pages: {
     '/team': Team,
@@ -61,7 +62,10 @@ const App = {
 
         // Listen for auth state changes (session expiry, token refresh)
         var self = this;
-        DB.client.auth.onAuthStateChange(function(event, session) {
+        if (self._authSubscription) {
+          self._authSubscription.unsubscribe();
+        }
+        var authSub = DB.client.auth.onAuthStateChange(function(event, session) {
           if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
             if (event === 'SIGNED_OUT') {
               self.clearAppState();
@@ -76,6 +80,7 @@ const App = {
             }
           }
         });
+        self._authSubscription = authSub.data.subscription;
 
         this.navigate(window.location.hash || '#/team');
       } else {
@@ -143,10 +148,21 @@ const App = {
     if (typeof Invoices !== 'undefined') {
       Invoices.invoices = [];
       Invoices.employees = [];
+      Invoices.timesheetMap = {};
+      Invoices.timesheets = [];
+      Invoices.projects = [];
     }
     if (typeof Expenses !== 'undefined') {
       Expenses.invoices = [];
-      Expenses.allExpenses = [];
+      Expenses.expenses = [];
+    }
+    if (typeof Settings !== 'undefined') {
+      Settings.settings = {};
+      Settings.projects = [];
+      Settings.teams = [];
+      Settings.teamMembers = {};
+      Settings.profiles = [];
+      Settings.monthLocks = [];
     }
     // Clear DOM content
     var mainContent = document.getElementById('main-content');
@@ -192,7 +208,7 @@ const App = {
       try {
         await Auth.sendOtp(email);
       } catch (err) {
-        errorEl.textContent = (err.message || 'Failed to send code.') + ' — You can still enter a code if you have one.';
+        errorEl.textContent = 'Failed to send code. Please try again or enter an existing code.';
       } finally {
         // V4: Start cooldown countdown timer on button
         var cooldownSec = CONFIG.OTP_COOLDOWN_SECONDS || 60;
@@ -246,7 +262,7 @@ const App = {
         self.setupRouter();
         self.navigate(window.location.hash || '#/team');
       } catch (err) {
-        errorEl.textContent = err.message || 'Invalid code. Please try again.';
+        errorEl.textContent = 'Invalid or expired code. Please try again.';
       } finally {
         btnVerify.disabled = false;
         btnVerify.textContent = 'Verify';
@@ -274,6 +290,10 @@ const App = {
         self._hashChangeHandler = null;
       }
       self._routerReady = false;
+      if (self._authSubscription) {
+        self._authSubscription.unsubscribe();
+        self._authSubscription = null;
+      }
       self.clearAppState();
       window.location.hash = '';
       self.showLogin();
@@ -293,6 +313,7 @@ const App = {
 
   /* ── Page Navigation ── */
   async navigate(hash) {
+    var navId = ++this._navId;
     var path = (hash || '').replace('#', '') || '/team';
 
     // Handle legacy route redirects
@@ -342,8 +363,10 @@ const App = {
         user: this.user,
         role: this.role,
       });
+      if (navId !== this._navId) return;
       this.currentPage = page;
     } catch (err) {
+      if (navId !== this._navId) return;
       console.error('[App] Page render error (' + path + '):', err);
       container.innerHTML =
         '<div class="loading" style="color:#EF4444;">' +

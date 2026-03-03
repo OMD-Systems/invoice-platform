@@ -80,7 +80,7 @@ const Validation = {
     isValidSWIFT(str) {
         if (!str) return false;
         var code = str.replace(/\s+/g, '').toUpperCase();
-        return /^[A-Z0-9]{8}$|^[A-Z0-9]{11}$/.test(code);
+        return /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(code);
     },
 
     /**
@@ -92,7 +92,7 @@ const Validation = {
      */
     isInRange(num, min, max) {
         var n = parseFloat(num);
-        return !isNaN(n) && n >= min && n <= max;
+        return isFinite(n) && n >= min && n <= max;
     },
 
     /**
@@ -102,7 +102,7 @@ const Validation = {
      */
     isNonNegative(num) {
         var n = parseFloat(num);
-        return !isNaN(n) && n >= 0;
+        return isFinite(n) && n >= 0;
     },
 
     /**
@@ -123,11 +123,14 @@ const Validation = {
      */
     sanitizeFileName(name) {
         if (!name) return '';
-        return String(name)
-            .replace(/\.\./g, '')
-            .replace(/[\/\\:*?"<>|]/g, '')
+        var result = String(name);
+        while (result.indexOf('..') !== -1) {
+            result = result.replace(/\.\./g, '');
+        }
+        return result
+            .replace(/[\/\\:*?"<>|\x00-\x1f]/g, '')
             .replace(/^\s+|\s+$/g, '')
-            .replace(/^\.+/, '');
+            .replace(/^\.+/, '') || 'unnamed';
     },
 
     /**
@@ -158,6 +161,7 @@ const Validation = {
     showFieldError(input, message) {
         if (!input) return;
         input.style.borderColor = '#EF4444';
+        input.classList.add('validation-error-field');
         var existing = input.parentNode.querySelector('.validation-error');
         if (existing) {
             existing.textContent = message;
@@ -177,6 +181,7 @@ const Validation = {
     clearFieldError(input) {
         if (!input) return;
         input.style.borderColor = '';
+        input.classList.remove('validation-error-field');
         var err = input.parentNode.querySelector('.validation-error');
         if (err) err.parentNode.removeChild(err);
     },
@@ -191,7 +196,7 @@ const Validation = {
         for (var i = 0; i < errors.length; i++) {
             errors[i].parentNode.removeChild(errors[i]);
         }
-        var inputs = container.querySelectorAll('[style*="border-color"]');
+        var inputs = container.querySelectorAll('.validation-error-field');
         for (var j = 0; j < inputs.length; j++) {
             inputs[j].style.borderColor = '';
         }
