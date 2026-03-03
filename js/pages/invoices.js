@@ -870,7 +870,7 @@ const Invoices = {
       });
 
       // Status change (select)
-      invTbody.addEventListener('change', function (e) {
+      tbody.addEventListener('change', function (e) {
         var target = e.target.closest('.inv-act-status');
         if (target) {
           var invIdStatus = target.getAttribute('data-invoice-id');
