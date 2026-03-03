@@ -25,6 +25,9 @@ var InvoicePreview = {
    *   .status         string (optional, for stamp)
    */
   show: function (invoiceData) {
+    // Store for _printInvoice filename generation
+    this._currentInvoiceData = invoiceData;
+
     // Remove any existing preview modal
     var existing = document.querySelector('.invoice-preview-overlay');
     if (existing) existing.remove();
@@ -110,11 +113,41 @@ var InvoicePreview = {
     // Hide overlay during print (we show printArea instead)
     overlay.style.display = 'none';
 
+    // Set document.title to a meaningful filename for Save as PDF
+    var originalTitle = document.title;
+    document.title = this._getPrintFileName();
+
     window.print();
 
     // Cleanup after print dialog closes
+    document.title = originalTitle;
     overlay.style.display = '';
     if (printArea.parentNode) printArea.remove();
+  },
+
+  /**
+   * Generate a PDF-friendly filename from current invoice data.
+   * Reuses Numbering.getFileName() when available, replacing .docx → .pdf.
+   * @returns {string}
+   */
+  _getPrintFileName: function () {
+    var data = this._currentInvoiceData;
+    if (!data) return 'Invoice';
+
+    // Try Numbering/InvoiceDocx for consistent naming
+    if (typeof InvoiceDocx !== 'undefined' && InvoiceDocx.getFileName) {
+      return InvoiceDocx.getFileName(data.employee, data.invoiceNumber, data.invoiceDate)
+        .replace(/\.docx$/i, '');
+    }
+    if (typeof Numbering !== 'undefined' && Numbering.getFileName) {
+      return Numbering.getFileName(data.employee, data.invoiceNumber, data.invoiceDate)
+        .replace(/\.docx$/i, '');
+    }
+
+    // Fallback
+    var emp = data.employee || {};
+    var name = (emp.full_name_lat || 'Unknown').replace(/\s+/g, '-');
+    return 'Invoice-' + (data.invoiceNumber || '0') + '-' + name + ' ' + (data.invoiceDate || '');
   },
 
   /**
@@ -267,7 +300,7 @@ var InvoicePreview = {
       '</div>' +
 
       /* ═════ SECTION 5: Footer (Bank + Terms) ═════ */
-      '<div style="display: flex; justify-content: space-between; gap: 24pt; margin-top: 12pt;">' +
+      '<div class="invoice-footer-columns" style="display: flex; justify-content: space-between; gap: 24pt; margin-top: 12pt;">' +
       '<div class="invoice-payment" style="flex: 1;">' +
       '<div class="invoice-payment-title">BANK ACCOUNT</div>' +
       '<div class="invoice-payment-details">' +
