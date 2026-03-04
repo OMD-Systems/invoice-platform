@@ -872,50 +872,49 @@ const Invoices = {
     console.log('[Invoices] binding tbody click handler, tbody found:', !!tbody, 'App.role:', App.role);
     if (tbody) {
       tbody.addEventListener('click', async function (e) {
-        console.log('[Invoices] tbody click, target:', e.target.tagName, e.target.className);
-        // Preview
-        var btnPreview = e.target.closest('.inv-act-preview');
-        if (btnPreview) {
-          var id = btnPreview.getAttribute('data-invoice-id');
-          await self._handlePreview(id);
-          return;
-        }
+        try {
+          console.log('[Invoices] tbody click, target:', e.target.tagName, e.target.className);
 
-        // Download
-        var btnDl = e.target.closest('.inv-act-download');
-        if (btnDl) {
-          var did = btnDl.getAttribute('data-invoice-id');
-          await self._handleDownload(did);
-          return;
-        }
+          // Preview
+          var btnPreview = e.target.closest('.inv-act-preview');
+          if (btnPreview) {
+            var id = btnPreview.getAttribute('data-invoice-id');
+            await self._handlePreview(id);
+            return;
+          }
 
-        // Delete
-        var btnDel = e.target.closest('.inv-act-delete');
-        if (btnDel) {
-          var delId = btnDel.getAttribute('data-invoice-id');
-          console.log('[Invoices] delete clicked, id:', delId);
-          if (!delId) { console.error('[Invoices] no invoice id on button'); return; }
-          var confirmed = confirm('Are you sure you want to permanently delete this invoice?');
-          console.log('[Invoices] confirm result:', confirmed);
-          if (confirmed) {
-            var btnOriginalHtml = btnDel.innerHTML;
-            btnDel.innerHTML = '...';
-            btnDel.disabled = true;
-            try {
+          // Download
+          var btnDl = e.target.closest('.inv-act-download');
+          if (btnDl) {
+            var did = btnDl.getAttribute('data-invoice-id');
+            await self._handleDownload(did);
+            return;
+          }
+
+          // Delete
+          var btnDel = e.target.closest('.inv-act-delete');
+          console.log('[Invoices] delete check, btnDel:', !!btnDel);
+          if (btnDel) {
+            var delId = btnDel.getAttribute('data-invoice-id');
+            console.log('[Invoices] delete clicked, id:', delId);
+            if (!delId) { console.error('[Invoices] no invoice id on button'); return; }
+            var confirmed = confirm('Are you sure you want to permanently delete this invoice?');
+            console.log('[Invoices] confirm result:', confirmed);
+            if (confirmed) {
+              btnDel.innerHTML = '...';
+              btnDel.disabled = true;
               console.log('[Invoices] calling DB.deleteInvoice...');
               var result = await DB.deleteInvoice(delId);
               console.log('[Invoices] delete result:', JSON.stringify(result));
               if (result && result.error) throw new Error(result.error.message);
               showToast('Invoice deleted', 'success');
               await self._reload(container, ctx);
-            } catch (err) {
-              console.error('[Invoices] delete error:', err);
-              showToast('Failed to delete: ' + err.message, 'error');
-              btnDel.innerHTML = btnOriginalHtml;
-              btnDel.disabled = false;
             }
+            return;
           }
-          return;
+        } catch (err) {
+          console.error('[Invoices] click handler error:', err);
+          showToast('Error: ' + err.message, 'error');
         }
       });
 
