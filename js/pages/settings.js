@@ -1320,6 +1320,7 @@ const Settings = {
       saveBtn.textContent = 'Creating...';
 
       try {
+        // Generate secure temp password
         var arr = new Uint8Array(12);
         crypto.getRandomValues(arr);
         var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
@@ -1327,18 +1328,32 @@ const Settings = {
         for (var ci = 0; ci < 12; ci++) {
           tempPassword += chars[arr[ci] % chars.length];
         }
-        var result = await DB.client.rpc('admin_create_user', {
-          p_email: email,
-          p_password: tempPassword,
-          p_full_name: fullName,
-          p_role: role
+
+        // Use standard Supabase auth.signUp instead of custom RPC
+        var signUpResult = await DB.client.auth.signUp({
+          email: email,
+          password: tempPassword,
+          options: {
+            data: { full_name: fullName }
+          }
         });
 
-        if (result.error) throw result.error;
+        if (signUpResult.error) throw signUpResult.error;
+        var newUserId = signUpResult.data && signUpResult.data.user && signUpResult.data.user.id;
+
+        // Update profile role (trigger creates profile with 'viewer' by default)
+        if (newUserId && role !== 'viewer') {
+          // Small delay to let the trigger create the profile first
+          await new Promise(function(r) { setTimeout(r, 500); });
+          await DB.client
+            .from('profiles')
+            .update({ role: role, full_name: fullName })
+            .eq('id', newUserId);
+        }
 
         self._closeModal();
 
-        // Copy temp password to clipboard securely instead of showing it in UI
+        // Copy temp password to clipboard
         if (navigator.clipboard) {
           navigator.clipboard.writeText(tempPassword).then(function() {
             showToast('User created! Password copied to clipboard.', 'success');
