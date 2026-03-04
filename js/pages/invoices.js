@@ -869,8 +869,10 @@ const Invoices = {
 
     // ── Invoice row actions (Delegated) ──
     var tbody = container.querySelector('#inv-tbody');
+    console.log('[Invoices] binding tbody click handler, tbody found:', !!tbody, 'App.role:', App.role);
     if (tbody) {
       tbody.addEventListener('click', async function (e) {
+        console.log('[Invoices] tbody click, target:', e.target.tagName, e.target.className);
         // Preview
         var btnPreview = e.target.closest('.inv-act-preview');
         if (btnPreview) {
