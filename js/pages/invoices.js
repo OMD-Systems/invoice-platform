@@ -893,18 +893,24 @@ const Invoices = {
         var btnDel = e.target.closest('.inv-act-delete');
         if (btnDel) {
           var delId = btnDel.getAttribute('data-invoice-id');
-          if (confirm('Are you sure you want to permanently delete this invoice?')) {
+          console.log('[Invoices] delete clicked, id:', delId);
+          if (!delId) { console.error('[Invoices] no invoice id on button'); return; }
+          var confirmed = confirm('Are you sure you want to permanently delete this invoice?');
+          console.log('[Invoices] confirm result:', confirmed);
+          if (confirmed) {
             var btnOriginalHtml = btnDel.innerHTML;
             btnDel.innerHTML = '...';
             btnDel.disabled = true;
             try {
+              console.log('[Invoices] calling DB.deleteInvoice...');
               var result = await DB.deleteInvoice(delId);
+              console.log('[Invoices] delete result:', JSON.stringify(result));
               if (result && result.error) throw new Error(result.error.message);
               showToast('Invoice deleted', 'success');
               await self._reload(container, ctx);
             } catch (err) {
               console.error('[Invoices] delete error:', err);
-              showToast('Failed to delete invoice. Please try again.', 'error');
+              showToast('Failed to delete: ' + err.message, 'error');
               btnDel.innerHTML = btnOriginalHtml;
               btnDel.disabled = false;
             }
