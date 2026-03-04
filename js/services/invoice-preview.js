@@ -134,20 +134,16 @@ var InvoicePreview = {
     var data = this._currentInvoiceData;
     if (!data) return 'Invoice';
 
-    // Try Numbering/InvoiceDocx for consistent naming
-    if (typeof InvoiceDocx !== 'undefined' && InvoiceDocx.getFileName) {
-      return InvoiceDocx.getFileName(data.employee, data.invoiceNumber, data.invoiceDate)
-        .replace(/\.docx$/i, '');
-    }
+    // Use Numbering for consistent naming, strip .docx extension
     if (typeof Numbering !== 'undefined' && Numbering.getFileName) {
       return Numbering.getFileName(data.employee, data.invoiceNumber, data.invoiceDate)
         .replace(/\.docx$/i, '');
     }
 
-    // Fallback
+    // Fallback: number already has prefix, just add name
     var emp = data.employee || {};
     var name = (emp.full_name_lat || 'Unknown').replace(/\s+/g, '-');
-    return 'Invoice-' + (data.invoiceNumber || '0') + '-' + name + ' ' + (data.invoiceDate || '');
+    return (data.invoiceNumber || 'Invoice') + '-' + name;
   },
 
   /**

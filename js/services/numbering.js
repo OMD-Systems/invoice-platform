@@ -76,22 +76,22 @@ const Numbering = {
   getFileName(employee, number, date) {
     var nameParts = (employee.full_name_lat || 'Unknown').split(' ');
     var format = employee.invoice_format || 'WS';
+    var fullDate = Numbering._toFullDate(date);
 
+    // number already contains prefix (e.g. "WS-Invoice-001"), use directly
     var rawName;
     switch (format) {
       case 'WS':
-        var fullDate = Numbering._toFullDate(date);
-        rawName = 'WS-Invoice-' + number + '-' + nameParts.join('-') + ' ' + fullDate + '.docx';
+        rawName = number + '-' + nameParts.join('-') + (fullDate ? ' ' + fullDate : '') + '.docx';
         break;
       case 'FOP':
-        rawName = nameParts[nameParts.length - 1] + '_Invoice-' + number + '-FOP.docx';
+        rawName = nameParts[nameParts.length - 1] + '_' + number + '.docx';
         break;
       case 'CUSTOM':
-        var prefix = employee.invoice_prefix || 'Invoice';
-        rawName = prefix + '-' + number + '.docx';
+        rawName = number + '.docx';
         break;
       default:
-        rawName = 'Invoice-' + number + '-' + nameParts.join('-') + '.docx';
+        rawName = number + '-' + nameParts.join('-') + '.docx';
     }
     return _sanitizeFileName(rawName);
   },
