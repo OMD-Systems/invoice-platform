@@ -1778,7 +1778,7 @@ const Team = {
 
     if (action === 'delete') {
       // Two-click: find the button that was clicked and toggle confirmation
-      var delBtn = container.querySelector('.td-inv-delete[data-invoice-id="' + invoiceId + '"]');
+      var delBtn = container.querySelector('.td-hist-delete[data-inv-id="' + invoiceId + '"]');
       if (delBtn && !delBtn.dataset.confirmPending) {
         delBtn.dataset.confirmPending = '1';
         delBtn.textContent = 'Sure?';
