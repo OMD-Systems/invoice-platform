@@ -426,6 +426,45 @@ const DB = {
   },
 
   /**
+   * Get ALL invoices for a given employee across all periods.
+   * @param {string} employeeId - Employee UUID
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getInvoicesByEmployee(employeeId) {
+    try {
+      const { data, error } = await this.client
+        .from('invoices')
+        .select('id, employee_id, invoice_number, invoice_date, month, year, format_type, subtotal_usd, total_usd, status, created_at')
+        .eq('employee_id', employeeId)
+        .order('invoice_date', { ascending: false })
+        .order('created_at', { ascending: false });
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get line items for a single invoice, ordered by item_order.
+   * @param {string} invoiceId - Invoice UUID
+   * @returns {Promise<{data: Array, error: object|null}>}
+   */
+  async getInvoiceItemsByInvoiceId(invoiceId) {
+    try {
+      const { data, error } = await this.client
+        .from('invoice_items')
+        .select('id, invoice_id, item_order, description, price_usd, qty, total_usd')
+        .eq('invoice_id', invoiceId)
+        .order('item_order', { ascending: true });
+
+      return { data: data || [], error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  /**
    * Delete an existing invoice (Admin only).
    * @param {string} invoiceId
    * @returns {Promise<{data: object|null, error: object|null}>}
@@ -433,17 +472,26 @@ const DB = {
   async deleteInvoice(invoiceId) {
     try {
       // First delete related invoice_items
-      await this.client
+      var itemsDel = await this.client
         .from('invoice_items')
         .delete()
         .eq('invoice_id', invoiceId);
+      if (itemsDel.error) {
+        console.warn('[DB] invoice_items delete warning:', itemsDel.error);
+      }
 
+      // Then delete the invoice itself
       const { error } = await this.client
         .from('invoices')
         .delete()
         .eq('id', invoiceId);
+
+      if (error) {
+        console.error('[DB] invoice delete error:', error);
+      }
       return { data: null, error };
     } catch (err) {
+      console.error('[DB] deleteInvoice exception:', err);
       return { data: null, error: { message: err.message } };
     }
   },
