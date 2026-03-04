@@ -3,7 +3,8 @@
 -- Enables Admins to create new users (auth.users + profiles) directly
 -- ============================================================
 
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+-- pgcrypto functions (crypt, gen_salt) live in 'extensions' schema on Supabase
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA extensions;
 
 CREATE OR REPLACE FUNCTION admin_create_user(
   p_email TEXT,
@@ -29,13 +30,12 @@ BEGIN
   v_user_id := gen_random_uuid();
 
   -- 3. Insert into auth.users
-  -- We assume 'authenticated' as the aud and role for standard Supabase auth
   INSERT INTO auth.users (
     instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data, created_at, updated_at
   ) VALUES (
     '00000000-0000-0000-0000-000000000000', v_user_id, 'authenticated', 'authenticated', p_email,
-    crypt(p_password, gen_salt('bf')), now(),
+    extensions.crypt(p_password, extensions.gen_salt('bf')), now(),
     '{"provider":"email","providers":["email"]}'::jsonb,
     jsonb_build_object('full_name', p_full_name),
     now(), now()
@@ -50,7 +50,7 @@ BEGIN
 
   RETURN v_user_id;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth, extensions;
 
 -- Grant execution to authenticated users (the function internally checks for admin role)
 GRANT EXECUTE ON FUNCTION admin_create_user TO authenticated;

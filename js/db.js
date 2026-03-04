@@ -432,13 +432,17 @@ const DB = {
    */
   async deleteInvoice(invoiceId) {
     try {
-      const { data, error } = await this.client
+      // First delete related invoice_items
+      await this.client
+        .from('invoice_items')
+        .delete()
+        .eq('invoice_id', invoiceId);
+
+      const { error } = await this.client
         .from('invoices')
         .delete()
-        .eq('id', invoiceId)
-        .select()
-        .single();
-      return { data, error };
+        .eq('id', invoiceId);
+      return { data: null, error };
     } catch (err) {
       return { data: null, error: { message: err.message } };
     }
