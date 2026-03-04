@@ -282,8 +282,14 @@ const Team = {
 
       var isSelected = emp.id === self.selectedId;
 
+      var avatarHtml = emp.avatar_url
+        ? '<img class="td-avatar-sm" src="' + self.escapeHtml(emp.avatar_url) + '" alt="">'
+        : '<div class="td-avatar-placeholder-sm">' + (emp.full_name_lat || emp.name || '?').charAt(0).toUpperCase() + '</div>';
+
       html +=
         '<div class="team-list-item' + (isSelected ? ' active' : '') + '" data-id="' + emp.id + '">' +
+        avatarHtml +
+        '<div class="team-list-item-info">' +
         '<div class="team-list-item-top">' +
         '<span class="team-status-dot ' + statusClass + '"></span>' +
         '<span class="team-list-name">' + self.escapeHtml(emp.name) + '</span>' +
@@ -293,6 +299,7 @@ const Team = {
         '<span class="team-badge ' + ctBadgeClass + '">' + ctLabel + '</span>' +
         '<span class="team-list-rate">' + rateStr + '</span>' +
         (totalHours > 0 ? '<span class="team-list-hours">' + totalHours.toFixed(0) + 'h</span>' : '') +
+        '</div>' +
         '</div>' +
         '</div>';
     }
@@ -378,6 +385,10 @@ const Team = {
       ? (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase()
       : (nameParts[0] || 'U').charAt(0).toUpperCase();
 
+    var detailAvatarHtml = emp.avatar_url
+      ? '<img class="td-avatar" src="' + self.escapeHtml(emp.avatar_url) + '" alt="">'
+      : '<div class="td-avatar">' + initials + '</div>';
+
     // ── Build HTML ──
     var html = '';
 
@@ -385,7 +396,7 @@ const Team = {
     html +=
       '<div class="td-header">' +
       '<div class="td-header-left">' +
-      '<div class="td-avatar">' + initials + '</div>' +
+      detailAvatarHtml +
       '<div class="td-header-info">' +
       '<h2 class="td-name">' + self.escapeHtml(emp.name) + '</h2>' +
       '<div class="td-meta">' +
@@ -571,8 +582,23 @@ const Team = {
 
     html += '</div>';
 
+    // ═══ INVOICE HISTORY ═══
+    html +=
+      '<div class="td-invoice-history">' +
+      '<div class="td-section-header" style="display:flex;justify-content:space-between;align-items:center;margin-top:24px;">' +
+      '<h3 style="margin:0;font-size:14px;color:var(--fury-text-secondary);text-transform:uppercase;letter-spacing:0.05em;">Invoice History</h3>' +
+      (isAdminOrLead
+        ? '<button class="fury-btn fury-btn-sm fury-btn-primary" id="team-btn-new-invoice">+ New Invoice</button>'
+        : '') +
+      '</div>' +
+      '<div id="team-invoice-list" class="td-invoice-list" style="margin-top:12px;">' +
+      '<div style="color:var(--fury-text-muted);font-size:13px;padding:12px 0;">Loading...</div>' +
+      '</div>' +
+      '</div>';
+
     panel.innerHTML = html;
     self.bindDetailEvents(container);
+    self._loadInvoiceHistory(self.selectedId);
   },
 
   /* ── Helper: render document card ── */
@@ -866,6 +892,33 @@ const Team = {
     if (deleteBtn) {
       deleteBtn.addEventListener('click', function () {
         self.handleDeleteInvoice(container);
+      });
+    }
+
+    // New Invoice button (history section)
+    var newInvBtn = container.querySelector('#team-btn-new-invoice');
+    if (newInvBtn) {
+      newInvBtn.addEventListener('click', function () {
+        self.handleGenerateInvoice(container);
+      });
+    }
+
+    // Invoice history table — delegated events
+    var invList = container.querySelector('#team-invoice-list');
+    if (invList) {
+      invList.addEventListener('click', function (e) {
+        var btn = e.target.closest('.td-hist-preview, .td-hist-download, .td-hist-delete');
+        if (!btn) return;
+        var invoiceId = btn.getAttribute('data-inv-id');
+        if (!invoiceId) return;
+
+        var action = btn.classList.contains('td-hist-preview') ? 'preview'
+          : btn.classList.contains('td-hist-download') ? 'download'
+            : btn.classList.contains('td-hist-delete') ? 'delete'
+              : null;
+        if (action) {
+          self._handleHistoryAction(action, invoiceId, container);
+        }
       });
     }
   },
@@ -1593,6 +1646,210 @@ const Team = {
     var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  },
+
+  /* ═══════════════════════════════════════════════════════
+     INVOICE HISTORY
+     ═══════════════════════════════════════════════════════ */
+
+  async _loadInvoiceHistory(employeeId) {
+    var self = this;
+    var listEl = document.querySelector('#team-invoice-list');
+    if (!listEl) return;
+
+    try {
+      var result = await DB.getInvoicesByEmployee(employeeId);
+      var invoices = (result && result.data) || [];
+
+      if (invoices.length === 0) {
+        listEl.innerHTML =
+          '<div style="color:var(--fury-text-muted);font-size:13px;padding:12px 0;text-align:center;">No invoices yet</div>';
+        return;
+      }
+
+      // Sort by date descending
+      invoices.sort(function (a, b) {
+        return (b.invoice_date || '').localeCompare(a.invoice_date || '');
+      });
+
+      var html =
+        '<table class="td-inv-hist-table" style="width:100%;border-collapse:collapse;font-size:13px;">' +
+        '<thead>' +
+        '<tr style="color:var(--fury-text-muted);text-align:left;border-bottom:1px solid var(--fury-border,#333);">' +
+        '<th style="padding:6px 8px;font-weight:500;">#</th>' +
+        '<th style="padding:6px 8px;font-weight:500;">Number</th>' +
+        '<th style="padding:6px 8px;font-weight:500;">Date</th>' +
+        '<th style="padding:6px 8px;font-weight:500;text-align:right;">Amount</th>' +
+        '<th style="padding:6px 8px;font-weight:500;text-align:center;">Status</th>' +
+        '<th style="padding:6px 8px;font-weight:500;text-align:right;">Actions</th>' +
+        '</tr>' +
+        '</thead><tbody>';
+
+      for (var i = 0; i < invoices.length; i++) {
+        var inv = invoices[i];
+        var total = parseFloat(inv.total_usd) || 0;
+        var dateStr = self._formatInvoiceDate(inv.invoice_date);
+        var statusBadge = self._statusBadge(inv.status || 'draft');
+
+        html +=
+          '<tr style="border-bottom:1px solid var(--fury-border,#222);" data-invoice-id="' + inv.id + '">' +
+          '<td style="padding:8px;color:var(--fury-text-muted);">' + (i + 1) + '</td>' +
+          '<td style="padding:8px;">' + self.escapeHtml(inv.invoice_number || '—') + '</td>' +
+          '<td style="padding:8px;">' + self.escapeHtml(dateStr || '—') + '</td>' +
+          '<td style="padding:8px;text-align:right;font-weight:600;">$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' +
+          '<td style="padding:8px;text-align:center;">' + statusBadge + '</td>' +
+          '<td style="padding:8px;text-align:right;white-space:nowrap;">' +
+          '<button class="fury-btn fury-btn-secondary fury-btn-xs td-hist-preview" data-inv-id="' + inv.id + '" title="Preview" style="padding:2px 6px;font-size:12px;margin-left:2px;">&#128065;</button>' +
+          '<button class="fury-btn fury-btn-secondary fury-btn-xs td-hist-download" data-inv-id="' + inv.id + '" title="Download" style="padding:2px 6px;font-size:12px;margin-left:2px;">&#11015;</button>' +
+          '<button class="fury-btn fury-btn-danger fury-btn-xs td-hist-delete" data-inv-id="' + inv.id + '" title="Delete" style="padding:2px 6px;font-size:12px;margin-left:2px;">&#128465;</button>' +
+          '</td>' +
+          '</tr>';
+      }
+
+      html += '</tbody></table>';
+      listEl.innerHTML = html;
+
+    } catch (err) {
+      console.error('[Team] _loadInvoiceHistory error:', err);
+      listEl.innerHTML =
+        '<div style="color:var(--fury-text-muted);font-size:13px;padding:12px 0;">Failed to load invoice history</div>';
+    }
+  },
+
+  async _buildInvoiceDataForPreview(employee, invoice, items) {
+    var self = this;
+    var fullEmp = employee;
+    try {
+      var empResult = await DB.getEmployee(employee.id);
+      if (empResult && empResult.data) fullEmp = empResult.data;
+    } catch (e) { /* fallback to cached */ }
+
+    var mappedItems = (items || []).map(function (it) {
+      return {
+        description: it.description || '',
+        price: it.price_usd || 0,
+        qty: it.qty || 1,
+        total: it.total_usd || 0
+      };
+    });
+
+    return {
+      employee: {
+        full_name_lat: fullEmp.full_name_lat || fullEmp.name || '',
+        address: fullEmp.address || '',
+        phone: fullEmp.phone || '',
+        iban: fullEmp.iban || '',
+        swift: fullEmp.swift || '',
+        receiver_name: fullEmp.receiver_name || fullEmp.full_name_lat || '',
+        bank_name: fullEmp.bank_name || '',
+        invoice_format: fullEmp.invoice_format || 'WS',
+        invoice_prefix: fullEmp.invoice_prefix || ''
+      },
+      billedTo: self.billedTo || { name: '', address: '' },
+      invoiceNumber: invoice.invoice_number || '',
+      invoiceDate: self._formatInvoiceDate(invoice.invoice_date) || '',
+      dueDays: 15,
+      items: mappedItems,
+      subtotal: invoice.subtotal_usd || 0,
+      discount: invoice.discount_usd || 0,
+      tax: invoice.tax_usd || 0,
+      taxRate: invoice.tax_rate || '0',
+      total: invoice.total_usd || 0,
+      terms: self.defaultTerms || '',
+      status: invoice.status || 'draft'
+    };
+  },
+
+  async _handleHistoryAction(action, invoiceId, container) {
+    var self = this;
+    var emp = self.findEmployee(self.selectedId);
+    if (!emp) return;
+
+    if (action === 'delete') {
+      if (!confirm('Delete this invoice? This action cannot be undone.')) return;
+      try {
+        var result = await DB.deleteInvoice(invoiceId);
+        if (result && result.error) throw new Error(result.error.message);
+        showToast('Invoice deleted', 'success');
+        // Refresh period invoices too
+        var invResult = await DB.getInvoices({ month: self.month, year: self.year });
+        self.invoices = (invResult && invResult.data) || [];
+        self.renderDetail(container);
+        self.renderEmployeeList(container);
+        self.highlightSelected(container);
+      } catch (err) {
+        console.error('[Team] history delete error:', err);
+        showToast('Failed to delete invoice', 'error');
+      }
+      return;
+    }
+
+    // For preview/download we need invoice + items
+    try {
+      var invByEmp = await DB.getInvoicesByEmployee(emp.id);
+      var allInvoices = (invByEmp && invByEmp.data) || [];
+      var invoice = null;
+      for (var i = 0; i < allInvoices.length; i++) {
+        if (allInvoices[i].id === invoiceId) {
+          invoice = allInvoices[i];
+          break;
+        }
+      }
+      if (!invoice) {
+        showToast('Invoice not found', 'error');
+        return;
+      }
+
+      var itemsResult = await DB.getInvoiceItemsByInvoiceId(invoiceId);
+      var items = (itemsResult && itemsResult.data) || invoice.invoice_items || [];
+
+      var invoiceData = await self._buildInvoiceDataForPreview(emp, invoice, items);
+
+      if (action === 'preview') {
+        if (typeof InvoicePreview !== 'undefined' && typeof InvoicePreview.renderInvoiceHTML === 'function') {
+          var overlay = container.querySelector('#team-modal-overlay');
+          var modal = container.querySelector('#team-modal');
+          if (overlay && modal) {
+            var furyModal = modal.querySelector('.fury-modal') || modal;
+            furyModal.classList.add('fury-modal-lg');
+            modal.innerHTML =
+              '<div style="padding:0;max-width:800px;width:100%;max-height:90vh;overflow:auto;background:#fff;border-radius:8px">' +
+              '<div style="display:flex;justify-content:flex-end;padding:8px;background:#111114;border-radius:8px 8px 0 0">' +
+              '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-preview-close">&times; Close</button>' +
+              '</div>' +
+              '<div id="team-preview-content" style="padding:20px"><div class="invoice-preview">' +
+              InvoicePreview.renderInvoiceHTML(invoiceData) +
+              '</div></div>' +
+              '</div>';
+            overlay.classList.add('active');
+            var closeBtn = modal.querySelector('#team-preview-close');
+            if (closeBtn) {
+              closeBtn.addEventListener('click', function () {
+                overlay.classList.remove('active');
+                furyModal.classList.remove('fury-modal-lg');
+              });
+            }
+          }
+        } else {
+          showToast('Preview module not available', 'error');
+        }
+      } else if (action === 'download') {
+        if (typeof InvoicePreview !== 'undefined' && typeof InvoicePreview.show === 'function') {
+          InvoicePreview.show(invoiceData);
+          setTimeout(function () {
+            var previewOverlay = document.querySelector('.invoice-preview-overlay');
+            if (previewOverlay && typeof InvoicePreview._printInvoice === 'function') {
+              InvoicePreview._printInvoice(previewOverlay);
+            }
+          }, 300);
+        } else {
+          showToast('Download module not available', 'error');
+        }
+      }
+    } catch (err) {
+      console.error('[Team] history action error:', err);
+      showToast('Failed to load invoice data', 'error');
+    }
   },
 
   escapeHtml(str) {

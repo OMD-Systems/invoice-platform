@@ -2843,6 +2843,204 @@ textarea.fury-input {
   font-size: 14px;
 }
 
+/* ── Invoice History ── */
+.td-invoice-history {
+  margin-top: 24px;
+  border-top: 1px solid var(--fury-border);
+  padding-top: 16px;
+}
+
+.td-invoice-list {
+  margin-top: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.td-invoice-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) 100px 90px 80px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  transition: background var(--fury-transition);
+}
+
+.td-invoice-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.td-invoice-row + .td-invoice-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.td-invoice-row-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fury-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 4px 12px 8px;
+}
+
+.td-invoice-row-header:hover {
+  background: transparent;
+}
+
+.td-inv-number {
+  font-weight: 500;
+  color: var(--fury-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.td-inv-date {
+  color: var(--fury-text-secondary);
+}
+
+.td-inv-amount {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.td-inv-status {
+  text-align: center;
+}
+
+.td-inv-actions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.td-inv-actions button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity var(--fury-transition), background var(--fury-transition);
+}
+
+.td-inv-actions button:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.td-inv-actions button.td-inv-delete:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--fury-danger);
+}
+
+.td-inv-empty {
+  text-align: center;
+  padding: 24px 16px;
+  color: var(--fury-text-muted);
+  font-size: 13px;
+}
+
+/* ── Employee Avatar ── */
+.td-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--fury-border);
+  flex-shrink: 0;
+}
+
+.td-avatar-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1.5px solid var(--fury-border);
+  flex-shrink: 0;
+}
+
+.td-avatar-placeholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--fury-elevated);
+  border: 2px solid var(--fury-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fury-text-secondary);
+  flex-shrink: 0;
+}
+
+.td-avatar-placeholder-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--fury-elevated);
+  border: 1.5px solid var(--fury-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fury-text-secondary);
+  flex-shrink: 0;
+}
+
+/* Avatar in employee list */
+.team-list-item .td-avatar-sm,
+.team-list-item .td-avatar-placeholder-sm {
+  margin-right: 10px;
+}
+
+/* ── Invoice status mini badges ── */
+.td-inv-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.td-inv-badge-draft {
+  background: rgba(107, 114, 128, 0.2);
+  color: #9CA3AF;
+}
+
+.td-inv-badge-generated {
+  background: rgba(0, 212, 255, 0.15);
+  color: var(--fury-accent);
+}
+
+.td-inv-badge-sent {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60A5FA;
+}
+
+.td-inv-badge-paid {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ADE80;
+}
+
+.td-inv-badge-overdue {
+  background: rgba(239, 68, 68, 0.15);
+  color: #FCA5A5;
+}
+
+/* Team invoice generated dot */
+.team-inv-generated {
+  background: var(--fury-accent);
+}
+
 /* ── Compact Table (legacy compat) ── */
 .fury-table-compact th,
 .fury-table-compact td {
