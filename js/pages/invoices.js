@@ -891,25 +891,34 @@ const Invoices = {
             return;
           }
 
-          // Delete
+          // Delete (two-click confirmation: first click shows "Sure?", second deletes)
           var btnDel = e.target.closest('.inv-act-delete');
-          console.log('[Invoices] delete check, btnDel:', !!btnDel);
           if (btnDel) {
             var delId = btnDel.getAttribute('data-invoice-id');
-            console.log('[Invoices] delete clicked, id:', delId);
-            if (!delId) { console.error('[Invoices] no invoice id on button'); return; }
-            var confirmed = confirm('Are you sure you want to permanently delete this invoice?');
-            console.log('[Invoices] confirm result:', confirmed);
-            if (confirmed) {
-              btnDel.innerHTML = '...';
-              btnDel.disabled = true;
-              console.log('[Invoices] calling DB.deleteInvoice...');
-              var result = await DB.deleteInvoice(delId);
-              console.log('[Invoices] delete result:', JSON.stringify(result));
-              if (result && result.error) throw new Error(result.error.message);
-              showToast('Invoice deleted', 'success');
-              await self._reload(container, ctx);
+            if (!delId) return;
+
+            // First click — ask confirmation inline
+            if (!btnDel.dataset.confirmPending) {
+              btnDel.dataset.confirmPending = '1';
+              btnDel.innerHTML = '<span style="font-size:11px;color:var(--fury-danger)">Sure?</span>';
+              // Reset after 3 seconds if not confirmed
+              setTimeout(function () {
+                if (btnDel.dataset.confirmPending) {
+                  delete btnDel.dataset.confirmPending;
+                  btnDel.innerHTML = '&#x1F5D1;';
+                }
+              }, 3000);
+              return;
             }
+
+            // Second click — delete
+            delete btnDel.dataset.confirmPending;
+            btnDel.innerHTML = '...';
+            btnDel.disabled = true;
+            var result = await DB.deleteInvoice(delId);
+            if (result && result.error) throw new Error(result.error.message);
+            showToast('Invoice deleted', 'success');
+            await self._reload(container, ctx);
             return;
           }
         } catch (err) {
@@ -1084,10 +1093,21 @@ const Invoices = {
     var checks = container.querySelectorAll('.inv-row-check:checked');
     if (checks.length === 0) return;
 
-    if (!confirm('Are you sure you want to permanently delete ' + checks.length + ' selected invoice(s)?')) return;
-
+    // Two-click confirmation on batch delete button
     var btn = container.querySelector('#btn-delete-selected');
+    if (btn && !btn.dataset.confirmPending) {
+      btn.dataset.confirmPending = '1';
+      btn.textContent = 'Click again to confirm (' + checks.length + ')';
+      setTimeout(function () {
+        if (btn.dataset.confirmPending) {
+          delete btn.dataset.confirmPending;
+          btn.textContent = 'Delete Selected';
+        }
+      }, 3000);
+      return;
+    }
     if (btn) {
+      delete btn.dataset.confirmPending;
       btn.disabled = true;
       btn.textContent = 'Deleting...';
     }
