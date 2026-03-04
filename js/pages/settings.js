@@ -1329,27 +1329,15 @@ const Settings = {
           tempPassword += chars[arr[ci] % chars.length];
         }
 
-        // Use standard Supabase auth.signUp instead of custom RPC
-        var signUpResult = await DB.client.auth.signUp({
-          email: email,
-          password: tempPassword,
-          options: {
-            data: { full_name: fullName }
-          }
+        // Create user via admin RPC (checks admin role server-side)
+        var result = await DB.client.rpc('admin_create_user', {
+          p_email: email,
+          p_password: tempPassword,
+          p_full_name: fullName,
+          p_role: role
         });
 
-        if (signUpResult.error) throw signUpResult.error;
-        var newUserId = signUpResult.data && signUpResult.data.user && signUpResult.data.user.id;
-
-        // Update profile role (trigger creates profile with 'viewer' by default)
-        if (newUserId && role !== 'viewer') {
-          // Small delay to let the trigger create the profile first
-          await new Promise(function(r) { setTimeout(r, 500); });
-          await DB.client
-            .from('profiles')
-            .update({ role: role, full_name: fullName })
-            .eq('id', newUserId);
-        }
+        if (result.error) throw result.error;
 
         self._closeModal();
 
