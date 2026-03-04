@@ -833,16 +833,23 @@ const Team = {
 
     // Hours input live calc
     var hoursInputs = container.querySelectorAll('.team-hours-input');
+    var autoSaveTimer = null;
     for (var hi = 0; hi < hoursInputs.length; hi++) {
       hoursInputs[hi].addEventListener('input', function () {
         self.recalcHours(container);
+        // Auto-save after 1.5s of inactivity
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
+        autoSaveTimer = setTimeout(function () {
+          self.handleSaveHours(container);
+        }, 1500);
       });
     }
 
-    // Save hours
+    // Save hours (manual button still works)
     var saveHoursBtn = container.querySelector('#team-btn-save-hours');
     if (saveHoursBtn) {
       saveHoursBtn.addEventListener('click', function () {
+        if (autoSaveTimer) clearTimeout(autoSaveTimer);
         self.handleSaveHours(container);
       });
     }
