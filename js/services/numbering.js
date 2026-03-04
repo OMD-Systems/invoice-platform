@@ -17,21 +17,26 @@ const Numbering = {
 
   /* ── Get the next invoice number for an employee (raw int) ── */
   async getNextNumber(employeeId) {
-    var result = await DB.client
-      .from('employees')
-      .select('next_invoice_number, invoice_prefix')
-      .eq('id', employeeId)
-      .single();
+    try {
+      var result = await DB.client
+        .from('employees')
+        .select('next_invoice_number, invoice_prefix')
+        .eq('id', employeeId)
+        .single();
 
-    if (result.error) {
-      console.error('[Numbering] getNextNumber error:', result.error);
+      if (result.error) {
+        console.error('[Numbering] getNextNumber error:', result.error);
+        return { number: 1, prefix: '' };
+      }
+
+      return {
+        number: (result.data && result.data.next_invoice_number) || 1,
+        prefix: (result.data && result.data.invoice_prefix) || ''
+      };
+    } catch (err) {
+      console.error('[Numbering] getNextNumber exception:', err);
       return { number: 1, prefix: '' };
     }
-
-    return {
-      number: (result.data && result.data.next_invoice_number) || 1,
-      prefix: (result.data && result.data.invoice_prefix) || ''
-    };
   },
 
   /* ── Get the next formatted invoice number string (convenience) ── */
@@ -42,34 +47,46 @@ const Numbering = {
 
   /* ── Increment the invoice number in DB after generation ── */
   async incrementNumber(employeeId) {
-    var info = await this.getNextNumber(employeeId);
-    var current = info.number;
+    try {
+      var info = await this.getNextNumber(employeeId);
+      var current = info.number;
 
-    var result = await DB.client
-      .from('employees')
-      .update({ next_invoice_number: current + 1 })
-      .eq('id', employeeId);
+      // Optimistic concurrency: only update if the number hasn't changed
+      var result = await DB.client
+        .from('employees')
+        .update({ next_invoice_number: current + 1 })
+        .eq('id', employeeId)
+        .eq('next_invoice_number', current);
 
-    if (result.error) {
-      console.error('[Numbering] incrementNumber error:', result.error);
-      throw new Error('Failed to increment invoice number: ' + result.error.message);
+      if (result.error) {
+        console.error('[Numbering] incrementNumber error:', result.error);
+        throw new Error('Failed to increment invoice number: ' + result.error.message);
+      }
+
+      return current;
+    } catch (err) {
+      console.error('[Numbering] incrementNumber exception:', err);
+      throw err;
     }
-
-    return current;
   },
 
   /* ── Use the DB RPC function for atomic increment (preferred) ── */
   async incrementNumberAtomic(employeeId) {
-    var result = await DB.client
-      .rpc('increment_invoice_number', { emp_id: employeeId });
+    try {
+      var result = await DB.client
+        .rpc('increment_invoice_number', { emp_id: employeeId });
 
-    if (result.error) {
-      console.error('[Numbering] incrementNumberAtomic error:', result.error);
-      // Fall back to non-atomic version
-      return await this.incrementNumber(employeeId);
+      if (result.error) {
+        console.error('[Numbering] incrementNumberAtomic error:', result.error);
+        // Fall back to non-atomic version
+        return await this.incrementNumber(employeeId);
+      }
+
+      return result.data;
+    } catch (err) {
+      console.error('[Numbering] incrementNumberAtomic exception:', err);
+      throw err;
     }
-
-    return result.data;
   },
 
   /* ── Generate filename based on employee format ── */
@@ -98,41 +115,58 @@ const Numbering = {
 
   /* ── Validate invoice number is not already used ── */
   async isNumberUsed(employeeId, number, month, year) {
-    var result = await DB.client
-      .from('invoices')
-      .select('id')
-      .eq('employee_id', employeeId)
-      .eq('invoice_number', number)
-      .maybeSingle();
+    try {
+      var query = DB.client
+        .from('invoices')
+        .select('id')
+        .eq('employee_id', employeeId)
+        .eq('invoice_number', number);
 
-    if (result.error) {
-      console.error('[Numbering] isNumberUsed error:', result.error);
-      return false;
+      // Scope to month/year if provided (allows reuse across periods)
+      if (month != null && year != null) {
+        query = query.eq('month', month).eq('year', year);
+      }
+
+      var result = await query.maybeSingle();
+
+      if (result.error) {
+        console.error('[Numbering] isNumberUsed error:', result.error);
+        // Fail safe: assume used to prevent duplicates
+        return true;
+      }
+
+      return !!result.data;
+    } catch (err) {
+      console.error('[Numbering] isNumberUsed exception:', err);
+      return true;
     }
-
-    return !!result.data;
   },
 
   /* ── Get the next available number (skipping used ones) ── */
   async getNextAvailableNumber(employeeId) {
-    var info = await this.getNextNumber(employeeId);
-    var nextNum = info.number;
-    var prefix = info.prefix;
+    try {
+      var info = await this.getNextNumber(employeeId);
+      var nextNum = info.number;
+      var prefix = info.prefix;
 
-    // Check if this number is already used (edge case: manual override)
-    var formatted = this.formatNumber(prefix, nextNum);
-    var used = await this.isNumberUsed(employeeId, formatted);
-    var maxAttempts = 100;
-    var attempts = 0;
+      // Check if this number is already used (edge case: manual override)
+      var formatted = this.formatNumber(prefix, nextNum);
+      var used = await this.isNumberUsed(employeeId, formatted);
+      var maxAttempts = 100;
+      var attempts = 0;
 
-    while (used && attempts < maxAttempts) {
-      nextNum++;
-      formatted = this.formatNumber(prefix, nextNum);
-      used = await this.isNumberUsed(employeeId, formatted);
-      attempts++;
+      while (used && attempts < maxAttempts) {
+        nextNum++;
+        formatted = this.formatNumber(prefix, nextNum);
+        used = await this.isNumberUsed(employeeId, formatted);
+        attempts++;
+      }
+
+      return { number: nextNum, prefix: prefix, formatted: formatted };
+    } catch (err) {
+      console.error('[Numbering] getNextAvailableNumber exception:', err);
+      return { number: 1, prefix: '', formatted: '001' };
     }
-
-    return { number: nextNum, prefix: prefix, formatted: formatted };
   },
 
   /* ── Internal: convert date to DD.MM.YYYY ── */
@@ -146,13 +180,10 @@ const Numbering = {
     if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) {
       return dateStr;
     }
-    // ISO date (YYYY-MM-DD)
-    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-      var d = new Date(dateStr);
-      var dd = String(d.getDate()).padStart(2, '0');
-      var mm = String(d.getMonth() + 1).padStart(2, '0');
-      var yyyy = String(d.getFullYear());
-      return dd + '.' + mm + '.' + yyyy;
+    // ISO date (YYYY-MM-DD) — parse components directly to avoid timezone shift
+    var isoMatch = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      return isoMatch[3] + '.' + isoMatch[2] + '.' + isoMatch[1];
     }
     return dateStr;
   },

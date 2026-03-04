@@ -26,6 +26,15 @@ const Team = {
   billedTo: null,
   defaultTerms: '',
 
+  /* ── Guard flags ── */
+  _saving: false,
+  _generating: false,
+  _deletingInvoice: false,
+  _changingStatus: false,
+  _searchTimeout: null,
+  _autoSaveTimer: null,
+  _confirmTimers: [],
+
   /* ── Constants ── */
   MONTH_NAMES: [
     'January', 'February', 'March', 'April', 'May', 'June',
@@ -36,6 +45,9 @@ const Team = {
      RENDER
      ═══════════════════════════════════════════════════════ */
   async render(container, ctx) {
+    // Sync period from shared App state
+    if (App.month) this.month = App.month;
+    if (App.year) this.year = App.year;
     container.innerHTML = this.template();
     this.bindEvents(container, ctx);
     await this.loadData(ctx);
@@ -77,19 +89,19 @@ const Team = {
       /* ── LEFT: Employee List ── */
       '<div class="team-list">' +
       '<div class="team-list-header">' +
-      '<input type="text" class="fury-input team-search" id="team-search" ' +
+      '<input type="text" class="fury-input team-search" id="team-search" aria-label="Search employees" ' +
       'placeholder="Search employees..." />' +
       (App.role === 'admin' ? '<button id="team-btn-add" class="fury-btn fury-btn-primary fury-btn-sm" style="margin-left: 8px;">+ Add Employee</button>' : '') +
       '<div class="team-period" style="margin-top: 8px;">' +
-      '<select class="fury-select fury-select-sm" id="team-month">' + monthOptions + '</select>' +
-      '<select class="fury-select fury-select-sm" id="team-year">' + yearOptions + '</select>' +
+      '<select class="fury-select fury-select-sm" id="team-month" aria-label="Month">' + monthOptions + '</select>' +
+      '<select class="fury-select fury-select-sm" id="team-year" aria-label="Year">' + yearOptions + '</select>' +
       '</div>' +
       '</div>' +
       '<div class="team-list-body" id="team-list-body">' +
       '<div class="loading" style="padding:40px">Loading...</div>' +
       '</div>' +
       '<div class="team-list-footer">' +
-      '<label class="fury-btn fury-btn-secondary fury-btn-sm team-upload-btn" id="team-upload-label">' +
+      '<label class="fury-btn fury-btn-secondary fury-btn-sm team-upload-btn" id="team-upload-label" tabindex="0" role="button">' +
       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' +
       ' Upload Timesheet' +
       '<input type="file" accept=".xlsx,.xls" id="team-upload-file" style="display:none" />' +
@@ -109,7 +121,7 @@ const Team = {
 
       /* ── Modal ── */
       '<div class="fury-modal-overlay" id="team-modal-overlay">' +
-      '<div class="fury-modal" id="team-modal"></div>' +
+      '<div class="fury-modal" id="team-modal" role="dialog" aria-modal="true"></div>' +
       '</div>';
   },
 
@@ -151,33 +163,27 @@ const Team = {
 
       self.applySearch();
 
-      // Load projects
-      var projResult = await DB.getProjects();
-      self.projects = (projResult && projResult.data) || [];
+      // Parallel load: projects, timesheets, invoices, teams, hoursConfig, settings
+      var parallel = await Promise.all([
+        DB.getProjects(),
+        DB.getTimesheets(self.month, self.year),
+        DB.getInvoices({ month: self.month, year: self.year }),
+        DB.getTeams(),
+        DB.getWorkingHoursConfig(self.month, self.year).catch(function (whErr) {
+          console.warn('[Team] working_hours_config not available:', whErr.message);
+          return null;
+        }),
+        DB.getSetting('billed_to'),
+        DB.getSetting('payment_terms')
+      ]);
 
-      // Load all timesheets for period (for summary)
-      var tsResult = await DB.getTimesheets(self.month, self.year);
-      self.allTimesheets = (tsResult && tsResult.data) || [];
+      self.projects = (parallel[0] && parallel[0].data) || [];
+      self.allTimesheets = (parallel[1] && parallel[1].data) || [];
+      self.invoices = (parallel[2] && parallel[2].data) || [];
+      self.teams = (parallel[3] && parallel[3].data) || [];
+      self.hoursConfig = (parallel[4] && parallel[4].data) || null;
 
-      // Load invoices for period
-      var invResult = await DB.getInvoices({ month: self.month, year: self.year });
-      self.invoices = (invResult && invResult.data) || [];
-
-      // Load teams
-      var teamsResult = await DB.getTeams();
-      self.teams = (teamsResult && teamsResult.data) || [];
-
-      // Load working hours config (table may not exist yet)
-      try {
-        var whResult = await DB.getWorkingHoursConfig(self.month, self.year);
-        self.hoursConfig = (whResult && whResult.data) || null;
-      } catch (whErr) {
-        console.warn('[Team] working_hours_config not available:', whErr.message);
-        self.hoursConfig = null;
-      }
-
-      // Load billed_to
-      var btResult = await DB.getSetting('billed_to');
+      var btResult = parallel[5];
       if (btResult && btResult.data) {
         try {
           self.billedTo = typeof btResult.data === 'string' ? JSON.parse(btResult.data) : btResult.data;
@@ -186,8 +192,7 @@ const Team = {
         }
       }
 
-      // Load payment terms
-      var ptResult = await DB.getSetting('payment_terms');
+      var ptResult = parallel[6];
       if (ptResult && ptResult.data) {
         try {
           var ptData = typeof ptResult.data === 'string' ? JSON.parse(ptResult.data) : ptResult.data;
@@ -197,10 +202,9 @@ const Team = {
         }
       }
 
-      // Data loaded
-
     } catch (err) {
       console.error('[Team] loadData error:', err);
+      if (typeof showToast === 'function') showToast('Failed to load data. Please refresh.', 'error');
     }
   },
 
@@ -234,26 +238,25 @@ const Team = {
       return;
     }
 
+    // Pre-build lookup maps: O(n+m) instead of O(n*m)
+    var hoursMap = {};
+    for (var t = 0; t < self.allTimesheets.length; t++) {
+      var ts = self.allTimesheets[t];
+      hoursMap[ts.employee_id] = (hoursMap[ts.employee_id] || 0) + (parseFloat(ts.hours) || 0);
+    }
+    var invoiceMap = {};
+    for (var inv = 0; inv < self.invoices.length; inv++) {
+      if (!invoiceMap[self.invoices[inv].employee_id]) {
+        invoiceMap[self.invoices[inv].employee_id] = self.invoices[inv];
+      }
+    }
+
     var html = '';
     for (var i = 0; i < self.employees.length; i++) {
       var emp = self.employees[i];
 
-      // Get hours for this employee
-      var totalHours = 0;
-      for (var t = 0; t < self.allTimesheets.length; t++) {
-        if (self.allTimesheets[t].employee_id === emp.id) {
-          totalHours += parseFloat(self.allTimesheets[t].hours) || 0;
-        }
-      }
-
-      // Get invoice status
-      var invoice = null;
-      for (var inv = 0; inv < self.invoices.length; inv++) {
-        if (self.invoices[inv].employee_id === emp.id) {
-          invoice = self.invoices[inv];
-          break;
-        }
-      }
+      var totalHours = hoursMap[emp.id] || 0;
+      var invoice = invoiceMap[emp.id] || null;
 
       // Contract type badge
       var contractType = emp.contract_type || 'Contractor';
@@ -283,11 +286,11 @@ const Team = {
       var isSelected = emp.id === self.selectedId;
 
       var avatarHtml = emp.avatar_url
-        ? '<img class="td-avatar-sm" src="' + self.escapeHtml(emp.avatar_url) + '" alt="">'
+        ? '<img class="td-avatar-sm" src="' + self.escapeHtml(emp.avatar_url) + '" alt="" loading="lazy">'
         : '<div class="td-avatar-placeholder-sm">' + (emp.full_name_lat || emp.name || '?').charAt(0).toUpperCase() + '</div>';
 
       html +=
-        '<div class="team-list-item' + (isSelected ? ' active' : '') + '" data-id="' + emp.id + '">' +
+        '<div class="team-list-item' + (isSelected ? ' active' : '') + '" data-id="' + emp.id + '" tabindex="0" role="button" aria-label="' + self.escapeHtml(emp.name) + '">' +
         avatarHtml +
         '<div class="team-list-item-info">' +
         '<div class="team-list-item-top">' +
@@ -298,7 +301,7 @@ const Team = {
         '<div class="team-list-item-bottom">' +
         '<span class="team-badge ' + ctBadgeClass + '">' + ctLabel + '</span>' +
         '<span class="team-list-rate">' + rateStr + '</span>' +
-        (totalHours > 0 ? '<span class="team-list-hours">' + totalHours.toFixed(0) + 'h</span>' : '') +
+        (totalHours > 0 ? '<span class="team-list-hours">' + (totalHours % 1 === 0 ? totalHours.toFixed(0) : totalHours.toFixed(1)) + 'h</span>' : '') +
         '</div>' +
         '</div>' +
         '</div>';
@@ -370,7 +373,8 @@ const Team = {
 
     var diff = totalHours - regularHours;
     var diffClass = diff > 0 ? 'team-diff-over' : diff < 0 ? 'team-diff-under' : 'team-diff-zero';
-    var diffStr = diff > 0 ? '+' + diff.toFixed(0) + 'h' : diff < 0 ? diff.toFixed(0) + 'h' : '0h';
+    var diffFmt = Math.abs(diff) % 1 === 0 ? Math.abs(diff).toFixed(0) : Math.abs(diff).toFixed(1);
+    var diffStr = diff > 0 ? '+' + diffFmt + 'h' : diff < 0 ? '-' + diffFmt + 'h' : '0h';
     var hoursPercent = regularHours > 0 ? Math.min(Math.round((totalHours / regularHours) * 100), 150) : 0;
     var progressClass = hoursPercent >= 100 ? 'team-progress-full' : hoursPercent >= 75 ? 'team-progress-good' : 'team-progress-low';
 
@@ -425,14 +429,14 @@ const Team = {
       '<div class="td-contact-item">' +
       '<div class="td-contact-label">Email</div>' +
       (emp.work_email
-        ? '<a href="mailto:' + self.escapeHtml(emp.work_email) + '" class="td-contact-link">' + self.escapeHtml(emp.work_email) + '</a>'
+        ? '<a href="mailto:' + encodeURI(emp.work_email) + '" class="td-contact-link">' + self.escapeHtml(emp.work_email) + '</a>'
         : '<span class="td-contact-empty">Not assigned</span>') +
       '</div>' +
       // Phone
       '<div class="td-contact-item">' +
       '<div class="td-contact-label">Phone</div>' +
       (emp.phone
-        ? '<a href="tel:' + self.escapeHtml(emp.phone) + '" class="td-contact-link">' + self.escapeHtml(emp.phone) + '</a>'
+        ? '<a href="tel:' + encodeURI(emp.phone) + '" class="td-contact-link">' + self.escapeHtml(emp.phone) + '</a>'
         : '<span class="td-contact-empty">&#8212;</span>') +
       '</div>' +
       '</div>' +
@@ -454,7 +458,7 @@ const Team = {
       // Hours summary bar
       '<div class="td-hours-summary">' +
       '<div class="td-hours-stats">' +
-      '<span class="td-hours-logged" id="team-total-hours">' + totalHours.toFixed(0) + 'h</span>' +
+      '<span class="td-hours-logged" id="team-total-hours">' + (totalHours % 1 === 0 ? totalHours.toFixed(0) : totalHours.toFixed(1)) + 'h</span>' +
       '<span class="td-hours-separator">/</span>' +
       '<span class="td-hours-standard">' + regularHours + 'h</span>' +
       '<span class="td-hours-info">(' + regularDays + ' days)</span>' +
@@ -497,11 +501,7 @@ const Team = {
       html += '</div>';
 
       if (isAdminOrLead) {
-        html +=
-          '<button class="fury-btn fury-btn-primary fury-btn-sm td-save-btn" id="team-btn-save-hours">' +
-          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>' +
-          ' Save Hours' +
-          '</button>';
+        html += '<div class="td-autosave-indicator" id="team-save-indicator" style="display:none;"></div>';
       }
     }
 
@@ -531,7 +531,7 @@ const Team = {
         '<div class="td-invoice-detail">' +
         (invNumber ? '<span class="td-invoice-num">#' + self.escapeHtml(String(invNumber)) + '</span>' : '') +
         '<span class="td-invoice-calc">' +
-        totalHours.toFixed(0) + 'h' +
+        (totalHours % 1 === 0 ? totalHours.toFixed(0) : totalHours.toFixed(1)) + 'h' +
         (isHourly ? ' &times; $' + rate.toFixed(2) + '/hr' : ' (monthly rate)') +
         '</span>' +
         '</div>' +
@@ -654,12 +654,12 @@ const Team = {
 
     // Search
     var searchInput = container.querySelector('#team-search');
-    var searchTimeout = null;
     if (searchInput) {
       searchInput.addEventListener('input', function () {
         var val = this.value;
-        clearTimeout(searchTimeout);
-        searchTimeout = setTimeout(function () {
+        if (self._searchTimeout) clearTimeout(self._searchTimeout);
+        self._searchTimeout = setTimeout(function () {
+          self._searchTimeout = null;
           self.searchQuery = val;
           self.applySearch();
           self.renderEmployeeList(container);
@@ -734,6 +734,7 @@ const Team = {
       overlay.addEventListener('click', function (e) {
         if (e.target === overlay) {
           overlay.classList.remove('active');
+          document.body.classList.remove('fury-modal-open');
         }
       });
     }
@@ -742,7 +743,10 @@ const Team = {
     self._escHandler = function (e) {
       if (e.key === 'Escape') {
         var ol = container.querySelector('#team-modal-overlay');
-        if (ol) ol.classList.remove('active');
+        if (ol) {
+          ol.classList.remove('active');
+          document.body.classList.remove('fury-modal-open');
+        }
       }
     };
     document.addEventListener('keydown', self._escHandler);
@@ -831,26 +835,26 @@ const Team = {
       });
     }
 
-    // Hours input live calc
+    // Hours input live calc + auto-save
     var hoursInputs = container.querySelectorAll('.team-hours-input');
-    var autoSaveTimer = null;
+    var indicator = container.querySelector('#team-save-indicator');
     for (var hi = 0; hi < hoursInputs.length; hi++) {
       hoursInputs[hi].addEventListener('input', function () {
+        // Clamp negative values in real-time
+        var val = parseFloat(this.value);
+        if (val < 0) { this.value = '0'; }
         self.recalcHours(container);
-        // Auto-save after 1.5s of inactivity
-        if (autoSaveTimer) clearTimeout(autoSaveTimer);
-        autoSaveTimer = setTimeout(function () {
+        if (self._autoSaveTimer) clearTimeout(self._autoSaveTimer);
+        // Show "saving..." indicator
+        if (indicator) {
+          indicator.textContent = 'saving...';
+          indicator.style.display = '';
+          indicator.className = 'td-autosave-indicator td-autosave-pending';
+        }
+        self._autoSaveTimer = setTimeout(function () {
+          self._autoSaveTimer = null;
           self.handleSaveHours(container);
         }, 1500);
-      });
-    }
-
-    // Save hours (manual button still works)
-    var saveHoursBtn = container.querySelector('#team-btn-save-hours');
-    if (saveHoursBtn) {
-      saveHoursBtn.addEventListener('click', function () {
-        if (autoSaveTimer) clearTimeout(autoSaveTimer);
-        self.handleSaveHours(container);
       });
     }
 
@@ -945,11 +949,12 @@ const Team = {
     var regularHours = this.calculateRegularHours();
     var diff = total - regularHours;
     var diffClass = diff > 0 ? 'team-diff-over' : diff < 0 ? 'team-diff-under' : 'team-diff-zero';
-    var diffStr = diff > 0 ? '+' + diff.toFixed(0) + 'h' : diff < 0 ? diff.toFixed(0) + 'h' : '0h';
+    var diffFmt = Math.abs(diff) % 1 === 0 ? Math.abs(diff).toFixed(0) : Math.abs(diff).toFixed(1);
+    var diffStr = diff > 0 ? '+' + diffFmt + 'h' : diff < 0 ? '-' + diffFmt + 'h' : '0h';
 
     var totalEl = container.querySelector('#team-total-hours');
     var diffEl = container.querySelector('#team-diff-hours');
-    if (totalEl) totalEl.textContent = total.toFixed(0) + 'h';
+    if (totalEl) totalEl.textContent = (total % 1 === 0 ? total.toFixed(0) : total.toFixed(1)) + 'h';
     if (diffEl) diffEl.innerHTML = '<span class="' + diffClass + '">' + diffStr + '</span>';
 
     // Update progress bar
@@ -965,6 +970,7 @@ const Team = {
   /* ── Save hours ── */
   async handleSaveHours(container) {
     var self = this;
+    if (self._saving) return;
     var emp = self.findEmployee(self.selectedId);
     if (!emp) return;
 
@@ -976,7 +982,13 @@ const Team = {
       var projectId = inputs[i].getAttribute('data-project-id');
       var hours = parseFloat(inputs[i].value) || 0;
 
-      if (hours < 0 || hours > 744) {
+      if (hours < 0) {
+        showToast('Hours cannot be negative', 'error');
+        inputs[i].value = '0';
+        inputs[i].focus();
+        return;
+      }
+      if (hours > 744) {
         showToast('Hours must be between 0 and 744', 'error');
         inputs[i].focus();
         return;
@@ -995,19 +1007,24 @@ const Team = {
     }
 
     if (rows.length === 0) {
-      showToast('No hours to save.', 'error');
+      var indicator0 = container.querySelector('#team-save-indicator');
+      if (indicator0) indicator0.style.display = 'none';
       return;
     }
 
-    var btn = container.querySelector('#team-btn-save-hours');
-    var btnHtml = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    var indicator = container.querySelector('#team-save-indicator');
+    self._saving = true;
 
     try {
       var result = await DB.upsertTimesheets(rows);
       if (result && result.error) throw new Error(result.error.message);
 
-      showToast('Hours saved!', 'success');
+      // Show saved, then fade out
+      if (indicator) {
+        indicator.textContent = 'saved';
+        indicator.className = 'td-autosave-indicator td-autosave-done';
+        setTimeout(function () { indicator.style.display = 'none'; }, 1200);
+      }
 
       // Refresh timesheets
       var tsResult = await DB.getTimesheets(self.month, self.year);
@@ -1021,27 +1038,51 @@ const Team = {
       self.highlightSelected(container);
     } catch (err) {
       console.error('[Team] save hours error:', err);
-      showToast('Failed to save hours. Please try again.', 'error');
+      if (indicator) {
+        indicator.textContent = 'error';
+        indicator.className = 'td-autosave-indicator td-autosave-error';
+        setTimeout(function () { indicator.style.display = 'none'; }, 2000);
+      }
+      showToast('Failed to save hours', 'error');
     } finally {
-      if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
+      self._saving = false;
     }
   },
 
   /* ── Generate invoice ── */
   async handleGenerateInvoice(container) {
     var self = this;
+    if (self._generating) return;
     var emp = self.findEmployee(self.selectedId);
     if (!emp) return;
 
-    var btn = container.querySelector('#team-btn-generate');
+    // Check for zero hours
+    var totalHours = 0;
+    for (var t = 0; t < self.timesheets.length; t++) {
+      totalHours += parseFloat(self.timesheets[t].hours) || 0;
+    }
+    if (totalHours <= 0) {
+      showToast('Cannot generate invoice: no hours logged', 'error');
+      return;
+    }
+
+    // Check for missing rate
+    var rate = parseFloat(emp.rate_usd) || 0;
+    if (rate <= 0) {
+      showToast('Cannot generate invoice: rate is not set', 'error');
+      return;
+    }
+
+    var btn = container.querySelector('#team-btn-generate') || container.querySelector('#team-btn-new-invoice');
     var btnHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Generating...'; }
+    self._generating = true;
 
     try {
       var result = await DB.generateInvoice(emp.id, self.month, self.year);
       if (result && result.error) throw new Error(result.error.message || 'Failed to generate');
 
-      showToast('Invoice generated!', 'success');
+      showToast('Invoice generated', 'success');
 
       // Refresh invoices
       var invResult = await DB.getInvoices({ month: self.month, year: self.year });
@@ -1053,8 +1094,9 @@ const Team = {
       self.highlightSelected(container);
     } catch (err) {
       console.error('[Team] generate invoice error:', err);
-      showToast('Failed to generate invoice. Please try again.', 'error');
+      showToast(err.message || 'Failed to generate invoice', 'error');
     } finally {
+      self._generating = false;
       if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
     }
   },
@@ -1062,6 +1104,7 @@ const Team = {
   /* ── Delete invoice ── */
   async handleDeleteInvoice(container) {
     var self = this;
+    if (self._deletingInvoice) return;
     var emp = self.findEmployee(self.selectedId);
     if (!emp) return;
     var invoice = self.getEmployeeInvoice(emp.id);
@@ -1073,18 +1116,20 @@ const Team = {
     if (!btn.dataset.confirmPending) {
       btn.dataset.confirmPending = '1';
       var btnHtmlSaved = btn.innerHTML;
-      btn.innerHTML = '<span style="color:var(--fury-danger)">Sure? Click again</span>';
-      setTimeout(function () {
+      btn.innerHTML = '<span style="font-size:11px;color:var(--fury-danger)">Sure?</span>';
+      var timerId = setTimeout(function () {
         if (btn.dataset.confirmPending) {
           delete btn.dataset.confirmPending;
           btn.innerHTML = btnHtmlSaved;
         }
       }, 3000);
+      self._confirmTimers.push(timerId);
       return;
     }
     delete btn.dataset.confirmPending;
     var btnHtml = btn.innerHTML;
     btn.disabled = true; btn.textContent = 'Deleting...';
+    self._deletingInvoice = true;
 
     try {
       var result = await DB.deleteInvoice(invoice.id);
@@ -1104,6 +1149,7 @@ const Team = {
       console.error('[Team] delete invoice error:', err);
       showToast('Failed to delete invoice. Please try again.', 'error');
     } finally {
+      self._deletingInvoice = false;
       if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
     }
   },
@@ -1113,9 +1159,13 @@ const Team = {
     var self = this;
     var emp = self.findEmployee(self.selectedId);
     var invoice = self.getEmployeeInvoice(emp ? emp.id : null);
-    if (!invoice || !emp) return;
+    if (!invoice || !emp) {
+      showToast('No invoice to preview', 'error');
+      return;
+    }
 
     if (typeof InvoicePreview !== 'undefined' && typeof InvoicePreview.renderInvoiceHTML === 'function') {
+      try {
       // Fetch full employee data (with bank details) for preview
       var fullEmp = emp;
       try {
@@ -1173,14 +1223,20 @@ const Team = {
           '</div></div>' +
           '</div>';
         overlay.classList.add('active');
+        document.body.classList.add('fury-modal-open');
 
         var closeBtn = modal.querySelector('#team-preview-close');
         if (closeBtn) {
           closeBtn.addEventListener('click', function () {
             overlay.classList.remove('active');
+            document.body.classList.remove('fury-modal-open');
             furyModal.classList.remove('fury-modal-lg');
           });
         }
+      }
+      } catch (err) {
+        console.error('[Team] preview error:', err);
+        showToast('Failed to generate preview.', 'error');
       }
     } else {
       showToast('Preview module not available', 'error');
@@ -1192,8 +1248,17 @@ const Team = {
     var self = this;
     var emp = self.findEmployee(self.selectedId);
     var invoice = self.getEmployeeInvoice(emp ? emp.id : null);
-    if (!invoice || !emp) return;
+    if (!invoice || !emp) {
+      showToast('No invoice to download', 'error');
+      return;
+    }
 
+    if (typeof InvoicePreview === 'undefined' || typeof InvoicePreview.show !== 'function') {
+      showToast('Download module not available', 'error');
+      return;
+    }
+
+    try {
     // Fetch full employee data (with bank details)
     var fullEmp = emp;
     try {
@@ -1243,15 +1308,40 @@ const Team = {
         InvoicePreview._printInvoice(previewOverlay);
       }
     }, 300);
+    } catch (err) {
+      console.error('[Team] download error:', err);
+      showToast('Failed to prepare download.', 'error');
+    }
   },
 
   /* ── Status change (mark sent / mark paid) ── */
   async handleStatusChange(newStatus, container) {
     var self = this;
+    if (self._changingStatus) return;
     var emp = self.findEmployee(self.selectedId);
     if (!emp) return;
     var invoice = self.getEmployeeInvoice(emp.id);
     if (!invoice) return;
+
+    // Validate status transitions (forward-only for non-admins)
+    var prevStatus = invoice.status || 'draft';
+    var validForward = { 'draft': ['generated', 'sent'], 'generated': ['sent'], 'sent': ['paid'], 'paid': [] };
+    var allowed = (validForward[prevStatus] || []).slice();
+    if (App.role === 'admin') {
+      allowed = ['draft', 'generated', 'sent', 'paid'];
+    }
+    if (newStatus === prevStatus) { return; }
+    if (allowed.indexOf(newStatus) === -1) {
+      showToast('Invalid transition: ' + prevStatus + ' -> ' + newStatus, 'error');
+      return;
+    }
+
+    // Disable the button that was clicked
+    var btnId = newStatus === 'sent' ? '#team-btn-mark-sent' : '#team-btn-mark-paid';
+    var btn = container.querySelector(btnId);
+    var btnHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
+    self._changingStatus = true;
 
     try {
       var result = await DB.updateInvoiceStatus(invoice.id, newStatus);
@@ -1268,6 +1358,9 @@ const Team = {
     } catch (err) {
       console.error('[Team] status change error:', err);
       showToast('Failed to update status. Please try again.', 'error');
+    } finally {
+      self._changingStatus = false;
+      if (btn) { btn.disabled = false; btn.innerHTML = btnHtml; }
     }
   },
 
@@ -1337,27 +1430,53 @@ const Team = {
       document.removeEventListener('keydown', this._escHandler);
       this._escHandler = null;
     }
+    // Clear all timers
+    if (this._searchTimeout) { clearTimeout(this._searchTimeout); this._searchTimeout = null; }
+    if (this._autoSaveTimer) { clearTimeout(this._autoSaveTimer); this._autoSaveTimer = null; }
+    for (var i = 0; i < this._confirmTimers.length; i++) {
+      clearTimeout(this._confirmTimers[i]);
+    }
+    this._confirmTimers = [];
+    // Remove scroll lock if left open
+    document.body.classList.remove('fury-modal-open');
+    // Reset guard flags
+    this._saving = false;
+    this._generating = false;
+    this._deletingInvoice = false;
+    this._changingStatus = false;
+    // Clear data
     this.allEmployees = [];
+    this.employees = [];
     this.projects = [];
+    this.timesheets = [];
     this.allTimesheets = [];
     this.invoices = [];
+    this.selectedId = null;
   },
 
   /* ── Period change ── */
   async onPeriodChange(container, ctx) {
+    // Sync period to shared App state
+    App.month = this.month;
+    App.year = this.year;
     var self = this;
     var detail = container.querySelector('#team-detail');
     if (detail) {
       detail.innerHTML = '<div class="loading" style="padding:40px">Loading...</div>';
     }
 
-    await self.loadData(ctx);
-    self.renderEmployeeList(container);
-    self.highlightSelected(container);
+    try {
+      await self.loadData(ctx);
+      self.renderEmployeeList(container);
+      self.highlightSelected(container);
 
-    if (self.selectedId) {
-      await self.loadEmployeeDetails(self.selectedId);
-      self.renderDetail(container);
+      if (self.selectedId) {
+        await self.loadEmployeeDetails(self.selectedId);
+        self.renderDetail(container);
+      }
+    } catch (err) {
+      console.error('[Team] onPeriodChange error:', err);
+      showToast('Failed to load data for selected period.', 'error');
     }
   },
 
@@ -1376,7 +1495,7 @@ const Team = {
     modal.innerHTML = '' +
       '<div class="fury-modal-header">' +
       '<span class="fury-modal-title">' + (isNew ? 'Add Employee' : 'Edit Employee') + '</span>' +
-      '<button class="fury-modal-close" id="team-modal-close">&times;</button>' +
+      '<button class="fury-modal-close" id="team-modal-close" aria-label="Close">&times;</button>' +
       '</div>' +
       '<div class="fury-modal-body" style="padding: 24px; max-height: 70vh; overflow-y: auto;">' +
 
@@ -1384,28 +1503,28 @@ const Team = {
       '<div class="fury-modal-section-title" style="font-size: 14px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; border-bottom: 1px solid #374151; padding-bottom: 8px;">Basic Information</div>' +
       '<div class="fury-form-row">' +
       '<div class="fury-form-group">' +
-      '<label class="fury-label">PIN</label>' +
+      '<label class="fury-label" for="team-f-pin">PIN</label>' +
       '<input type="text" class="fury-input" id="team-f-pin" maxlength="4" value="' + self.escapeHtml(emp.pin || '') + '" />' +
       '</div>' +
       '<div class="fury-form-group">' +
-      '<label class="fury-label">Name</label>' +
+      '<label class="fury-label" for="team-f-name">Name</label>' +
       '<input type="text" class="fury-input" id="team-f-name" value="' + self.escapeHtml(emp.name || '') + '" />' +
       '</div>' +
       '</div>' +
       '<div class="fury-form-group fury-mt-2">' +
-      '<label class="fury-label">Full Name (Latin)</label>' +
+      '<label class="fury-label" for="team-f-full-name">Full Name (Latin)</label>' +
       '<input type="text" class="fury-input" id="team-f-full-name" value="' + self.escapeHtml(emp.full_name_lat || '') + '" />' +
       '</div>' +
       '<div class="fury-form-group fury-mt-2">' +
-      '<label class="fury-label">Work Email</label>' +
+      '<label class="fury-label" for="team-f-work-email">Work Email</label>' +
       '<input type="email" class="fury-input" id="team-f-work-email" placeholder="name@omdsystems.com" value="' + self.escapeHtml(emp.work_email || '') + '" />' +
       '</div>' +
       '<div class="fury-form-group fury-mt-2">' +
-      '<label class="fury-label">Phone</label>' +
+      '<label class="fury-label" for="team-f-phone">Phone</label>' +
       '<input type="text" class="fury-input" id="team-f-phone" value="' + self.escapeHtml(emp.phone || '') + '" />' +
       '</div>' +
       '<div class="fury-form-group fury-mt-2">' +
-      '<label class="fury-label">Address</label>' +
+      '<label class="fury-label" for="team-f-address">Address</label>' +
       '<textarea class="fury-textarea" id="team-f-address">' + self.escapeHtml(emp.address || '') + '</textarea>' +
       '</div>' +
       '</div>' +
@@ -1413,21 +1532,21 @@ const Team = {
       '<div class="fury-modal-section" style="margin-bottom: 24px;">' +
       '<div class="fury-modal-section-title" style="font-size: 14px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; border-bottom: 1px solid #374151; padding-bottom: 8px;">Banking</div>' +
       '<div class="fury-form-group">' +
-      '<label class="fury-label">IBAN</label>' +
+      '<label class="fury-label" for="team-f-iban">IBAN</label>' +
       '<input type="text" class="fury-input" id="team-f-iban" value="' + self.escapeHtml(emp.iban || '') + '" />' +
       '</div>' +
       '<div class="fury-form-row fury-mt-2">' +
       '<div class="fury-form-group">' +
-      '<label class="fury-label">SWIFT</label>' +
+      '<label class="fury-label" for="team-f-swift">SWIFT</label>' +
       '<input type="text" class="fury-input" id="team-f-swift" value="' + self.escapeHtml(emp.swift || 'UNJSUAUKXXX') + '" />' +
       '</div>' +
       '<div class="fury-form-group">' +
-      '<label class="fury-label">Bank Name</label>' +
+      '<label class="fury-label" for="team-f-bank">Bank Name</label>' +
       '<input type="text" class="fury-input" id="team-f-bank" value="' + self.escapeHtml(emp.bank_name || 'JSC UNIVERSAL BANK, KYIV, UKRAINE') + '" />' +
       '</div>' +
       '</div>' +
       '<div class="fury-form-group fury-mt-2">' +
-      '<label class="fury-label">Receiver Name</label>' +
+      '<label class="fury-label" for="team-f-receiver">Receiver Name</label>' +
       '<input type="text" class="fury-input" id="team-f-receiver" value="' + self.escapeHtml(emp.receiver_name || '') + '" />' +
       '</div>' +
       '</div>' +
@@ -1436,11 +1555,11 @@ const Team = {
       '<div class="fury-modal-section-title" style="font-size: 14px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; border-bottom: 1px solid #374151; padding-bottom: 8px;">Contract & Rate</div>' +
       '<div class="fury-form-row">' +
       '<div class="fury-form-group">' +
-      '<label class="fury-label">Rate (USD)</label>' +
+      '<label class="fury-label" for="team-f-rate">Rate (USD)</label>' +
       '<input type="number" class="fury-input" id="team-f-rate" step="0.01" value="' + (emp.rate_usd || '') + '" />' +
       '</div>' +
       '<div class="fury-form-group">' +
-      '<label class="fury-label">Contract Type</label>' +
+      '<label class="fury-label" for="team-f-contract">Contract Type</label>' +
       '<select class="fury-select" id="team-f-contract-type">' +
       '<option value="Contractor"' + ((emp.contract_type || 'Contractor') === 'Contractor' ? ' selected' : '') + '>Contractor</option>' +
       '<option value="Full-Time"' + (emp.contract_type === 'Full-Time' ? ' selected' : '') + '>Full-Time</option>' +
@@ -1450,14 +1569,14 @@ const Team = {
       '</div>' +
       '<div class="fury-form-row fury-mt-2">' +
       '<div class="fury-form-group">' +
-      '<label class="fury-label">Employee Type</label>' +
+      '<label class="fury-label" for="team-f-emptype">Employee Type</label>' +
       '<select class="fury-select" id="team-f-emp-type">' +
       '<option value="FTE"' + (emp.employee_type !== 'Hourly Contractor' ? ' selected' : '') + '>FTE</option>' +
       '<option value="Hourly Contractor"' + (emp.employee_type === 'Hourly Contractor' ? ' selected' : '') + '>Hourly Contractor</option>' +
       '</select>' +
       '</div>' +
       '<div class="fury-form-group">' +
-      '<label class="fury-label">Invoice Format</label>' +
+      '<label class="fury-label" for="team-f-invformat">Invoice Format</label>' +
       '<select class="fury-select" id="team-f-inv-format">' +
       '<option value="WS"' + ((emp.invoice_format || 'WS') === 'WS' ? ' selected' : '') + '>WS</option>' +
       '<option value="FOP"' + (emp.invoice_format === 'FOP' ? ' selected' : '') + '>FOP</option>' +
@@ -1467,16 +1586,16 @@ const Team = {
       '</div>' +
       '<div class="fury-form-row fury-mt-2">' +
       '<div class="fury-form-group">' +
-      '<label class="fury-label">Invoice Prefix</label>' +
+      '<label class="fury-label" for="team-f-prefix">Invoice Prefix</label>' +
       '<input type="text" class="fury-input" id="team-f-inv-prefix" value="' + self.escapeHtml(emp.invoice_prefix || 'WS-Invoice') + '" />' +
       '</div>' +
       '<div class="fury-form-group">' +
-      '<label class="fury-label">Next Invoice #</label>' +
+      '<label class="fury-label" for="team-f-next-num">Next Invoice #</label>' +
       '<input type="number" class="fury-input" id="team-f-next-inv" min="1" value="' + (emp.next_invoice_number || 1) + '" />' +
       '</div>' +
       '</div>' +
       '<div class="fury-form-group fury-mt-2">' +
-      '<label class="fury-label">Service Description</label>' +
+      '<label class="fury-label" for="team-f-service-desc">Service Description</label>' +
       '<input type="text" class="fury-input" id="team-f-service" value="' + self.escapeHtml(emp.service_description || 'UAV Systems Development Services') + '" />' +
       '</div>' +
       '<div class="fury-checkbox-group fury-mt-2">' +
@@ -1492,6 +1611,7 @@ const Team = {
       '</div>';
 
     overlay.classList.add('active');
+    document.body.classList.add('fury-modal-open');
 
     setTimeout(function() {
       var firstInput = document.querySelector('#team-modal input:not([readonly]):not([disabled])');
@@ -1499,18 +1619,31 @@ const Team = {
     }, 100);
 
     // Bind modal buttons
-    modal.querySelector('#team-modal-close').addEventListener('click', function () { overlay.classList.remove('active'); });
-    modal.querySelector('#team-modal-cancel').addEventListener('click', function () { overlay.classList.remove('active'); });
-    modal.querySelector('#team-modal-save').addEventListener('click', function () {
-      self.handleEditSave(employee, container);
+    var closeTeamModal = function () {
+      overlay.classList.remove('active');
+      document.body.classList.remove('fury-modal-open');
+    };
+    modal.querySelector('#team-modal-close').addEventListener('click', closeTeamModal);
+    modal.querySelector('#team-modal-cancel').addEventListener('click', closeTeamModal);
+    var saveBtn = modal.querySelector('#team-modal-save');
+    saveBtn.addEventListener('click', function () {
+      if (saveBtn.disabled) return;
+      self.handleEditSave(employee, container, saveBtn);
     });
   },
 
-  async handleEditSave(existingEmployee, container) {
+  async handleEditSave(existingEmployee, container, saveBtn) {
     var self = this;
     var modal = container.querySelector('#team-modal');
     var overlay = container.querySelector('#team-modal-overlay');
     if (!modal) return;
+
+    var rateVal = modal.querySelector('#team-f-rate').value.trim();
+    var parsedRate = rateVal === '' ? null : parseFloat(rateVal);
+    if (rateVal !== '' && (isNaN(parsedRate) || parsedRate < 0)) {
+      showToast('Rate must be a non-negative number', 'error');
+      return;
+    }
 
     var data = {
       pin: (modal.querySelector('#team-f-pin').value || '').trim(),
@@ -1523,7 +1656,7 @@ const Team = {
       swift: (modal.querySelector('#team-f-swift').value || '').trim(),
       bank_name: (modal.querySelector('#team-f-bank').value || '').trim(),
       receiver_name: (modal.querySelector('#team-f-receiver').value || '').trim(),
-      rate_usd: parseFloat(modal.querySelector('#team-f-rate').value) || null,
+      rate_usd: parsedRate,
       contract_type: modal.querySelector('#team-f-contract-type').value,
       employee_type: modal.querySelector('#team-f-emp-type').value,
       invoice_format: modal.querySelector('#team-f-inv-format').value,
@@ -1538,22 +1671,17 @@ const Team = {
       return;
     }
 
-    if (data.work_email && !Validation.isValidEmail(data.work_email)) {
+    if (data.work_email && typeof Validation !== 'undefined' && !Validation.isValidEmail(data.work_email)) {
       showToast('Invalid email format', 'error');
       return;
     }
 
-    if (data.rate_usd !== null && data.rate_usd < 0) {
-      showToast('Rate cannot be negative', 'error');
-      return;
-    }
-
-    if (data.iban && !Validation.isValidIBAN(data.iban)) {
+    if (data.iban && typeof Validation !== 'undefined' && !Validation.isValidIBAN(data.iban)) {
       showToast('Invalid IBAN format', 'error');
       return;
     }
 
-    if (data.swift && !Validation.isValidSWIFT(data.swift)) {
+    if (data.swift && typeof Validation !== 'undefined' && !Validation.isValidSWIFT(data.swift)) {
       showToast('Invalid SWIFT/BIC format', 'error');
       return;
     }
@@ -1562,6 +1690,9 @@ const Team = {
       showToast('Next invoice number must be a positive integer', 'error');
       return;
     }
+
+    // Disable save button to prevent double-submit
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
 
     try {
       if (existingEmployee) {
@@ -1572,20 +1703,42 @@ const Team = {
 
       showToast(existingEmployee ? 'Employee updated' : 'Employee added', 'success');
       overlay.classList.remove('active');
+      document.body.classList.remove('fury-modal-open');
 
       // Update cache
       if (result && result.data) {
         self.updateEmployeeInCache(result.data);
+        // Auto-select newly created employee
+        if (!existingEmployee) {
+          self.selectedId = result.data.id;
+        }
+        // If employee was deactivated, clear selection
+        if (!result.data.is_active && self.selectedId === result.data.id) {
+          self.selectedId = null;
+        }
       }
 
+      self.applySearch();
       self.renderEmployeeList(container);
       self.highlightSelected(container);
       if (self.selectedId) {
+        await self.loadEmployeeDetails(self.selectedId);
         self.renderDetail(container);
+      } else {
+        // Clear detail panel when selection is cleared
+        var panel = container.querySelector('#team-detail');
+        if (panel) {
+          panel.innerHTML =
+            '<div class="team-detail-empty">' +
+            '<div style="color:var(--fury-text-muted)">Select an employee from the list</div>' +
+            '</div>';
+        }
       }
     } catch (err) {
       console.error('[Team] save employee error:', err);
       showToast('Failed to save employee. Please try again.', 'error');
+    } finally {
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = existingEmployee ? 'Save' : 'Add'; }
     }
   },
 
@@ -1611,12 +1764,17 @@ const Team = {
     var found = false;
     for (var i = 0; i < this.allEmployees.length; i++) {
       if (this.allEmployees[i].id === updatedEmp.id) {
-        this.allEmployees[i] = updatedEmp;
+        if (!updatedEmp.is_active) {
+          // Remove deactivated employee from cache
+          this.allEmployees.splice(i, 1);
+        } else {
+          this.allEmployees[i] = updatedEmp;
+        }
         found = true;
         break;
       }
     }
-    if (!found) {
+    if (!found && updatedEmp.is_active) {
       this.allEmployees.push(updatedEmp);
     }
     this.applySearch();
@@ -1691,15 +1849,15 @@ const Team = {
       });
 
       var html =
-        '<table class="td-inv-hist-table" style="width:100%;border-collapse:collapse;font-size:13px;">' +
+        '<table class="fury-table" style="min-width:auto;font-size:13px;">' +
         '<thead>' +
-        '<tr style="color:var(--fury-text-muted);text-align:left;border-bottom:1px solid var(--fury-border,#333);">' +
-        '<th style="padding:6px 8px;font-weight:500;">#</th>' +
-        '<th style="padding:6px 8px;font-weight:500;">Number</th>' +
-        '<th style="padding:6px 8px;font-weight:500;">Date</th>' +
-        '<th style="padding:6px 8px;font-weight:500;text-align:right;">Amount</th>' +
-        '<th style="padding:6px 8px;font-weight:500;text-align:center;">Status</th>' +
-        '<th style="padding:6px 8px;font-weight:500;text-align:right;">Actions</th>' +
+        '<tr>' +
+        '<th style="width:32px">#</th>' +
+        '<th>Number</th>' +
+        '<th>Date</th>' +
+        '<th style="text-align:right">Amount</th>' +
+        '<th style="text-align:center">Status</th>' +
+        '<th style="text-align:right">Actions</th>' +
         '</tr>' +
         '</thead><tbody>';
 
@@ -1711,15 +1869,15 @@ const Team = {
 
         html +=
           '<tr style="border-bottom:1px solid var(--fury-border,#222);" data-invoice-id="' + inv.id + '">' +
-          '<td style="padding:8px;color:var(--fury-text-muted);">' + (i + 1) + '</td>' +
-          '<td style="padding:8px;">' + self.escapeHtml(inv.invoice_number || '—') + '</td>' +
-          '<td style="padding:8px;">' + self.escapeHtml(dateStr || '—') + '</td>' +
-          '<td style="padding:8px;text-align:right;font-weight:600;">$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' +
-          '<td style="padding:8px;text-align:center;">' + statusBadge + '</td>' +
-          '<td style="padding:8px;text-align:right;white-space:nowrap;">' +
-          '<button class="fury-btn fury-btn-secondary fury-btn-xs td-hist-preview" data-inv-id="' + inv.id + '" title="Preview" style="padding:2px 6px;font-size:12px;margin-left:2px;">&#128065;</button>' +
-          '<button class="fury-btn fury-btn-secondary fury-btn-xs td-hist-download" data-inv-id="' + inv.id + '" title="Download" style="padding:2px 6px;font-size:12px;margin-left:2px;">&#11015;</button>' +
-          '<button class="fury-btn fury-btn-danger fury-btn-xs td-hist-delete" data-inv-id="' + inv.id + '" title="Delete" style="padding:2px 6px;font-size:12px;margin-left:2px;">&#128465;</button>' +
+          '<td style="color:var(--fury-text-muted)">' + (i + 1) + '</td>' +
+          '<td>' + self.escapeHtml(inv.invoice_number || '—') + '</td>' +
+          '<td>' + self.escapeHtml(dateStr || '—') + '</td>' +
+          '<td style="text-align:right;font-weight:600">$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' +
+          '<td style="text-align:center">' + statusBadge + '</td>' +
+          '<td style="text-align:right;white-space:nowrap">' +
+          '<button class="fury-btn fury-btn-secondary fury-btn-xs td-hist-preview" data-inv-id="' + inv.id + '" title="Preview">&#128065;</button>' +
+          '<button class="fury-btn fury-btn-secondary fury-btn-xs td-hist-download" data-inv-id="' + inv.id + '" title="Download">&#11015;</button>' +
+          '<button class="fury-btn fury-btn-danger fury-btn-xs td-hist-delete" data-inv-id="' + inv.id + '" title="Delete">&#128465;</button>' +
           '</td>' +
           '</tr>';
       }
@@ -1788,15 +1946,15 @@ const Team = {
       var delBtn = container.querySelector('.td-hist-delete[data-inv-id="' + invoiceId + '"]');
       if (delBtn && !delBtn.dataset.confirmPending) {
         delBtn.dataset.confirmPending = '1';
-        delBtn.textContent = 'Sure?';
-        delBtn.style.color = 'var(--fury-danger)';
-        setTimeout(function () {
+        delBtn.innerHTML = '<span style="font-size:11px;color:var(--fury-danger)">Sure?</span>';
+        var _histTimer = setTimeout(function () {
           if (delBtn.dataset.confirmPending) {
             delete delBtn.dataset.confirmPending;
             delBtn.textContent = '🗑';
             delBtn.style.color = '';
           }
         }, 3000);
+        self._confirmTimers.push(_histTimer);
         return;
       }
       if (delBtn) delete delBtn.dataset.confirmPending;
@@ -1855,10 +2013,12 @@ const Team = {
               '</div></div>' +
               '</div>';
             overlay.classList.add('active');
+            document.body.classList.add('fury-modal-open');
             var closeBtn = modal.querySelector('#team-preview-close');
             if (closeBtn) {
               closeBtn.addEventListener('click', function () {
                 overlay.classList.remove('active');
+                document.body.classList.remove('fury-modal-open');
                 furyModal.classList.remove('fury-modal-lg');
               });
             }

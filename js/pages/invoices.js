@@ -20,11 +20,16 @@ const Invoices = {
   defaultTerms: '',
   exchangeRate: 42.16,
   hoursAdjustment: 0,
+  _reloading: false,
+  _generating: false,
 
   /* ═══════════════════════════════════════════════════════
      RENDER
      ═══════════════════════════════════════════════════════ */
   async render(container, ctx) {
+    // Sync period from shared App state
+    if (App.month) this.month = App.month;
+    if (App.year) this.year = App.year;
     container.innerHTML = this.template();
     this.bindEvents(container, ctx);
     await this.loadData(ctx);
@@ -57,7 +62,7 @@ const Invoices = {
       '<div class="invoices-page">' +
 
       /* ── Tabs ── */
-      '<div class="fury-tabs fury-mb-3">' +
+      '<div class="fury-tabs fury-mb-3" role="tablist" aria-label="Invoice views">' +
       '<button class="fury-tab' + (this.activeTab === 'invoices' ? ' active' : '') + '" data-inv-tab="invoices">All Invoices</button>' +
       '<button class="fury-tab' + (this.activeTab === 'summary' ? ' active' : '') + '" data-inv-tab="summary">Monthly Summary</button>' +
       '<button class="fury-tab' + (this.activeTab === 'settlements' ? ' active' : '') + '" data-inv-tab="settlements">Settlements</button>' +
@@ -70,16 +75,16 @@ const Invoices = {
       '<div class="fury-flex-between fury-mb-3" style="flex-wrap: wrap; gap: 12px;">' +
       '<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">' +
       '<label class="fury-text-sm" style="color: var(--fury-text-secondary); font-weight: 500;">Period:</label>' +
-      '<select class="fury-select" id="inv-month" style="width: 140px;">' + monthOptions + '</select>' +
-      '<select class="fury-select" id="inv-year" style="width: 100px;">' + yearOptions + '</select>' +
-      '<select class="fury-select" id="inv-status" style="width: 130px;">' +
+      '<select class="fury-select" id="inv-month" aria-label="Month" style="width: 140px;">' + monthOptions + '</select>' +
+      '<select class="fury-select" id="inv-year" aria-label="Year" style="width: 100px;">' + yearOptions + '</select>' +
+      '<select class="fury-select" id="inv-status" aria-label="Filter by status" style="width: 130px;">' +
       '<option value="all"' + (this.statusFilter === 'all' ? ' selected' : '') + '>All Status</option>' +
       '<option value="draft"' + (this.statusFilter === 'draft' ? ' selected' : '') + '>Draft</option>' +
       '<option value="generated"' + (this.statusFilter === 'generated' ? ' selected' : '') + '>Generated</option>' +
       '<option value="sent"' + (this.statusFilter === 'sent' ? ' selected' : '') + '>Sent</option>' +
       '<option value="paid"' + (this.statusFilter === 'paid' ? ' selected' : '') + '>Paid</option>' +
       '</select>' +
-      '<select class="fury-select" id="inv-employee" style="width: 170px;">' +
+      '<select class="fury-select" id="inv-employee" aria-label="Filter by employee" style="width: 170px;">' +
       '<option value="all">All Employees</option>' +
       '</select>' +
       '</div>' +
@@ -103,18 +108,18 @@ const Invoices = {
       '<table class="fury-table" id="inv-table">' +
       '<thead>' +
       '<tr>' +
-      '<th style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all" title="Select all"></th>' +
-      '<th>Employee</th>' +
-      '<th>Invoice #</th>' +
-      '<th>Date</th>' +
-      '<th style="text-align: center;">Items</th>' +
-      '<th style="text-align: right;">Total</th>' +
-      '<th style="text-align: center;">Status</th>' +
-      '<th style="text-align: center;">Actions</th>' +
+      '<th scope="col" style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all" title="Select all" aria-label="Select all invoices"></th>' +
+      '<th scope="col">Employee</th>' +
+      '<th scope="col">Invoice #</th>' +
+      '<th scope="col">Date</th>' +
+      '<th scope="col" style="text-align: center;">Items</th>' +
+      '<th scope="col" style="text-align: right;">Total</th>' +
+      '<th scope="col" style="text-align: center;">Status</th>' +
+      '<th scope="col" style="text-align: center;">Actions</th>' +
       '</tr>' +
       '</thead>' +
       '<tbody id="inv-tbody">' +
-      '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--fury-text-muted);">Loading invoices...</td></tr>' +
+      '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--fury-text-muted);">Loading...</td></tr>' +
       '</tbody>' +
       '</table>' +
       '</div>' +
@@ -128,12 +133,12 @@ const Invoices = {
       '<table class="fury-table">' +
       '<thead>' +
       '<tr>' +
-      '<th style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all-pending" title="Select all pending"></th>' +
-      '<th>Employee</th>' +
-      '<th style="text-align: right;">Hours</th>' +
-      '<th style="text-align: right;">Rate (USD)</th>' +
-      '<th style="text-align: right;">Est. Amount</th>' +
-      '<th style="text-align: center;">Action</th>' +
+      '<th scope="col" style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all-pending" title="Select all pending" aria-label="Select all pending employees"></th>' +
+      '<th scope="col">Employee</th>' +
+      '<th scope="col" style="text-align: right;">Hours</th>' +
+      '<th scope="col" style="text-align: right;">Rate (USD)</th>' +
+      '<th scope="col" style="text-align: right;">Est. Amount</th>' +
+      '<th scope="col" style="text-align: center;">Action</th>' +
       '</tr>' +
       '</thead>' +
       '<tbody id="inv-pending-tbody"></tbody>' +
@@ -151,89 +156,88 @@ const Invoices = {
      LOAD DATA
      ═══════════════════════════════════════════════════════ */
   async loadData(ctx) {
+    var self = this;
     try {
       var role = ctx.role || App.role;
       var user = ctx.user || App.user;
 
-      // Load employees (filtered for leads)
+      // Load employees (filtered for leads) — must complete first
       var empResult;
       if (role === 'admin') {
         empResult = await DB.getEmployees();
       } else {
         empResult = await DB.getTeamEmployees(user.email);
       }
-      this.employees = (empResult && empResult.data) ? empResult.data : [];
+      self.employees = (empResult && empResult.data) ? empResult.data : [];
 
-      // Load invoices for selected month/year
-      var invFilters = { month: this.month, year: this.year };
-      if (this.statusFilter !== 'all') {
-        invFilters.status = this.statusFilter;
+      // Parallel load: invoices, timesheets, projects, settings, config
+      var invFilters = { month: self.month, year: self.year };
+      if (self.statusFilter !== 'all') invFilters.status = self.statusFilter;
+      if (self.employeeFilter !== 'all') invFilters.employee_id = self.employeeFilter;
+
+      var parallel = await Promise.all([
+        DB.getInvoices(invFilters),
+        DB.getTimesheets(self.month, self.year),
+        DB.getProjects(),
+        DB.getSetting('billed_to'),
+        DB.getSetting('invoice_terms'),
+        DB.getSetting('uah_usd_rate'),
+        DB.getSetting('working_hours_adjustment').catch(function () { return null; }),
+        DB.getWorkingHoursConfig(self.month, self.year).catch(function () { return null; })
+      ]);
+
+      self.invoices = (parallel[0] && parallel[0].data) ? parallel[0].data : [];
+
+      // Build timesheetMap from full timesheets (replaces separate getTimesheetSummary call)
+      self.timesheets = (parallel[1] && parallel[1].data) || [];
+      self.timesheetMap = {};
+      for (var t = 0; t < self.timesheets.length; t++) {
+        var ts = self.timesheets[t];
+        if (!self.timesheetMap[ts.employee_id]) {
+          self.timesheetMap[ts.employee_id] = { employee_id: ts.employee_id, total_hours: 0 };
+        }
+        self.timesheetMap[ts.employee_id].total_hours += parseFloat(ts.hours) || 0;
       }
-      if (this.employeeFilter !== 'all') {
-        invFilters.employee_id = this.employeeFilter;
-      }
-      var invResult = await DB.getInvoices(invFilters);
-      this.invoices = (invResult && invResult.data) ? invResult.data : [];
 
-      // Load timesheet summary to know hours per employee
-      var tsResult = await DB.getTimesheetSummary(this.month, this.year);
-      var tsSummary = (tsResult && tsResult.data) ? tsResult.data : [];
-      this.timesheetMap = {};
-      for (var t = 0; t < tsSummary.length; t++) {
-        this.timesheetMap[tsSummary[t].employee_id] = tsSummary[t];
-      }
+      self.projects = (parallel[2] && parallel[2].data) || [];
 
-      // Load billedTo setting
-      var btResult = await DB.getSetting('billed_to');
-      this.billedTo = (btResult && btResult.data) ? btResult.data : { name: '', address: '' };
+      var btResult = parallel[3];
+      self.billedTo = (btResult && btResult.data) ? btResult.data : { name: '', address: '' };
 
-      // Load default terms
-      var termsResult = await DB.getSetting('invoice_terms');
-      this.defaultTerms = (termsResult && termsResult.data) ? termsResult.data : 'Payment is due within 15 days of invoice date.';
+      var termsResult = parallel[4];
+      self.defaultTerms = (termsResult && termsResult.data) ? termsResult.data : 'Payment is due within 15 days of invoice date.';
 
-      // Load timesheets + projects for Summary/Settlements tabs
-      var tsFullResult = await DB.getTimesheets(this.month, this.year);
-      this.timesheets = (tsFullResult && tsFullResult.data) || [];
-
-      var projResult = await DB.getProjects();
-      this.projects = (projResult && projResult.data) || [];
-
-      // Exchange rate
-      var rateResult = await DB.getSetting('uah_usd_rate');
+      var rateResult = parallel[5];
       if (rateResult && rateResult.data) {
-        var rateData = typeof rateResult.data === 'string' ? JSON.parse(rateResult.data) : rateResult.data;
-        if (rateData.rate) this.exchangeRate = parseFloat(rateData.rate) || 42.16;
+        try {
+          var rateData = typeof rateResult.data === 'string' ? JSON.parse(rateResult.data) : rateResult.data;
+          if (rateData && rateData.rate) self.exchangeRate = parseFloat(rateData.rate) || 42.16;
+        } catch (e) { /* keep default exchangeRate */ }
       }
 
-      // Hours adjustment
-      try {
-        var adjResult = await DB.getSetting('working_hours_adjustment');
-        if (adjResult && adjResult.data) {
+      var adjResult = parallel[6];
+      if (adjResult && adjResult.data) {
+        try {
           var adjData = typeof adjResult.data === 'string' ? JSON.parse(adjResult.data) : adjResult.data;
-          if (adjData.subtract_hours) this.hoursAdjustment = parseInt(adjData.subtract_hours) || 0;
-        }
-      } catch (e) { /* default 0 */ }
+          if (adjData.subtract_hours) self.hoursAdjustment = parseInt(adjData.subtract_hours) || 0;
+        } catch (e) { /* default 0 */ }
+      }
 
-      // Working hours config for the month
-      try {
-        var whResult = await DB.getWorkingHoursConfig(this.month, this.year);
-        if (whResult && whResult.data) {
-          this.workingDays = whResult.data.working_days || 21;
-          this.hoursPerDay = whResult.data.hours_per_day || 8;
-        } else {
-          this.workingDays = 21;
-          this.hoursPerDay = 8;
-        }
-      } catch (e) {
-        this.workingDays = 21;
-        this.hoursPerDay = 8;
+      var whResult = parallel[7];
+      if (whResult && whResult.data) {
+        self.workingDays = whResult.data.working_days || 21;
+        self.hoursPerDay = whResult.data.hours_per_day || 8;
+      } else {
+        self.workingDays = 21;
+        self.hoursPerDay = 8;
       }
 
     } catch (err) {
       console.error('[Invoices] loadData error:', err);
-      this.employees = [];
-      this.invoices = [];
-      this.timesheetMap = {};
+      showToast('Failed to load invoice data. Please refresh.', 'error');
+      self.employees = [];
+      self.invoices = [];
+      self.timesheetMap = {};
     }
   },
 
@@ -318,9 +322,9 @@ const Invoices = {
       '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-export-summary">Export .xlsx</button>' +
       '</div>' +
       '<div style="overflow-x:auto"><table class="fury-table"><thead><tr>' +
-      '<th style="width:40px">#</th><th>Employee</th><th>Invoice #</th><th>Date</th>' +
-      '<th style="text-align:right">Subtotal ($)</th><th style="text-align:right">Discount ($)</th>' +
-      '<th style="text-align:right">Total ($)</th><th style="text-align:center">Status</th>' +
+      '<th scope="col" style="width:40px">#</th><th scope="col">Employee</th><th scope="col">Invoice #</th><th scope="col">Date</th>' +
+      '<th scope="col" style="text-align:right">Subtotal ($)</th><th scope="col" style="text-align:right">Discount ($)</th>' +
+      '<th scope="col" style="text-align:right">Total ($)</th><th scope="col" style="text-align:center">Status</th>' +
       '</tr></thead><tbody>';
 
     if (invoices.length === 0) {
@@ -340,13 +344,13 @@ const Invoices = {
 
         tableHtml +=
           '<tr><td style="color:var(--fury-text-muted)">' + (r + 1) + '</td>' +
-          '<td style="font-weight:500">' + self._escHtml(empName) + '</td>' +
-          '<td><span class="fury-badge fury-badge-info">' + self._escHtml(invNum) + '</span></td>' +
-          '<td style="color:var(--fury-text-secondary)">' + self._escHtml(inv.invoice_date ? self._formatDate(inv.invoice_date) : '') + '</td>' +
+          '<td style="font-weight:500">' + self._escapeHtml(empName) + '</td>' +
+          '<td><span class="fury-badge fury-badge-info">' + self._escapeHtml(invNum) + '</span></td>' +
+          '<td style="color:var(--fury-text-secondary)">' + self._escapeHtml(inv.invoice_date ? self._formatDate(inv.invoice_date) : '') + '</td>' +
           '<td style="text-align:right;font-variant-numeric:tabular-nums">' + self._formatCurrency(subtotal) + '</td>' +
           '<td style="text-align:right;color:var(--fury-text-secondary)">' + (discount > 0 ? '-' + self._formatCurrency(discount) : '$0.00') + '</td>' +
           '<td style="text-align:right;font-weight:600">' + self._formatCurrency(invTotal) + '</td>' +
-          '<td style="text-align:center">' + self._statusBadgeHtml(inv.status || 'draft') + '</td></tr>';
+          '<td style="text-align:center">' + self._statusBadge(inv.status || 'draft') + '</td></tr>';
       }
       // Grand total
       tableHtml +=
@@ -400,12 +404,12 @@ const Invoices = {
       // Build table
       var projHeaders = '';
       for (var phi = 0; phi < activeProjectCodes.length; phi++) {
-        projHeaders += '<th style="text-align:right;font-size:10px">' + activeProjectCodes[phi] + '</th>';
+        projHeaders += '<th scope="col" style="text-align:right;font-size:10px">' + self._escapeHtml(activeProjectCodes[phi]) + '</th>';
       }
       var compHeaders = '';
       for (var chi = 0; chi < companies.length; chi++) {
-        compHeaders += '<th style="text-align:right;font-size:10px;background:rgba(0,212,255,0.05)">' +
-          self._escHtml(Settlements.getCompanyLabel(companies[chi])) + '</th>';
+        compHeaders += '<th scope="col" style="text-align:right;font-size:10px;background:rgba(0,212,255,0.05)">' +
+          self._escapeHtml(Settlements.getCompanyLabel(companies[chi])) + '</th>';
       }
 
       // Mapping chips
@@ -417,7 +421,7 @@ const Invoices = {
         var chip = chips[ci];
         var bgC = chip.company === 'WS' ? 'rgba(0,212,255,0.1)' : chip.company === 'OMD' ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.1)';
         var txC = chip.company === 'WS' ? 'var(--fury-accent)' : chip.company === 'OMD' ? 'var(--fury-warning)' : '#A78BFA';
-        chipsHtml += '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:var(--fury-radius-full);font-size:12px;font-weight:500;background:' + bgC + ';color:' + txC + '">' + chip.code + ' &rarr; ' + self._escHtml(chip.label) + '</span>';
+        chipsHtml += '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:var(--fury-radius-full);font-size:12px;font-weight:500;background:' + bgC + ';color:' + txC + '">' + self._escapeHtml(chip.code) + ' &rarr; ' + self._escapeHtml(chip.label) + '</span>';
       }
       chipsHtml += '</div></div>';
 
@@ -428,7 +432,7 @@ const Invoices = {
         '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-export-settlements">Export .xlsx</button>' +
         '</div>' +
         '<div style="overflow-x:auto"><table class="fury-table" style="font-size:13px"><thead><tr>' +
-        '<th>Employee</th><th style="text-align:right">Total Paid</th><th style="text-align:right">Hours</th>' +
+        '<th scope="col">Employee</th><th scope="col" style="text-align:right">Total Paid</th><th scope="col" style="text-align:right">Hours</th>' +
         projHeaders + compHeaders +
         '</tr></thead><tbody>';
 
@@ -449,7 +453,7 @@ const Invoices = {
             compCells += '<td style="text-align:right;font-weight:600;background:rgba(0,212,255,0.03)">' +
               (cc > 0 ? self._formatCurrency(cc) : '-') + '</td>';
           }
-          tableHtml += '<tr><td style="font-weight:500">' + self._escHtml(row.employee.name) + '</td>' +
+          tableHtml += '<tr><td style="font-weight:500">' + self._escapeHtml(row.employee.name) + '</td>' +
             '<td style="text-align:right;font-weight:600">' + self._formatCurrency(row.totalPaid) + '</td>' +
             '<td style="text-align:right;color:var(--fury-text-secondary)">' + row.totalHours.toFixed(1) + '</td>' +
             projCells + compCells + '</tr>';
@@ -482,7 +486,7 @@ const Invoices = {
           var cTotal = companyTotals[cCode] || 0;
           var cPct = grandTotal > 0 ? ((cTotal / grandTotal) * 100).toFixed(1) : '0.0';
           cardsHtml += '<div class="fury-card"><h4 style="font-size:12px;font-weight:600;text-transform:uppercase;color:var(--fury-text-secondary);margin-bottom:8px">' +
-            self._escHtml(cLabel) + '</h4><div class="fury-kpi-value" style="font-size:24px;margin-bottom:4px">' + self._formatCurrency(cTotal) + '</div>' +
+            self._escapeHtml(cLabel) + '</h4><div class="fury-kpi-value" style="font-size:24px;margin-bottom:4px">' + self._formatCurrency(cTotal) + '</div>' +
             '<div style="font-size:12px;color:var(--fury-text-muted)">' + cPct + '% of total</div></div>';
         }
         cardsHtml += '</div>';
@@ -493,7 +497,7 @@ const Invoices = {
         for (var nsi = 0; nsi < companies.length; nsi++) {
           if (companies[nsi] === 'WS') continue;
           cardsHtml += '<div style="padding:16px;border:1px solid var(--fury-border);border-radius:var(--fury-radius);background:var(--fury-elevated)">' +
-            '<div style="font-size:12px;color:var(--fury-text-secondary);margin-bottom:4px">' + self._escHtml(Settlements.getCompanyLabel(companies[nsi])) + ' owes WS</div>' +
+            '<div style="font-size:12px;color:var(--fury-text-secondary);margin-bottom:4px">' + self._escapeHtml(Settlements.getCompanyLabel(companies[nsi])) + ' owes WS</div>' +
             '<div style="font-size:22px;font-weight:700;color:var(--fury-success)">' + self._formatCurrency(companyTotals[companies[nsi]] || 0) + '</div></div>';
         }
         cardsHtml += '</div></div>';
@@ -517,19 +521,6 @@ const Invoices = {
   /* ── Summary/Settlements helpers ── */
   _kpiCard(label, value, extraClass) {
     return '<div class="fury-kpi ' + (extraClass || '') + '"><span class="fury-kpi-value">' + value + '</span><span class="fury-kpi-label">' + label + '</span></div>';
-  },
-  _formatCurrency(amount) {
-    if (amount == null || isNaN(amount)) return '$0.00';
-    return '$' + Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  },
-  _escHtml(str) {
-    if (!str) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  },
-  _statusBadgeHtml(status) {
-    var m = { draft: 'neutral', generated: 'info', sent: 'warning', paid: 'success' };
-    var l = { draft: 'Draft', generated: 'Generated', sent: 'Sent', paid: 'Paid' };
-    return '<span class="fury-badge fury-badge-' + (m[status] || 'neutral') + '">' + (l[status] || 'Draft') + '</span>';
   },
   _exportSummaryXlsx() {
     var self = this;
@@ -555,7 +546,7 @@ const Invoices = {
       var ws = XLSX.utils.aoa_to_sheet(wsData);
       XLSX.utils.book_append_sheet(wb, ws, self.MONTH_NAMES[self.month - 1] + ' ' + self.year);
       XLSX.writeFile(wb, 'Invoice_Summary_' + self.year + '-' + String(self.month).padStart(2, '0') + '.xlsx');
-      showToast('Exported!', 'success');
+      showToast('Exported', 'success');
     } catch (err) { console.error('[Invoices] export error:', err); showToast('Export failed. Please try again.', 'error'); }
   },
   MONTH_NAMES: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
@@ -568,7 +559,7 @@ const Invoices = {
       var wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), 'Settlements');
       XLSX.writeFile(wb, 'Settlements_' + this.year + '-' + String(this.month).padStart(2, '0') + '.xlsx');
-      showToast('Exported!', 'success');
+      showToast('Exported', 'success');
     } catch (err) { console.error('[Invoices] settlements export error:', err); showToast('Export failed. Please try again.', 'error'); }
   },
 
@@ -607,7 +598,7 @@ const Invoices = {
     if (this.invoices.length === 0) {
       tbody.innerHTML =
         '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--fury-text-muted);">' +
-        'No invoices found for the selected period.' +
+        'No invoices for this period.' +
         '</td></tr>';
       return;
     }
@@ -620,7 +611,7 @@ const Invoices = {
       var items = inv.invoice_items || [];
       var itemCount = items.length;
       var total = inv.total_usd != null ? inv.total_usd : (inv.total != null ? inv.total : 0);
-      var invNumber = inv.invoice_number || '—';
+      var invNumber = inv.invoice_number != null ? String(inv.invoice_number) : '—';
       var invDate = inv.invoice_date ? this._formatDate(inv.invoice_date) : '—';
       var status = inv.status || 'draft';
 
@@ -640,11 +631,11 @@ const Invoices = {
         '<td style="text-align: center; white-space: nowrap;">' +
         '<div style="display: inline-flex; gap: 4px;">' +
         '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-preview" ' +
-        'data-invoice-id="' + inv.id + '" title="Preview">' +
+        'data-invoice-id="' + inv.id + '" title="Preview" aria-label="Preview invoice">' +
         '&#x1F441;' +
         '</button>' +
         '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-download" ' +
-        'data-invoice-id="' + inv.id + '" title="Save PDF">' +
+        'data-invoice-id="' + inv.id + '" title="Save PDF" aria-label="Download PDF">' +
         '&#x2B07;' +
         '</button>' +
         '<select class="fury-select inv-act-status" ' +
@@ -657,7 +648,7 @@ const Invoices = {
         '</select>' +
         (App.role === 'admin' ?
           '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-delete" ' +
-          'data-invoice-id="' + inv.id + '" title="Delete Invoice" style="color:var(--fury-danger)">' +
+          'data-invoice-id="' + inv.id + '" title="Delete Invoice" aria-label="Delete invoice" style="color:var(--fury-danger)">' +
           '&#x1F5D1;' +
           '</button>'
           : '') +
@@ -942,6 +933,8 @@ const Invoices = {
       pendingTbody.addEventListener('click', function (e) {
         var genBtn = e.target.closest('.inv-act-generate');
         if (genBtn) {
+          if (genBtn.disabled) return;
+          genBtn.disabled = true;
           var empId = genBtn.getAttribute('data-employee-id');
           var empName = genBtn.getAttribute('data-employee-name');
           self._handleGenerate(empId, empName, container, ctx);
@@ -954,17 +947,35 @@ const Invoices = {
      RELOAD DATA
      ═══════════════════════════════════════════════════════ */
   async _reload(container, ctx) {
-    var tbody = container.querySelector('#inv-tbody');
-    if (tbody) {
-      tbody.innerHTML =
-        '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--fury-text-muted);">' +
-        'Loading invoices...</td></tr>';
-    }
-    var pendingSection = container.querySelector('#inv-pending-section');
-    if (pendingSection) pendingSection.style.display = 'none';
+    if (this._reloading) return;
+    this._reloading = true;
+    // Sync period to shared App state
+    App.month = this.month;
+    App.year = this.year;
+    try {
+      var tbody = container.querySelector('#inv-tbody');
+      if (tbody) {
+        tbody.innerHTML =
+          '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--fury-text-muted);">' +
+          'Loading...</td></tr>';
+      }
+      var pendingSection = container.querySelector('#inv-pending-section');
+      if (pendingSection) pendingSection.style.display = 'none';
 
-    await this.loadData(ctx);
-    await this.renderActiveTab(container);
+      await this.loadData(ctx);
+      await this.renderActiveTab(container);
+
+      // Reset select-all checkboxes after reload
+      var selAll = container.querySelector('#inv-select-all');
+      if (selAll) selAll.checked = false;
+      var selAllPend = container.querySelector('#inv-select-all-pending');
+      if (selAllPend) selAllPend.checked = false;
+    } catch (err) {
+      console.error('[Invoices] reload error:', err);
+      showToast('Failed to reload data. Please try again.', 'error');
+    } finally {
+      this._reloading = false;
+    }
   },
 
   /* ═══════════════════════════════════════════════════════
@@ -1005,25 +1016,42 @@ const Invoices = {
   /* ── Status change ── */
   async _handleStatusChange(invoiceId, newStatus, container, ctx) {
     var target = container.querySelector('.inv-act-status[data-invoice-id="' + invoiceId + '"]');
+    var prevStatus = newStatus;
+    for (var s = 0; s < this.invoices.length; s++) {
+      if (this.invoices[s].id === invoiceId) {
+        prevStatus = this.invoices[s].status || 'draft';
+        break;
+      }
+    }
+    if (newStatus === prevStatus) return;
+
+    // Validate status transitions (forward-only for non-admins)
+    var validForward = { 'draft': ['generated', 'sent'], 'generated': ['sent'], 'sent': ['paid'], 'paid': [] };
+    var allowed = (validForward[prevStatus] || []).slice();
+    if (App.role === 'admin') {
+      allowed = ['draft', 'generated', 'sent', 'paid'];
+    }
+    if (allowed.indexOf(newStatus) === -1) {
+      showToast('Invalid transition: ' + prevStatus + ' -> ' + newStatus, 'error');
+      if (target) target.value = prevStatus;
+      return;
+    }
+
     if (target) target.disabled = true;
     try {
       var result = await DB.updateInvoiceStatus(invoiceId, newStatus);
       if (!result || result.error) {
         console.error('[Invoices] Status change error:', result.error);
         showToast('Failed to update status. Please try again.', 'error');
+        if (target) target.value = prevStatus;
         return;
       }
-      // Update local data
-      for (var i = 0; i < this.invoices.length; i++) {
-        if (this.invoices[i].id === invoiceId) {
-          this.invoices[i].status = newStatus;
-          break;
-        }
-      }
-      this.updateTable(container);
+      // Full reload to keep summary/settlements tabs in sync
+      await this._reload(container, ctx);
     } catch (err) {
       console.error('[Invoices] Status change error:', err);
       showToast('Failed to update status. Please try again.', 'error');
+      if (target) target.value = prevStatus;
     } finally {
       if (target) target.disabled = false;
     }
@@ -1036,11 +1064,17 @@ const Invoices = {
       showToast('Employee not found', 'error');
       return;
     }
-    this.showGenerateModal(emp, container, ctx);
+    // Re-enable the pending row button in case modal is closed without action
+    var pendingBtn = container.querySelector('.inv-act-generate[data-employee-id="' + employeeId + '"]');
+    this.showGenerateModal(emp, container, ctx, function () {
+      if (pendingBtn) pendingBtn.disabled = false;
+    });
   },
 
   /* ── Generate for selected pending employees ── */
   async _handleGenerateSelected(container, ctx) {
+    if (this._generating) return;
+
     var checks = container.querySelectorAll('.inv-pending-check:checked');
     if (checks.length === 0) {
       showToast('Please select at least one pending employee', 'error');
@@ -1052,28 +1086,45 @@ const Invoices = {
       ids.push(checks[i].getAttribute('data-employee-id'));
     }
 
-    if (!confirm('Generate invoices for ' + ids.length + ' employee(s)?')) return;
-
+    // Two-click confirmation on generate button
     var btn = container.querySelector('#btn-generate-selected');
+    if (btn && !btn.dataset.confirmPending) {
+      btn.dataset.confirmPending = '1';
+      btn.textContent = 'Click again to confirm (' + ids.length + ')';
+      setTimeout(function () {
+        if (btn.dataset.confirmPending) {
+          delete btn.dataset.confirmPending;
+          btn.textContent = 'Generate Selected';
+        }
+      }, 3000);
+      return;
+    }
+    if (btn) delete btn.dataset.confirmPending;
+
+    this._generating = true;
     if (btn) {
       btn.disabled = true;
       btn.textContent = 'Generating...';
     }
 
     var errors = [];
+    var successCount = 0;
     for (var j = 0; j < ids.length; j++) {
       var emp = this._findEmployee(ids[j]);
       if (!emp) continue;
       try {
         await this._autoGenerateInvoice(emp, ctx);
+        successCount++;
       } catch (err) {
         var eName = emp.full_name_lat || emp.name || 'Unknown';
-        errors.push(eName + ': generation failed');
+        errors.push(eName + ': ' + (err.message || 'generation failed'));
       }
     }
 
     if (errors.length > 0) {
-      showToast('Some invoices failed to generate', 'error');
+      showToast(errors.length + ' of ' + ids.length + ' invoices failed to generate', 'error');
+    } else if (successCount > 0) {
+      showToast(successCount + ' invoice(s) generated', 'success');
     }
 
     if (btn) {
@@ -1081,6 +1132,7 @@ const Invoices = {
       btn.textContent = 'Generate Selected';
     }
 
+    this._generating = false;
     await this._reload(container, ctx);
   },
 
@@ -1096,7 +1148,7 @@ const Invoices = {
     if (btn && !btn.dataset.confirmPending) {
       btn.dataset.confirmPending = '1';
       btn.textContent = 'Click again to confirm (' + checks.length + ')';
-      setTimeout(function () {
+      btn._confirmTimer = setTimeout(function () {
         if (btn.dataset.confirmPending) {
           delete btn.dataset.confirmPending;
           btn.textContent = 'Delete Selected';
@@ -1105,6 +1157,7 @@ const Invoices = {
       return;
     }
     if (btn) {
+      if (btn._confirmTimer) { clearTimeout(btn._confirmTimer); btn._confirmTimer = null; }
       delete btn.dataset.confirmPending;
       btn.disabled = true;
       btn.textContent = 'Deleting...';
@@ -1120,12 +1173,12 @@ const Invoices = {
         if (result && result.error) throw new Error(result.error.message);
         deletedCount++;
       } catch (err) {
-        errors.push(id + ': deletion failed');
+        errors.push(id + ': ' + (err.message || 'deletion failed'));
       }
     }
 
     if (errors.length > 0) {
-      showToast('Some deletions failed', 'error');
+      showToast(errors.length + ' of ' + checks.length + ' deletions failed', 'error');
     } else if (deletedCount > 0) {
       showToast(deletedCount + ' invoice(s) deleted', 'success');
     }
@@ -1140,13 +1193,23 @@ const Invoices = {
 
   /* ── Batch download ── */
   _handleBatchDownload: async function (container, ctx) {
+    var dlBtn = container.querySelector('#btn-batch-download');
+    if (dlBtn) {
+      dlBtn.disabled = true;
+      dlBtn.textContent = 'Downloading...';
+    }
     try {
+      if (this.invoices.length === 0) {
+        showToast('No invoices to download', 'error');
+        return;
+      }
       if (typeof InvoiceDocx !== 'undefined' && InvoiceDocx.downloadBatch) {
         var allData = [];
         for (var i = 0; i < this.invoices.length; i++) {
           allData.push(this._buildPreviewData(this.invoices[i]));
         }
         await InvoiceDocx.downloadBatch(allData);
+        showToast(allData.length + ' invoice(s) downloaded', 'success');
       } else {
         for (var j = 0; j < this.invoices.length; j++) {
           await this._handleDownload(this.invoices[j].id);
@@ -1155,13 +1218,18 @@ const Invoices = {
     } catch (err) {
       console.error('[Invoices] batch download error:', err);
       showToast('Batch download failed. Please try again.', 'error');
+    } finally {
+      if (dlBtn) {
+        dlBtn.disabled = false;
+        dlBtn.textContent = 'Download All DOCX';
+      }
     }
   },
 
   /* ═══════════════════════════════════════════════════════
      GENERATE MODAL
      ═══════════════════════════════════════════════════════ */
-  showGenerateModal: function (employee, container, ctx) {
+  showGenerateModal: function (employee, container, ctx, onCloseCallback) {
     var self = this;
     var empName = employee.full_name_lat || employee.name || 'Unknown';
     var rate = employee.rate_usd || employee.hourly_rate || 0;
@@ -1285,17 +1353,22 @@ const Invoices = {
     // ── Modal event bindings ──
 
     // Close
+    var self = this;
     var escHandler = function (e) {
       if (e.key === 'Escape') {
         document.removeEventListener('keydown', escHandler);
+        self._modalEscHandler = null;
         closeModal();
       }
     };
+    this._modalEscHandler = escHandler;
     var closeModal = function () {
       document.removeEventListener('keydown', escHandler);
+      self._modalEscHandler = null;
       document.body.classList.remove('fury-modal-open');
       overlay.classList.remove('active');
       setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 260);
+      if (typeof onCloseCallback === 'function') onCloseCallback();
     };
     document.addEventListener('keydown', escHandler);
 
@@ -1565,11 +1638,13 @@ const Invoices = {
       return null;
     }
 
+    // Disable all footer buttons to prevent double-click
     var saveBtn = overlay.querySelector('#gen-save-draft');
-    if (saveBtn) {
-      saveBtn.disabled = true;
-      saveBtn.textContent = 'Saving...';
-    }
+    var dlBtn = overlay.querySelector('#gen-download');
+    var prevBtn = overlay.querySelector('#gen-preview');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+    if (dlBtn) dlBtn.disabled = true;
+    if (prevBtn) prevBtn.disabled = true;
 
     try {
       var invoicePayload = {
@@ -1604,7 +1679,7 @@ const Invoices = {
       }
 
       if (closeCallback) closeCallback();
-      showToast('Invoice saved!', 'success');
+      showToast('Invoice saved', 'success');
       await this._reload(container, ctx);
       return result.data;
     } catch (err) {
@@ -1612,10 +1687,9 @@ const Invoices = {
       showToast('Failed to save invoice. Please try again.', 'error');
       return null;
     } finally {
-      if (saveBtn) {
-        saveBtn.disabled = false;
-        saveBtn.textContent = 'Save Draft';
-      }
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Draft'; }
+      if (dlBtn) dlBtn.disabled = false;
+      if (prevBtn) prevBtn.disabled = false;
     }
   },
 
@@ -1630,10 +1704,11 @@ const Invoices = {
     }
 
     var dlBtn = overlay.querySelector('#gen-download');
-    if (dlBtn) {
-      dlBtn.disabled = true;
-      dlBtn.textContent = 'Generating...';
-    }
+    var saveBtn2 = overlay.querySelector('#gen-save-draft');
+    var prevBtn2 = overlay.querySelector('#gen-preview');
+    if (dlBtn) { dlBtn.disabled = true; dlBtn.textContent = 'Generating...'; }
+    if (saveBtn2) saveBtn2.disabled = true;
+    if (prevBtn2) prevBtn2.disabled = true;
 
     try {
       // Fetch full employee data (with bank details) for preview/PDF
@@ -1706,10 +1781,9 @@ const Invoices = {
       console.error('[Invoices] Generate & download error:', err);
       showToast('Failed to generate invoice. Please try again.', 'error');
     } finally {
-      if (dlBtn) {
-        dlBtn.disabled = false;
-        dlBtn.textContent = 'Generate & Save PDF';
-      }
+      if (dlBtn) { dlBtn.disabled = false; dlBtn.textContent = 'Generate & Save PDF'; }
+      if (saveBtn2) saveBtn2.disabled = false;
+      if (prevBtn2) prevBtn2.disabled = false;
     }
   },
 
@@ -1913,12 +1987,19 @@ const Invoices = {
     if (!str) return '';
     return String(str)
       .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
   },
 
   /* ── Cleanup on page leave ── */
   destroy() {
+    // Remove leaked document-level keydown handler from modal
+    if (this._modalEscHandler) {
+      document.removeEventListener('keydown', this._modalEscHandler);
+      this._modalEscHandler = null;
+    }
     // Remove any generate modal overlays left in document.body
     var overlays = document.querySelectorAll('.invoice-generate-overlay, .invoice-preview-overlay');
     for (var i = 0; i < overlays.length; i++) {
@@ -1926,5 +2007,10 @@ const Invoices = {
         overlays[i].remove();
       }
     }
+    // Remove scroll lock in case modal was open
+    document.body.classList.remove('fury-modal-open');
+    // Reset race condition guards
+    this._reloading = false;
+    this._generating = false;
   }
 };

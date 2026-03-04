@@ -8,13 +8,27 @@
   <meta name="theme-color" content="#0D0D0F">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- Open Graph -->
+  <meta property="og:title" content="OMD Finance">
+  <meta property="og:description" content="Invoice & expense management platform for OMD Systems">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="en_US">
+  <!-- Security -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data:; frame-ancestors 'self';">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
   <title>OMD Finance</title>
+  <!-- Google Fonts (moved from @import in fury.css to non-blocking <link>) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
   <link rel="icon" type="image/svg+xml"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='8' fill='%230D0D0F'/><path d='M20 4L35 12.5V27.5L20 36L5 27.5V12.5Z' stroke='%2300D4FF' stroke-width='1.5' fill='rgba(0,212,255,0.08)'/><path d='M20 10L29 15.2V25.8L20 31L11 25.8V15.2Z' stroke='%2300D4FF' stroke-width='1' fill='none' opacity='0.4'/><text x='20' y='23' text-anchor='middle' fill='%2300D4FF' font-family='Inter,sans-serif' font-size='9' font-weight='700' letter-spacing='1'>OMD</text></svg>">
-  <link rel="stylesheet" href="css/fury.css">
-  <link rel="stylesheet" href="css/invoice-print.css">
+  <link rel="apple-touch-icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='36' fill='%230D0D0F'/><text x='90' y='110' text-anchor='middle' fill='%2300D4FF' font-family='sans-serif' font-size='48' font-weight='700'>OMD</text></svg>">
+  <link rel="stylesheet" href="css/fury.css?v=5">
+  <link rel="stylesheet" href="css/invoice-print.css?v=5" media="print">
   <style>
     /* ── Reset & Base ── */
     *,
@@ -470,12 +484,53 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #374151;
     }
+
+    /* ── Skip Navigation ── */
+    .skip-nav {
+      position: absolute;
+      top: -100%;
+      left: 16px;
+      z-index: 9999;
+      padding: 8px 16px;
+      background: #00D4FF;
+      color: #0D0D0F;
+      font-weight: 600;
+      font-size: 14px;
+      border-radius: 0 0 6px 6px;
+      text-decoration: none;
+      transition: top 0.2s;
+    }
+    .skip-nav:focus {
+      top: 0;
+    }
+
+    /* ── Global Focus Visible ── */
+    .nav-item:focus-visible {
+      outline: 2px solid #00D4FF;
+      outline-offset: -2px;
+    }
+
+    .login-btn:focus-visible {
+      outline: 2px solid #00D4FF;
+      outline-offset: 2px;
+    }
+
+    .login-field input:focus-visible {
+      border-color: #00D4FF;
+      box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.15);
+    }
+
+    .sidebar-logout:focus-visible {
+      outline: 2px solid #00D4FF;
+      outline-offset: 2px;
+    }
   </style>
 </head>
 
 <body>
 
-  <div class="fury-toast-container" id="toast-container"></div>
+  <a href="#main-content" class="skip-nav">Skip to main content</a>
+  <div class="fury-toast-container" id="toast-container" aria-live="polite" role="status"></div>
 
   <noscript>
     <div style="background:#0D0D0F;color:#E5E7EB;padding:40px;text-align:center;font-family:sans-serif;">
@@ -488,9 +543,9 @@
 
     <!-- ════════ Login Screen ════════ -->
     <div id="login-screen">
-      <div class="login-card">
+      <div class="login-card" role="form" aria-label="Login form">
         <div class="login-logo">
-          <svg width="56" height="56" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg width="56" height="56" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <path d="M20 4L35 12.5V27.5L20 36L5 27.5V12.5Z" stroke="#00D4FF" stroke-width="1.5"
               fill="rgba(0,212,255,0.06)" />
             <path d="M20 10L29 15.2V25.8L20 31L11 25.8V15.2Z" stroke="#00D4FF" stroke-width="0.8" fill="none"
@@ -502,7 +557,7 @@
           <span class="logo-sub">Finance Platform</span>
         </div>
 
-        <div class="login-error" id="login-error"></div>
+        <div class="login-error" id="login-error" role="alert" aria-live="assertive"></div>
 
         <!-- Step 1: Email -->
         <div class="login-step" id="login-step-email">
@@ -529,13 +584,13 @@
     <div id="main-app" style="display:none">
 
       <!-- Loading Overlay -->
-      <div id="loading-overlay" class="loading-overlay" style="display:none">
+      <div id="loading-overlay" class="loading-overlay" style="display:none" role="status" aria-live="polite" aria-label="Loading">
         <div class="spinner"></div>
       </div>
 
       <!-- Sidebar -->
       <aside id="sidebar">
-        <div class="sidebar-logo">
+        <div class="sidebar-logo" aria-hidden="true">
           <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M20 4L35 12.5V27.5L20 36L5 27.5V12.5Z" stroke="#00D4FF" stroke-width="1.5"
               fill="rgba(0,212,255,0.06)" />
@@ -589,7 +644,7 @@
         <div class="sidebar-bottom">
           <div class="sidebar-avatar" id="sidebar-avatar"></div>
           <div class="sidebar-user-name" id="sidebar-user-name"></div>
-          <button class="sidebar-logout" id="btn-logout" title="Logout"><svg width="16" height="16" viewBox="0 0 24 24"
+          <button class="sidebar-logout" id="btn-logout" title="Logout" aria-label="Logout"><svg width="16" height="16" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <polyline points="16 17 21 12 16 7" />
@@ -601,14 +656,14 @@
       <!-- Content -->
       <main id="content">
         <header id="top-bar">
-          <span id="page-title">Team</span>
+          <h1 id="page-title">Team</h1>
           <div class="top-bar-user">
             <span class="top-bar-user-name" id="top-bar-user-name"></span>
             <span class="role-badge" id="top-bar-role-badge"></span>
           </div>
         </header>
 
-        <div id="main-content">
+        <div id="main-content" role="region" aria-label="Page content">
           <!-- Pages render here -->
         </div>
       </main>
@@ -632,22 +687,22 @@
     crossorigin="anonymous"></script>
 
   <!-- ════════ App Modules ════════ -->
-  <script src="js/config.js"></script>
-  <script src="js/utils.js"></script>
-  <script src="js/validation.js"></script>
-  <script src="js/db.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/services/timesheet-parser.js?v=4"></script>
-  <script src="js/services/numbering.js?v=4"></script>
-  <script src="js/services/invoice-docx.js?v=4"></script>
-  <script src="js/services/invoice-preview.js?v=4"></script>
-  <script src="js/services/settlements.js?v=4"></script>
+  <script src="js/config.js?v=5"></script>
+  <script src="js/utils.js?v=5"></script>
+  <script src="js/validation.js?v=5"></script>
+  <script src="js/db.js?v=5"></script>
+  <script src="js/auth.js?v=5"></script>
+  <script src="js/services/timesheet-parser.js?v=5"></script>
+  <script src="js/services/numbering.js?v=5"></script>
+  <script src="js/services/invoice-docx.js?v=5"></script>
+  <script src="js/services/invoice-preview.js?v=5"></script>
+  <script src="js/services/settlements.js?v=5"></script>
 
-  <script src="js/pages/team.js?v=4"></script>
-  <script src="js/pages/invoices.js?v=4"></script>
-  <script src="js/pages/expenses.js?v=4"></script>
-  <script src="js/pages/settings.js?v=4"></script>
-  <script src="js/app.js?v=4"></script>
+  <script src="js/pages/team.js?v=5"></script>
+  <script src="js/pages/invoices.js?v=5"></script>
+  <script src="js/pages/expenses.js?v=5"></script>
+  <script src="js/pages/settings.js?v=5"></script>
+  <script src="js/app.js?v=5"></script>
 
 </body>
 

@@ -14,8 +14,19 @@ const DB = {
    * @param {string} [key] - Supabase anon/public key (defaults to CONFIG.SUPABASE_ANON_KEY)
    */
   init(url, key) {
+    if (typeof supabase === 'undefined' || typeof supabase.createClient !== 'function') {
+      console.error('[DB] Supabase SDK not loaded. Check CDN script tag.');
+      if (typeof showToast === 'function') {
+        showToast('Failed to load database client. Please refresh.', 'error');
+      }
+      return;
+    }
     const supabaseUrl = url || CONFIG.SUPABASE_URL;
     const supabaseKey = key || CONFIG.SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('[DB] Missing Supabase URL or Key in CONFIG.');
+      return;
+    }
     this.client = supabase.createClient(supabaseUrl, supabaseKey);
   },
 
@@ -91,7 +102,7 @@ const DB = {
     try {
       const { data, error } = await this.client
         .from('employees')
-        .select('id, pin, name, full_name_lat, employee_type, contract_type, is_active, work_email, email, invoice_format, invoice_prefix, next_invoice_number, service_description, rate_usd, address, phone, iban, swift, bank_name, receiver_name, contract_uploaded_at, nda_uploaded_at, created_at, avatar_url')
+        .select('id, pin, name, full_name_lat, employee_type, contract_type, is_active, work_email, email, invoice_format, invoice_prefix, next_invoice_number, service_description, rate_usd, address, phone, iban, swift, bank_name, receiver_name, contract_uploaded_at, nda_uploaded_at, created_at, updated_at, avatar_url')
         .eq('is_active', true)
         .order('name', { ascending: true });
 
@@ -131,19 +142,38 @@ const DB = {
       var allowed = ['id', 'pin', 'name', 'full_name_lat', 'employee_type', 'contract_type',
         'is_active', 'work_email', 'email', 'phone', 'address', 'rate_usd', 'iban', 'swift',
         'bank_name', 'receiver_name', 'invoice_format', 'invoice_prefix', 'next_invoice_number',
-        'service_description'];
+        'service_description', 'avatar_url', 'updated_at'];
       var cleaned = {};
       for (var i = 0; i < allowed.length; i++) {
         if (employeeData[allowed[i]] !== undefined) cleaned[allowed[i]] = employeeData[allowed[i]];
       }
 
-      const { data, error } = await this.client
-        .from('employees')
-        .upsert(cleaned, { onConflict: 'id' })
-        .select()
-        .single();
+      // Coerce numeric fields
+      if (cleaned.rate_usd !== undefined && cleaned.rate_usd !== null) {
+        cleaned.rate_usd = parseFloat(cleaned.rate_usd) || 0;
+      }
+      if (cleaned.next_invoice_number !== undefined && cleaned.next_invoice_number !== null) {
+        cleaned.next_invoice_number = parseInt(cleaned.next_invoice_number) || 1;
+      }
 
-      return { data, error };
+      // If id is present, do update; if not, do insert (avoid upsert with empty/invalid id)
+      if (cleaned.id) {
+        const { data, error } = await this.client
+          .from('employees')
+          .update(cleaned)
+          .eq('id', cleaned.id)
+          .select()
+          .single();
+        return { data, error };
+      } else {
+        delete cleaned.id;
+        const { data, error } = await this.client
+          .from('employees')
+          .insert(cleaned)
+          .select()
+          .single();
+        return { data, error };
+      }
     } catch (err) {
       return { data: null, error: { message: err.message } };
     }
@@ -156,38 +186,31 @@ const DB = {
    */
   async getTeamEmployees(leadEmail) {
     try {
-      // First, find the team for this lead
-      const { data: team, error: teamError } = await this.client
-        .from('teams')
-        .select('id')
-        .eq('lead_email', leadEmail)
-        .single();
-
-      if (teamError) return { data: [], error: teamError };
-
-      // Get employee IDs from team_members
-      const { data: members, error: membersError } = await this.client
+      // Single query: team_members -> employees via join, filtered by lead's team
+      const { data: members, error } = await this.client
         .from('team_members')
-        .select('employee_id')
-        .eq('team_id', team.id);
+        .select(`
+          employee_id,
+          teams!inner ( id, lead_email ),
+          employees!inner (
+            id, pin, name, full_name_lat, employee_type, contract_type, is_active,
+            work_email, email, invoice_format, invoice_prefix, next_invoice_number,
+            service_description, rate_usd, address, phone, iban, swift, bank_name,
+            receiver_name, contract_uploaded_at, nda_uploaded_at, created_at, updated_at, avatar_url
+          )
+        `)
+        .eq('teams.lead_email', leadEmail)
+        .eq('employees.is_active', true);
 
-      if (membersError) return { data: [], error: membersError };
+      if (error) return { data: [], error };
 
-      if (!members || members.length === 0) {
-        return { data: [], error: null };
-      }
+      // Extract employee objects and sort by name
+      var employees = (members || [])
+        .map(function(m) { return m.employees; })
+        .filter(Boolean)
+        .sort(function(a, b) { return (a.name || '').localeCompare(b.name || ''); });
 
-      const employeeIds = members.map(m => m.employee_id);
-
-      // Fetch the actual employee records
-      const { data, error } = await this.client
-        .from('employees')
-        .select('id, pin, name, full_name_lat, employee_type, contract_type, is_active, work_email, email, invoice_format, invoice_prefix, next_invoice_number, service_description, rate_usd, address, phone, iban, swift, bank_name, receiver_name, contract_uploaded_at, nda_uploaded_at, created_at, avatar_url')
-        .in('id', employeeIds)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-
-      return { data: data || [], error };
+      return { data: employees, error: null };
     } catch (err) {
       return { data: [], error: { message: err.message } };
     }
@@ -465,31 +488,31 @@ const DB = {
   },
 
   /**
-   * Delete an existing invoice (Admin only).
+   * Delete an existing invoice (Admin/Lead only).
+   * invoice_items and expenses cascade-delete via FK ON DELETE CASCADE.
    * @param {string} invoiceId
    * @returns {Promise<{data: object|null, error: object|null}>}
    */
   async deleteInvoice(invoiceId) {
     try {
-      // First delete related invoice_items
-      var itemsDel = await this.client
-        .from('invoice_items')
-        .delete()
-        .eq('invoice_id', invoiceId);
-      if (itemsDel.error) {
-        console.warn('[DB] invoice_items delete warning:', itemsDel.error);
-      }
+      if (!invoiceId) return { data: null, error: { message: 'Missing invoiceId' } };
 
-      // Then delete the invoice itself
-      const { error } = await this.client
+      // CASCADE handles invoice_items + expenses automatically
+      const { data, error } = await this.client
         .from('invoices')
         .delete()
-        .eq('id', invoiceId);
+        .eq('id', invoiceId)
+        .select('id')
+        .maybeSingle();
 
       if (error) {
         console.error('[DB] invoice delete error:', error);
+        return { data: null, error };
       }
-      return { data: null, error };
+      if (!data) {
+        return { data: null, error: { message: 'Invoice not found: ' + invoiceId } };
+      }
+      return { data, error: null };
     } catch (err) {
       console.error('[DB] deleteInvoice exception:', err);
       return { data: null, error: { message: err.message } };
@@ -661,13 +684,37 @@ const DB = {
         if (expenseData[allowed[i]] !== undefined) cleaned[allowed[i]] = expenseData[allowed[i]];
       }
 
-      const { data, error } = await this.client
-        .from('expenses')
-        .upsert(cleaned, { onConflict: 'id' })
-        .select()
-        .single();
+      // Coerce numeric fields
+      if (cleaned.amount_uah !== undefined && cleaned.amount_uah !== null) {
+        cleaned.amount_uah = parseFloat(cleaned.amount_uah) || 0;
+      }
+      if (cleaned.amount_usd !== undefined && cleaned.amount_usd !== null) {
+        cleaned.amount_usd = parseFloat(cleaned.amount_usd) || 0;
+      }
+      if (cleaned.exchange_rate !== undefined && cleaned.exchange_rate !== null) {
+        cleaned.exchange_rate = parseFloat(cleaned.exchange_rate) || 0;
+      }
 
-      return { data, error };
+      // Explicit insert vs update to avoid upsert pitfalls with auto-generated UUIDs
+      if (cleaned.id) {
+        const updateData = Object.assign({}, cleaned);
+        delete updateData.id;
+        const { data, error } = await this.client
+          .from('expenses')
+          .update(updateData)
+          .eq('id', cleaned.id)
+          .select()
+          .single();
+        return { data, error };
+      } else {
+        delete cleaned.id;
+        const { data, error } = await this.client
+          .from('expenses')
+          .insert(cleaned)
+          .select()
+          .single();
+        return { data, error };
+      }
     } catch (err) {
       return { data: null, error: { message: err.message } };
     }
@@ -680,13 +727,18 @@ const DB = {
    */
   async deleteExpense(id) {
     try {
+      if (!id) return { data: null, error: { message: 'Expense id is required' } };
+
       const { data, error } = await this.client
         .from('expenses')
         .delete()
         .eq('id', id)
         .select()
-        .single();
+        .maybeSingle();
 
+      if (!error && !data) {
+        return { data: null, error: { message: 'Expense not found: ' + id } };
+      }
       return { data, error };
     } catch (err) {
       return { data: null, error: { message: err.message } };
@@ -725,6 +777,8 @@ const DB = {
    */
   async setSetting(key, value) {
     try {
+      if (!key) return { data: null, error: { message: 'Setting key is required' } };
+
       const { data, error } = await this.client
         .from('settings')
         .upsert(
@@ -777,9 +831,13 @@ const DB = {
       const { data: session } = await this.client.auth.getSession();
       const userId = session?.session?.user?.id;
 
+      // Use upsert to avoid PK violation if already locked
       const { data, error } = await this.client
         .from('month_locks')
-        .insert({ month, year, locked_by: userId })
+        .upsert(
+          { month, year, locked_by: userId, locked_at: new Date().toISOString() },
+          { onConflict: 'month,year' }
+        )
         .select()
         .single();
 
@@ -803,8 +861,11 @@ const DB = {
         .eq('month', month)
         .eq('year', year)
         .select()
-        .single();
+        .maybeSingle();
 
+      if (!error && !data) {
+        return { data: null, error: { message: 'Month ' + month + '/' + year + ' was not locked' } };
+      }
       return { data, error };
     } catch (err) {
       return { data: null, error: { message: err.message } };
@@ -874,23 +935,21 @@ const DB = {
    */
   async generateInvoice(employeeId, month, year) {
     try {
-      // Full select needed — invoice generation requires bank details (iban, swift, bank_name, receiver_name, address, phone)
-      const { data: emp, error: empErr } = await this.client
-        .from('employees')
-        .select('*')
-        .eq('id', employeeId)
-        .single();
+      if (!employeeId || !month || !year) {
+        return { data: null, error: { message: 'employeeId, month, and year are required' } };
+      }
 
+      // Parallel fetch: employee + timesheets + working hours config
+      var [empResult, tsResult, whResult] = await Promise.all([
+        this.client.from('employees').select('*').eq('id', employeeId).single(),
+        this.client.from('timesheets').select('*, projects ( id, name, code )').eq('employee_id', employeeId).eq('month', month).eq('year', year),
+        this.getWorkingHoursConfig(month, year)
+      ]);
+
+      const { data: emp, error: empErr } = empResult;
       if (empErr || !emp) return { data: null, error: empErr || { message: 'Employee not found' } };
 
-      // Get timesheet entries for this employee + period
-      const { data: timesheets, error: tsErr } = await this.client
-        .from('timesheets')
-        .select('*, projects ( id, name, code )')
-        .eq('employee_id', employeeId)
-        .eq('month', month)
-        .eq('year', year);
-
+      const { data: timesheets, error: tsErr } = tsResult;
       if (tsErr) return { data: null, error: tsErr };
 
       // Check for existing invoice (UNIQUE constraint: employee_id, month, year, format_type)
@@ -908,9 +967,8 @@ const DB = {
         return { data: null, error: { message: 'Invoice already exists for this employee/period. Delete the existing invoice first or edit it on the Invoices page.' } };
       }
 
-      // Get working hours configuration to determine standard hours for monthly employees
-      var whRet = await this.getWorkingHoursConfig(month, year);
-      var config = whRet && whRet.data ? whRet.data : null;
+      // Working hours config was fetched in parallel above
+      var config = whResult && whResult.data ? whResult.data : null;
       var expectedHours = config ? (config.working_days || 21) * (config.hours_per_day || 8) : 21 * 8; // default 168 hours
 
       // Calculate total hours and build line items
@@ -990,6 +1048,8 @@ const DB = {
    */
   async uploadContract(employeeId, file) {
     try {
+      if (!employeeId || !file) return { data: null, error: { message: 'employeeId and file are required' } };
+
       var path = employeeId + '/contract.pdf';
       var { data, error } = await this.client.storage
         .from('contracts')
@@ -998,10 +1058,14 @@ const DB = {
       if (error) return { data: null, error };
 
       // Update timestamp on employee
-      await this.client
+      var { error: updateErr } = await this.client
         .from('employees')
         .update({ contract_uploaded_at: new Date().toISOString() })
         .eq('id', employeeId);
+
+      if (updateErr) {
+        console.warn('[DB] contract timestamp update failed:', updateErr);
+      }
 
       return { data, error: null };
     } catch (err) {
@@ -1036,6 +1100,8 @@ const DB = {
    */
   async uploadNda(employeeId, file) {
     try {
+      if (!employeeId || !file) return { data: null, error: { message: 'employeeId and file are required' } };
+
       var path = employeeId + '/nda.pdf';
       var { data, error } = await this.client.storage
         .from('documents')
@@ -1044,10 +1110,14 @@ const DB = {
       if (error) return { data: null, error };
 
       // Update timestamp on employee
-      await this.client
+      var { error: updateErr } = await this.client
         .from('employees')
         .update({ nda_uploaded_at: new Date().toISOString() })
         .eq('id', employeeId);
+
+      if (updateErr) {
+        console.warn('[DB] nda timestamp update failed:', updateErr);
+      }
 
       return { data, error: null };
     } catch (err) {
@@ -1186,9 +1256,26 @@ const DB = {
    */
   async upsertWorkingHoursConfig(config) {
     try {
+      var allowed = ['month', 'year', 'working_days', 'hours_per_day', 'adjustment_hours', 'notes'];
+      var cleaned = {};
+      for (var i = 0; i < allowed.length; i++) {
+        if (config[allowed[i]] !== undefined) cleaned[allowed[i]] = config[allowed[i]];
+      }
+
+      if (!cleaned.month || !cleaned.year || cleaned.working_days === undefined) {
+        return { data: null, error: { message: 'month, year, and working_days are required' } };
+      }
+
+      // Coerce numeric fields
+      cleaned.month = parseInt(cleaned.month);
+      cleaned.year = parseInt(cleaned.year);
+      cleaned.working_days = parseInt(cleaned.working_days);
+      if (cleaned.hours_per_day !== undefined) cleaned.hours_per_day = parseFloat(cleaned.hours_per_day) || 8.0;
+      if (cleaned.adjustment_hours !== undefined) cleaned.adjustment_hours = parseFloat(cleaned.adjustment_hours) || 0;
+
       var { data, error } = await this.client
         .from('working_hours_config')
-        .upsert(config, { onConflict: 'month,year' })
+        .upsert(cleaned, { onConflict: 'month,year' })
         .select()
         .single();
 

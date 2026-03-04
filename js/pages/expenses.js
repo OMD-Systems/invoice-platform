@@ -24,6 +24,9 @@ const Expenses = {
 
   /* ── Main Render ── */
   async render(container, ctx) {
+    // Sync period from shared App state
+    if (App.month) this.month = App.month;
+    if (App.year) this.year = App.year;
     container.innerHTML = this.template();
     this.bindEvents(container, ctx);
     await this.loadData(ctx);
@@ -61,8 +64,8 @@ const Expenses = {
       /* ── Period Selector ── */
       '<div class="fury-flex-between fury-mb-3">' +
         '<div class="fury-flex fury-gap-3">' +
-          '<select class="fury-select" id="exp-month" style="width:auto">' + monthOptions + '</select>' +
-          '<select class="fury-select" id="exp-year" style="width:auto">' + yearOptions + '</select>' +
+          '<select class="fury-select" id="exp-month" aria-label="Month" style="width:auto">' + monthOptions + '</select>' +
+          '<select class="fury-select" id="exp-year" aria-label="Year" style="width:auto">' + yearOptions + '</select>' +
         '</div>' +
         '<div style="font-size:12px;color:var(--fury-text-muted)" id="exp-updated"></div>' +
       '</div>' +
@@ -73,7 +76,7 @@ const Expenses = {
           '<h3 style="font-size:14px;font-weight:600;color:var(--fury-text);margin-bottom:12px">Exchange Rate</h3>' +
           '<div class="fury-flex fury-gap-3">' +
             '<div class="fury-form-group" style="flex:1;margin-bottom:0">' +
-              '<label class="fury-label">UAH per 1 USD</label>' +
+              '<label class="fury-label" for="exchange-rate">UAH per 1 USD</label>' +
               '<input type="number" class="fury-input" id="exchange-rate" step="0.01" min="0" value="' + self.exchangeRate + '">' +
             '</div>' +
             '<button class="fury-btn fury-btn-secondary" id="btn-update-rate" style="align-self:flex-end;height:36px">Update</button>' +
@@ -93,7 +96,7 @@ const Expenses = {
       '</div>' +
 
       /* ── Category Tabs ── */
-      '<div class="fury-tabs fury-mb-3">' +
+      '<div class="fury-tabs fury-mb-3" role="tablist" aria-label="Expense categories">' +
         '<button class="fury-tab active" data-cat="all">All</button>' +
         '<button class="fury-tab" data-cat="motor">Motor</button>' +
         '<button class="fury-tab" data-cat="electronics">Electronics</button>' +
@@ -114,13 +117,13 @@ const Expenses = {
           '<table class="fury-table">' +
             '<thead>' +
               '<tr>' +
-                '<th>Category</th>' +
-                '<th>Description</th>' +
-                '<th style="text-align:right">Amount (UAH)</th>' +
-                '<th style="text-align:right">Rate</th>' +
-                '<th style="text-align:right">Amount (USD)</th>' +
-                '<th>Linked Invoice</th>' +
-                '<th style="text-align:center">Actions</th>' +
+                '<th scope="col">Category</th>' +
+                '<th scope="col">Description</th>' +
+                '<th scope="col" style="text-align:right">Amount (UAH)</th>' +
+                '<th scope="col" style="text-align:right">Rate</th>' +
+                '<th scope="col" style="text-align:right">Amount (USD)</th>' +
+                '<th scope="col">Linked Invoice</th>' +
+                '<th scope="col" style="text-align:center">Actions</th>' +
               '</tr>' +
             '</thead>' +
             '<tbody id="expenses-tbody">' +
@@ -139,85 +142,72 @@ const Expenses = {
     var self = this;
 
     try {
-      // Load exchange rate from settings
-      var rateResult = await DB.getSetting('uah_usd_rate');
+      // Parallel load: exchange rate, invoices, and all expenses in one query
+      var parallel = await Promise.all([
+        DB.getSetting('uah_usd_rate'),
+        DB.getInvoices({ month: self.month, year: self.year }),
+        // Single query replaces N+1 loop (was: getExpenses(inv.id) per invoice)
+        DB.client
+          .from('expenses')
+          .select('*')
+          .order('created_at', { ascending: true })
+      ]);
+
+      // Exchange rate
+      var rateResult = parallel[0];
       if (rateResult && rateResult.data) {
-        var rateData = typeof rateResult.data === 'string'
-          ? JSON.parse(rateResult.data)
-          : rateResult.data;
-        if (rateData.rate) {
-          self.exchangeRate = parseFloat(rateData.rate) || 42.16;
-        }
+        try {
+          var rateData = typeof rateResult.data === 'string'
+            ? JSON.parse(rateResult.data)
+            : rateResult.data;
+          if (rateData && rateData.rate) {
+            self.exchangeRate = parseFloat(rateData.rate) || 42.16;
+          }
+        } catch (e) { /* keep default exchangeRate */ }
       }
 
-      // Load invoices for the month (for linking)
-      var invoiceResult = await DB.getInvoices({
-        month: self.month,
-        year: self.year,
-      });
+      // Invoices
+      var invoiceResult = parallel[1];
       if (invoiceResult && invoiceResult.error) {
         console.warn('[Expenses] Failed to load invoices:', invoiceResult.error.message || invoiceResult.error);
       }
       self.invoices = (invoiceResult && invoiceResult.data) ? invoiceResult.data : [];
 
-      // Load expenses for the month
-      // Expenses are linked to invoices, so we gather all expense records
-      // from invoices in this month, plus any unlinked ones
-      self.expenses = [];
-
-      // Collect expenses from all invoices in this period
+      // Build invoice lookup map for O(1) access
+      var invoiceMap = {};
       for (var i = 0; i < self.invoices.length; i++) {
-        var inv = self.invoices[i];
-        var expResult = await DB.getExpenses(inv.id);
-        if (expResult && expResult.error) {
-          console.warn('[Expenses] Failed to load expenses for invoice ' + inv.id + ':', expResult.error.message || expResult.error);
-        }
-        if (expResult && expResult.data) {
-          for (var e = 0; e < expResult.data.length; e++) {
-            var exp = expResult.data[e];
-            exp._invoice = inv;
-            self.expenses.push(exp);
-          }
-        }
+        invoiceMap[self.invoices[i].id] = self.invoices[i];
       }
 
-      // Also load unlinked expenses (invoice_id is null) via a direct query
-      // Since DB.getExpenses requires an invoiceId, we handle unlinked ones
-      // by querying with a special method or loading all and filtering
-      try {
-        var unlinkedResult = await DB.client
-          .from('expenses')
-          .select('*')
-          .is('invoice_id', null)
-          .order('created_at', { ascending: true });
+      // All expenses loaded in one query — attach _invoice ref and filter to period
+      var allExpResult = parallel[2];
+      self.expenses = [];
 
-        if (unlinkedResult && unlinkedResult.error) {
-          console.warn('[Expenses] Failed to load unlinked expenses:', unlinkedResult.error.message || unlinkedResult.error);
-        }
+      if (allExpResult && !allExpResult.error && allExpResult.data) {
+        for (var e = 0; e < allExpResult.data.length; e++) {
+          var exp = allExpResult.data[e];
 
-        if (unlinkedResult && unlinkedResult.data) {
-          // Filter to match the selected month/year by created_at date
-          for (var u = 0; u < unlinkedResult.data.length; u++) {
-            var unlinked = unlinkedResult.data[u];
-            var createdDate = new Date(unlinked.created_at);
+          if (exp.invoice_id && invoiceMap[exp.invoice_id]) {
+            // Linked to an invoice in this period
+            exp._invoice = invoiceMap[exp.invoice_id];
+            self.expenses.push(exp);
+          } else if (!exp.invoice_id) {
+            // Unlinked — filter by created_at month/year
+            var createdDate = new Date(exp.created_at);
             if (createdDate.getMonth() + 1 === self.month && createdDate.getFullYear() === self.year) {
-              unlinked._invoice = null;
-              self.expenses.push(unlinked);
+              exp._invoice = null;
+              self.expenses.push(exp);
             }
           }
         }
-      } catch (err) {
-        console.warn('[Expenses] Could not load unlinked expenses:', err);
       }
 
-      // Sort by created_at
-      self.expenses.sort(function (a, b) {
-        return new Date(a.created_at) - new Date(b.created_at);
-      });
+      // Already sorted by created_at from the query
 
     } catch (err) {
       console.error('[Expenses] loadData error:', err);
       self.expenses = [];
+      showToast('Failed to load expenses. Please refresh.', 'error');
     }
   },
 
@@ -339,13 +329,13 @@ const Expenses = {
         '<td>' + invoiceDisplay + '</td>' +
         '<td style="text-align:center;white-space:nowrap">' +
           '<button class="fury-btn fury-btn-ghost fury-btn-sm exp-edit-btn" ' +
-            'data-expense-id="' + expense.id + '" title="Edit">' +
+            'data-expense-id="' + expense.id + '" title="Edit" aria-label="Edit expense">' +
             '&#x270E;' +
           '</button>' +
           '<button class="fury-btn fury-btn-ghost fury-btn-sm exp-delete-btn" ' +
             'data-expense-id="' + expense.id + '" ' +
             'data-expense-desc="' + self.escapeAttr(expense.description || '') + '" ' +
-            'title="Delete" style="color:var(--fury-danger)">' +
+            'title="Delete" aria-label="Delete expense" style="color:var(--fury-danger)">' +
             '&#x2715;' +
           '</button>' +
         '</td>' +
@@ -441,13 +431,32 @@ const Expenses = {
 
   /* ── Reload Data ── */
   async reloadData(container, ctx) {
+    // Sync period to shared App state
+    App.month = this.month;
+    App.year = this.year;
+    var addBtn = container.querySelector('#btn-add-expense');
+    var monthSel = container.querySelector('#exp-month');
+    var yearSel = container.querySelector('#exp-year');
+
+    // Disable controls during loading
+    if (addBtn) addBtn.disabled = true;
+    if (monthSel) monthSel.disabled = true;
+    if (yearSel) yearSel.disabled = true;
+
     var tbody = container.querySelector('#expenses-tbody');
     if (tbody) {
       tbody.innerHTML =
         '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--fury-text-muted)">Loading...</td></tr>';
     }
-    await this.loadData(ctx);
-    this.updateUI(container);
+
+    try {
+      await this.loadData(ctx);
+      this.updateUI(container);
+    } finally {
+      if (addBtn) addBtn.disabled = false;
+      if (monthSel) monthSel.disabled = false;
+      if (yearSel) yearSel.disabled = false;
+    }
   },
 
   /* ── Handle Update Rate ── */
@@ -498,14 +507,31 @@ const Expenses = {
     }
   },
 
-  /* ── Handle Delete ── */
+  /* ── Handle Delete (two-click pattern) ── */
   async handleDelete(expenseId, description, container, ctx) {
     var self = this;
-    var confirmMsg = 'Delete expense' + (description ? ' "' + description + '"' : '') + '?';
-    if (!confirm(confirmMsg)) return;
-
     var btn = container.querySelector('.exp-delete-btn[data-expense-id="' + expenseId + '"]');
-    if (btn) btn.disabled = true;
+    if (!btn) return;
+
+    // First click -- ask confirmation inline
+    if (!btn.dataset.confirmPending) {
+      btn.dataset.confirmPending = '1';
+      btn.innerHTML = '<span style="font-size:11px;color:var(--fury-danger)">Sure?</span>';
+
+      // Reset after 3 seconds if not confirmed
+      setTimeout(function () {
+        if (btn.dataset.confirmPending) {
+          delete btn.dataset.confirmPending;
+          btn.innerHTML = '&#x2715;';
+        }
+      }, 3000);
+      return;
+    }
+
+    // Second click -- delete
+    delete btn.dataset.confirmPending;
+    btn.disabled = true;
+    btn.innerHTML = '...';
 
     try {
       var result = await DB.deleteExpense(expenseId);
@@ -520,10 +546,11 @@ const Expenses = {
 
       self.updateUI(container);
 
-      showToast('Expense deleted.', 'success');
+      showToast('Expense deleted', 'success');
     } catch (err) {
       console.error('[Expenses] delete error:', err);
       showToast('Failed to delete expense. Please try again.', 'error');
+      btn.innerHTML = '&#x2715;';
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -563,24 +590,27 @@ const Expenses = {
     var currentUsd = (expense && expense.amount_usd) ? expense.amount_usd : '';
     var currentDesc = (expense && expense.description) ? expense.description : '';
 
+    // Save trigger for focus return
+    var modalTrigger = document.activeElement;
+
     // Create modal overlay
     var overlay = document.createElement('div');
     overlay.className = 'fury-modal-overlay';
     overlay.innerHTML =
-      '<div class="fury-modal">' +
+      '<div class="fury-modal" role="dialog" aria-modal="true" aria-label="' + (isEdit ? 'Edit Expense' : 'Add Expense') + '">' +
         '<div class="fury-modal-header">' +
           '<span class="fury-modal-title">' + (isEdit ? 'Edit Expense' : 'Add Expense') + '</span>' +
-          '<button class="fury-modal-close" id="modal-close-btn">&times;</button>' +
+          '<button class="fury-modal-close" id="modal-close-btn" aria-label="Close">&times;</button>' +
         '</div>' +
         '<div class="fury-modal-body">' +
 
           '<div class="fury-form-group">' +
-            '<label class="fury-label">Category</label>' +
+            '<label class="fury-label" for="modal-category">Category</label>' +
             '<select class="fury-select" id="modal-category">' + categoryOptions + '</select>' +
           '</div>' +
 
           '<div class="fury-form-group">' +
-            '<label class="fury-label">Description</label>' +
+            '<label class="fury-label" for="modal-description">Description</label>' +
             '<input type="text" class="fury-input" id="modal-description" ' +
               'placeholder="e.g. T-Motor F90 2806.5 x2" ' +
               'value="' + self.escapeAttr(currentDesc) + '">' +
@@ -588,13 +618,13 @@ const Expenses = {
 
           '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
             '<div class="fury-form-group">' +
-              '<label class="fury-label">Amount (UAH)</label>' +
+              '<label class="fury-label" for="modal-amount-uah">Amount (UAH)</label>' +
               '<input type="number" class="fury-input" id="modal-amount-uah" ' +
                 'step="0.01" min="0" placeholder="0.00" ' +
                 'value="' + (currentUah != null && currentUah !== '' ? currentUah : '') + '">' +
             '</div>' +
             '<div class="fury-form-group">' +
-              '<label class="fury-label">Amount (USD)</label>' +
+              '<label class="fury-label" for="modal-amount-usd">Amount (USD)</label>' +
               '<input type="number" class="fury-input" id="modal-amount-usd" ' +
                 'step="0.01" min="0" placeholder="0.00" ' +
                 'value="' + (currentUsd != null && currentUsd !== '' ? currentUsd : '') + '">' +
@@ -602,14 +632,14 @@ const Expenses = {
           '</div>' +
 
           '<div class="fury-form-group">' +
-            '<label class="fury-label">Exchange Rate (UAH/USD)</label>' +
+            '<label class="fury-label" for="modal-rate">Exchange Rate (UAH/USD)</label>' +
             '<input type="number" class="fury-input" id="modal-rate" ' +
               'step="0.01" min="0" value="' + currentRate + '">' +
             '<span class="fury-help-text">Change UAH to auto-calculate USD, or vice versa</span>' +
           '</div>' +
 
           '<div class="fury-form-group">' +
-            '<label class="fury-label">Link to Invoice</label>' +
+            '<label class="fury-label" for="modal-invoice">Link to Invoice</label>' +
             '<select class="fury-select" id="modal-invoice">' + invoiceOptions + '</select>' +
           '</div>' +
 
@@ -683,13 +713,38 @@ const Expenses = {
     });
 
     // ── Close handlers ──
+    var escHandler = function (e) {
+      if (e.key === 'Escape') closeModal();
+    };
+
+    // Focus trap
+    var focusTrapHandler = function (e) {
+      if (e.key !== 'Tab') return;
+      var focusable = overlay.querySelectorAll('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])');
+      if (focusable.length === 0) return;
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    overlay.addEventListener('keydown', focusTrapHandler);
+
     var closeModal = function () {
+      document.removeEventListener('keydown', escHandler);
+      overlay.removeEventListener('keydown', focusTrapHandler);
       overlay.classList.remove('active');
       document.body.classList.remove('fury-modal-open');
       setTimeout(function () {
         if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
         self.modalOverlay = null;
       }, 250);
+      // Return focus to trigger
+      if (modalTrigger && typeof modalTrigger.focus === 'function') {
+        modalTrigger.focus();
+      }
     };
 
     overlay.querySelector('#modal-close-btn').addEventListener('click', closeModal);
@@ -701,26 +756,18 @@ const Expenses = {
     });
 
     // Close on Escape key
-    var escHandler = function (e) {
-      if (e.key === 'Escape') {
-        closeModal();
-      }
-    };
     document.addEventListener('keydown', escHandler);
 
-    // Store original closeModal and wrap to also remove escHandler
-    var origClose = closeModal;
-    closeModal = function () {
-      document.removeEventListener('keydown', escHandler);
-      origClose();
-    };
-    // Re-bind close buttons to wrapped closeModal
-    overlay.querySelector('#modal-close-btn').addEventListener('click', closeModal);
-    overlay.querySelector('#modal-cancel-btn').addEventListener('click', closeModal);
+    // ── Double-submit guard ──
+    var isSubmitting = false;
 
     // ── Save handler ──
     overlay.querySelector('#modal-save-btn').addEventListener('click', function () {
-      self.handleSaveExpense(expense, overlay, container, ctx, closeModal);
+      if (isSubmitting) return;
+      isSubmitting = true;
+      self.handleSaveExpense(expense, overlay, container, ctx, closeModal).finally(function () {
+        isSubmitting = false;
+      });
     });
 
     // Allow Enter key to save (but not from number inputs or textarea)
@@ -728,7 +775,11 @@ const Expenses = {
       if (e.key === 'Enter' && !e.shiftKey) {
         var active = document.activeElement;
         if (active && (active.tagName === 'SELECT' || active.tagName === 'TEXTAREA' || active.type === 'number')) return;
-        self.handleSaveExpense(expense, overlay, container, ctx, closeModal);
+        if (isSubmitting) return;
+        isSubmitting = true;
+        self.handleSaveExpense(expense, overlay, container, ctx, closeModal).finally(function () {
+          isSubmitting = false;
+        });
       }
     });
   },
@@ -745,6 +796,11 @@ const Expenses = {
     var invoiceId = overlay.querySelector('#modal-invoice').value || null;
 
     // Validation
+    if (!self.CATEGORIES[category]) {
+      showToast('Please select a valid category.', 'error');
+      return;
+    }
+
     if (!description) {
       showToast('Please enter a description.', 'error');
       overlay.querySelector('#modal-description').focus();
@@ -820,7 +876,7 @@ const Expenses = {
       self.updateUI(container);
 
       showToast(
-        existingExpense ? 'Expense updated successfully.' : 'Expense added successfully.',
+        existingExpense ? 'Expense updated' : 'Expense added',
         'success'
       );
     } catch (err) {
@@ -871,6 +927,8 @@ const Expenses = {
     if (!str) return '';
     return String(str)
       .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
   },

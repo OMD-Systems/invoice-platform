@@ -3,6 +3,11 @@
    Invoice Platform · OMD Systems
    ═══════════════════════════════════════════════════════ */
 
+/* ── HTTPS Enforcement (production only) ── */
+if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+  window.location.replace('https://' + window.location.host + window.location.pathname + window.location.search + window.location.hash);
+}
+
 /* ── Global Error Handlers ── */
 window.addEventListener('unhandledrejection', function (event) {
   console.error('[Unhandled Promise]', event.reason);
@@ -13,6 +18,9 @@ window.addEventListener('unhandledrejection', function (event) {
 
 window.addEventListener('error', function (event) {
   console.error('[Global Error]', event.error);
+  if (typeof showToast === 'function') {
+    showToast('A script error occurred. Check console.', 'error');
+  }
 });
 
 const App = {
@@ -20,6 +28,9 @@ const App = {
   user: null,
   role: null, // 'admin' | 'lead' | 'viewer'
   _navId: 0,
+  // Shared period state (synced across pages)
+  month: new Date().getMonth() + 1,
+  year: new Date().getFullYear(),
 
   pages: {
     '/team': Team,
@@ -47,6 +58,10 @@ const App = {
     DB.init();
     this.bindLoginEvents();
     this.bindLogout();
+
+    // Show loading state during bootstrap
+    var loginScreen = document.getElementById('login-screen');
+    if (loginScreen) loginScreen.style.display = 'none';
 
     try {
       const authResult = await Auth.getSession();
@@ -314,11 +329,20 @@ const App = {
   /* ── Page Navigation ── */
   async navigate(hash) {
     var navId = ++this._navId;
-    var path = (hash || '').replace('#', '') || '/team';
+    // Normalize: strip hash, query params, trailing slashes
+    var raw = (hash || '').replace(/^#/, '').split('?')[0].split('&')[0];
+    var path = raw.replace(/\/+$/, '') || '/team';
+    // Ensure path starts with /
+    if (path.charAt(0) !== '/') path = '/' + path;
 
-    // Handle legacy route redirects
+    // Handle legacy route redirects (prevent infinite loops)
     if (this.REDIRECTS && this.REDIRECTS[path]) {
-      window.location.hash = '#' + this.REDIRECTS[path];
+      var target = this.REDIRECTS[path];
+      if (this.pages[target]) {
+        window.location.hash = '#' + target;
+      } else {
+        window.location.hash = '#/team';
+      }
       return;
     }
 
@@ -341,7 +365,10 @@ const App = {
     for (var i = 0; i < navItems.length; i++) {
       navItems[i].classList.remove('active');
     }
-    var activeNav = document.querySelector('#sidebar-nav [data-page="' + path + '"]');
+    var activeNav = null;
+    for (var i = 0; i < navItems.length; i++) {
+      if (navItems[i].getAttribute('data-page') === path) { activeNav = navItems[i]; break; }
+    }
     if (activeNav) {
       activeNav.classList.add('active');
     }

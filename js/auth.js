@@ -4,9 +4,19 @@
 // ============================================================
 
 const Auth = {
-  // ── OTP Rate Limiting State ──
-  _otpCooldownUntil: 0,
-  _otpAttempts: 0,
+  // ── OTP Rate Limiting State (persisted in sessionStorage) ──
+  get _otpCooldownUntil() {
+    return parseInt(sessionStorage.getItem('otp_cooldown_until') || '0', 10);
+  },
+  set _otpCooldownUntil(val) {
+    sessionStorage.setItem('otp_cooldown_until', String(val));
+  },
+  get _otpAttempts() {
+    return parseInt(sessionStorage.getItem('otp_attempts') || '0', 10);
+  },
+  set _otpAttempts(val) {
+    sessionStorage.setItem('otp_attempts', String(val));
+  },
 
   /**
    * Check if OTP send is currently in cooldown.
@@ -29,7 +39,7 @@ const Auth = {
   _startOtpCooldown() {
     var cooldownMs = (CONFIG.OTP_COOLDOWN_SECONDS || 60) * 1000;
     this._otpCooldownUntil = Date.now() + cooldownMs;
-    this._otpAttempts++;
+    this._otpAttempts = this._otpAttempts + 1;
   },
 
   /**
@@ -134,6 +144,9 @@ const Auth = {
   async signOut() {
     try {
       const { error } = await DB.client.auth.signOut();
+      // Clear OTP rate limit state
+      sessionStorage.removeItem('otp_cooldown_until');
+      sessionStorage.removeItem('otp_attempts');
       return { error };
     } catch (err) {
       return { error: { message: err.message } };

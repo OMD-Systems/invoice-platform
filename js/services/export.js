@@ -70,7 +70,7 @@ const ExportService = {
 
       // Generate file title from invoice data
       var fileTitle = this._getInvoiceFileTitle(inv, emp);
-      var amount = parseFloat(inv.total_usd) || 0;
+      var amount = this._round(parseFloat(inv.total_usd) || 0);
       total += amount;
 
       rows.push({
@@ -80,11 +80,14 @@ const ExportService = {
       });
     }
 
+    // Round accumulated total to avoid floating-point drift
+    total = this._round(total);
+
     // Totals row
     rows.push({
       'File Title': '',
       'Supplier Name': 'TOTAL',
-      'Invoice Total': this._round(total)
+      'Invoice Total': total
     });
 
     var ws = XLSX.utils.json_to_sheet(rows);
@@ -378,14 +381,18 @@ const ExportService = {
 
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
-      var price = parseFloat(item.price || item.price_usd) || 0;
+      var price = this._round(parseFloat(item.price || item.price_usd) || 0);
       var qty = parseFloat(item.qty) || 1;
+      // Prefer provided total, fallback to calculated
+      var itemTotal = (item.total != null || item.total_usd != null)
+        ? this._round(parseFloat(item.total || item.total_usd) || 0)
+        : this._round(price * qty);
       wsData.push([
         i + 1,
         item.description || '',
         price,
         qty,
-        this._round(price * qty)
+        itemTotal
       ]);
     }
 
@@ -416,7 +423,9 @@ const ExportService = {
     XLSX.utils.book_append_sheet(wb, ws, 'Invoice');
 
     var nameParts = (emp.full_name_lat || 'Invoice').split(' ');
-    var filename = 'Invoice-' + (invoiceData.invoiceNumber || 0) + '-' + nameParts.join('-') + '.xlsx';
+    var rawFilename = 'Invoice-' + (invoiceData.invoiceNumber || 0) + '-' + nameParts.join('-') + '.xlsx';
+    // Sanitize filename to remove invalid chars
+    var filename = rawFilename.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 200);
     XLSX.writeFile(wb, filename);
   },
 
@@ -436,7 +445,8 @@ const ExportService = {
       case 'WS':
         return 'WS-Invoice-' + number + '-' + nameParts.join('-');
       case 'FOP':
-        return nameParts[0] + '_Invoice-' + number + '-FOP';
+        // Use last name (surname) for FOP format
+        return nameParts[nameParts.length - 1] + '_Invoice-' + number + '-FOP';
       case 'CUSTOM':
         return (employee.invoice_prefix || 'Invoice') + '-' + number;
       default:

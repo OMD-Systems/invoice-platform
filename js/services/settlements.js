@@ -27,17 +27,28 @@ const Settlements = {
    * Load the project -> company mapping from the projects table.
    * Also builds a project_id -> code lookup.
    */
-  async loadMapping() {
-    var result = await DB.getProjects();
-    var projects = result.data || [];
+  _mappingLoaded: false,
 
-    this.projectCompanyMap = {};
-    this.projectIdToCode = {};
+  async loadMapping(forceReload) {
+    if (this._mappingLoaded && !forceReload) return;
+    try {
+      var result = await DB.getProjects();
+      var projects = (result && result.data) || [];
 
-    for (var i = 0; i < projects.length; i++) {
-      var p = projects[i];
-      this.projectCompanyMap[p.code] = p.company || 'WS';
-      this.projectIdToCode[p.id] = p.code;
+      this.projectCompanyMap = {};
+      this.projectIdToCode = {};
+
+      for (var i = 0; i < projects.length; i++) {
+        var p = projects[i];
+        if (p.code) {
+          this.projectCompanyMap[p.code] = p.company || 'WS';
+          this.projectIdToCode[p.id] = p.code;
+        }
+      }
+      this._mappingLoaded = true;
+    } catch (err) {
+      console.error('[Settlements] loadMapping error:', err);
+      showToast('Failed to load project mapping for settlements.', 'error');
     }
   },
 
@@ -119,6 +130,8 @@ const Settlements = {
           totalPaid = rate;
         }
       }
+      // Always round totalPaid to cents
+      totalPaid = self._round(totalPaid);
 
       // Calculate hours per project
       // Resolve project code from either the join data or the ID-to-code map

@@ -257,8 +257,14 @@ const InvoiceDocx = {
     // Data rows
     // Accept both item.price (from UI/preview) and item.price_usd (from DB)
     var dataRows = (items || []).map(function (item, idx) {
-      var price = item.price != null ? item.price : (item.price_usd || 0);
-      var total = item.total != null ? item.total : (item.total_usd || (price * (item.qty || 1)));
+      var price = item.price != null ? Number(item.price) : (Number(item.price_usd) || 0);
+      if (isNaN(price)) price = 0;
+      var qty = Number(item.qty) || 1;
+      var total = item.total != null ? Number(item.total) : (item.total_usd != null ? Number(item.total_usd) : Math.round(price * qty * 100) / 100);
+      if (isNaN(total)) total = 0;
+      // Truncate very long descriptions to prevent DOCX cell overflow
+      var desc = String(item.description || '');
+      if (desc.length > 500) desc = desc.slice(0, 497) + '...';
       return new TableRow({
         children: [
           this._cell(
@@ -266,7 +272,7 @@ const InvoiceDocx = {
             { width: colW[0], borders: borders }
           ),
           this._cell(
-            this._para(this._text(item.description || '', { size: this.SIZE_BASE })),
+            this._para(this._text(desc, { size: this.SIZE_BASE })),
             { width: colW[1], borders: borders }
           ),
           this._cell(
@@ -278,7 +284,7 @@ const InvoiceDocx = {
           ),
           this._cell(
             this._para(
-              this._text(String(item.qty || 1), { size: this.SIZE_BASE }),
+              this._text(String(qty), { size: this.SIZE_BASE }),
               { alignment: AlignmentType.RIGHT }
             ),
             { width: colW[3], borders: borders }
@@ -537,11 +543,15 @@ const InvoiceDocx = {
     });
 
     // Pack to Blob
-    var blob = await Packer.toBlob(doc);
-    return blob;
+    try {
+      var blob = await Packer.toBlob(doc);
+      return blob;
+    } catch (packErr) {
+      console.error('[InvoiceDocx] Packer.toBlob failed:', packErr);
+      throw new Error('Failed to generate DOCX: ' + packErr.message);
+    }
   },
 
-  /* ── Format currency as "$1,234.56" ── */
   /* ── Calculate due date from invoice date + days ── */
   _calcDueDate(invoiceDate, dueDays) {
     var days = typeof dueDays === 'string' ? parseInt(dueDays.replace(/\D/g, '')) || 15 : (parseInt(dueDays) || 15);
@@ -554,23 +564,28 @@ const InvoiceDocx = {
   formatCurrency(amount) {
     var num = Number(amount);
     if (isNaN(num)) num = 0;
+    // Round to cents to avoid floating-point artifacts (e.g. 10870.00000001)
+    num = Math.round(num * 100) / 100;
     return '$' + num.toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
   },
 
-  /* ── Parse any date format into a Date object ── */
+  /* ── Parse any date format into a Date object (local timezone) ── */
   _parseAnyDate(dateStr) {
     if (!dateStr) return new Date();
     if (dateStr instanceof Date) return dateStr;
-    // ISO: YYYY-MM-DD
-    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) return new Date(dateStr);
+    // ISO: YYYY-MM-DD — parse components to avoid UTC interpretation
+    var isoMatch = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      return new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
+    }
     // DD.MM.YY or DD.MM.YYYY
-    var dotMatch = dateStr.match(/^(\d{2})\.(\d{2})\.(\d{2,4})$/);
+    var dotMatch = String(dateStr).match(/^(\d{2})\.(\d{2})\.(\d{2,4})$/);
     if (dotMatch) {
       var yr = dotMatch[3].length === 2 ? '20' + dotMatch[3] : dotMatch[3];
-      return new Date(yr + '-' + dotMatch[2] + '-' + dotMatch[1]);
+      return new Date(parseInt(yr), parseInt(dotMatch[2]) - 1, parseInt(dotMatch[1]));
     }
     // "January 28, 2026" or "Jan 28, 2026" etc.
     var d = new Date(dateStr);
@@ -586,13 +601,10 @@ const InvoiceDocx = {
     if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) {
       return dateStr.slice(0, 6) + dateStr.slice(8);
     }
-    // ISO date (YYYY-MM-DD)
-    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-      var d = new Date(dateStr);
-      var dd = String(d.getDate()).padStart(2, '0');
-      var mm = String(d.getMonth() + 1).padStart(2, '0');
-      var yy = String(d.getFullYear()).slice(2);
-      return dd + '.' + mm + '.' + yy;
+    // ISO date (YYYY-MM-DD) — parse components directly to avoid timezone shift
+    var isoMatch = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      return isoMatch[3] + '.' + isoMatch[2] + '.' + isoMatch[1].slice(2);
     }
     // Try parsing any other format (e.g. "January 28, 2026")
     var parsed = this._parseAnyDate(dateStr);
@@ -614,13 +626,10 @@ const InvoiceDocx = {
     }
     // Already DD.MM.YYYY
     if (/^\d{2}\.\d{2}\.\d{4}$/.test(dateStr)) return dateStr;
-    // ISO date
-    if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-      var d = new Date(dateStr);
-      var dd = String(d.getDate()).padStart(2, '0');
-      var mm = String(d.getMonth() + 1).padStart(2, '0');
-      var yyyy = String(d.getFullYear());
-      return dd + '.' + mm + '.' + yyyy;
+    // ISO date — parse components directly to avoid timezone shift
+    var isoMatch = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      return isoMatch[3] + '.' + isoMatch[2] + '.' + isoMatch[1];
     }
     return dateStr;
   },
@@ -637,13 +646,18 @@ const InvoiceDocx = {
 
   /* ── Download single invoice ── */
   async downloadInvoice(invoiceData) {
-    var blob = await this.generate(invoiceData);
-    var fileName = this.getFileName(
-      invoiceData.employee,
-      invoiceData.invoiceNumber,
-      invoiceData.invoiceDate
-    );
-    saveAs(blob, fileName);
+    try {
+      var blob = await this.generate(invoiceData);
+      var fileName = this.getFileName(
+        invoiceData.employee || {},
+        invoiceData.invoiceNumber || 'Invoice',
+        invoiceData.invoiceDate || ''
+      );
+      saveAs(blob, fileName);
+    } catch (err) {
+      console.error('[InvoiceDocx] downloadInvoice failed:', err);
+      throw err;
+    }
   },
 
   /* ── Download batch of invoices (one by one with delay) ── */

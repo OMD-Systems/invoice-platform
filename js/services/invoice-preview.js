@@ -172,11 +172,11 @@ var InvoicePreview = {
     var emp = data.employee || {};
     var billedTo = data.billedTo || {};
     var items = data.items || [];
-    var subtotal = data.subtotal || 0;
-    var discount = data.discount || 0;
-    var tax = data.tax || 0;
-    var taxRate = data.taxRate || '0';
-    var total = data.total || 0;
+    var subtotal = parseFloat(data.subtotal) || 0;
+    var discount = parseFloat(data.discount) || 0;
+    var tax = parseFloat(data.tax) || 0;
+    var taxRate = (data.taxRate != null && data.taxRate !== '') ? String(data.taxRate) : '0';
+    var total = parseFloat(data.total) || 0;
     var terms = data.terms || '';
     var status = data.status || '';
 
@@ -195,15 +195,21 @@ var InvoicePreview = {
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
       var itemPrice = this._parseCurrency(item.price);
-      var itemTotal = this._parseCurrency(item.total);
-      var itemQty = item.qty != null ? item.qty : 1;
+      var itemQty = parseFloat(item.qty) || 1;
+      // Use provided total, or compute from price * qty with rounding
+      var itemTotal = item.total != null
+        ? this._parseCurrency(item.total)
+        : Math.round(itemPrice * itemQty * 100) / 100;
+      // Truncate very long descriptions to prevent layout break
+      var desc = String(item.description || '');
+      if (desc.length > 500) desc = desc.slice(0, 497) + '...';
 
       itemsHtml +=
         '<tr>' +
         '<td class="text-center">' + (i + 1) + '</td>' +
-        '<td>' + this._esc(item.description || '') + '</td>' +
+        '<td>' + this._esc(desc) + '</td>' +
         '<td class="text-right">$' + this._fmtNum(itemPrice) + '</td>' +
-        '<td class="text-center">' + itemQty + '</td>' +
+        '<td class="text-center">' + this._fmtNum(itemQty).replace(/\.00$/, '') + '</td>' +
         '<td class="text-right">$' + this._fmtNum(itemTotal) + '</td>' +
         '</tr>';
     }
@@ -347,15 +353,17 @@ var InvoicePreview = {
   },
 
   /**
-   * Parse a value to a number (handles string inputs like "$1,200").
+   * Parse a value to a number (handles string inputs like "$1,200.50").
+   * Strips currency symbols, commas, spaces — keeps only digits, dot, minus.
    * @param {*} val
    * @returns {number}
    */
   _parseCurrency: function (val) {
     if (val == null) return 0;
-    if (typeof val === 'number') return val;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
     var cleaned = String(val).replace(/[^0-9.\-]/g, '');
-    return parseFloat(cleaned) || 0;
+    var num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : Math.round(num * 100) / 100;
   },
 
   /**
@@ -368,21 +376,24 @@ var InvoicePreview = {
     var days = parseInt(String(dueDays).replace(/\D/g, '')) || 15;
     var base;
     if (invoiceDate) {
-      base = new Date(invoiceDate);
-      if (isNaN(base.getTime())) {
-        // Try DD.MM.YY or DD.MM.YYYY
-        var m = String(invoiceDate).match(/^(\d{2})\.(\d{2})\.(\d{2,4})$/);
-        if (m) {
-          var yr = m[3].length === 2 ? '20' + m[3] : m[3];
-          base = new Date(yr + '-' + m[2] + '-' + m[1]);
+      // Try DD.MM.YY or DD.MM.YYYY first (most common in this app)
+      var m = String(invoiceDate).match(/^(\d{2})\.(\d{2})\.(\d{2,4})$/);
+      if (m) {
+        var yr = m[3].length === 2 ? '20' + m[3] : m[3];
+        base = new Date(parseInt(yr), parseInt(m[2]) - 1, parseInt(m[1]));
+      } else {
+        // Try ISO (YYYY-MM-DD) — parse components to avoid timezone shift
+        var isoMatch = String(invoiceDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (isoMatch) {
+          base = new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
         } else {
-          base = new Date();
+          base = new Date(invoiceDate);
         }
       }
+      if (isNaN(base.getTime())) base = new Date();
     } else {
       base = new Date();
     }
-    if (isNaN(base.getTime())) base = new Date();
     base.setDate(base.getDate() + days);
     var monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'];
@@ -391,12 +402,16 @@ var InvoicePreview = {
 
   /**
    * Format a number with 2 decimal places and locale-friendly thousands.
+   * Uses Math.round to avoid floating-point drift (e.g. 0.1 + 0.2).
    * @param {number} num
    * @returns {string}
    */
   _fmtNum: function (num) {
-    if (num == null || isNaN(num)) return '0.00';
-    return Number(num).toLocaleString('en-US', {
+    var n = parseFloat(num);
+    if (isNaN(n)) return '0.00';
+    // Round to cents to avoid floating point artifacts
+    n = Math.round(n * 100) / 100;
+    return n.toLocaleString('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });

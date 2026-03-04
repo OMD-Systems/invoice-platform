@@ -45,7 +45,7 @@ const Settings = {
       '<div class="settings-page" style="max-width:1200px;">' +
 
       /* ── Tabs ── */
-      '<div class="fury-tabs fury-mb-3">' +
+      '<div class="fury-tabs fury-mb-3" role="tablist" aria-label="Settings tabs">' +
       '<button class="fury-tab' + (this.activeTab === 'general' ? ' active' : '') + '" data-tab="general">General</button>' +
       '<button class="fury-tab' + (this.activeTab === 'projects' ? ' active' : '') + '" data-tab="projects">Projects</button>' +
       '<button class="fury-tab' + (this.activeTab === 'teams' ? ' active' : '') + '" data-tab="teams">Teams</button>' +
@@ -62,10 +62,10 @@ const Settings = {
 
       /* ── Modal Container ── */
       '<div id="settings-modal-overlay" class="fury-modal-overlay">' +
-      '<div class="fury-modal" id="settings-modal">' +
+      '<div class="fury-modal" id="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">' +
       '<div class="fury-modal-header">' +
       '<span class="fury-modal-title" id="settings-modal-title">Modal</span>' +
-      '<button class="fury-modal-close" id="settings-modal-close">&times;</button>' +
+      '<button class="fury-modal-close" id="settings-modal-close" aria-label="Close">&times;</button>' +
       '</div>' +
       '<div class="fury-modal-body" id="settings-modal-body"></div>' +
       '<div class="fury-modal-footer" id="settings-modal-footer"></div>' +
@@ -87,7 +87,7 @@ const Settings = {
       '.team-members-row td { padding: 8px 16px !important; background: #0D0D0F; }' +
       '.team-members-list { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; }' +
       '.team-member-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; background: rgba(0,212,255,0.08); border: 1px solid #374151; border-radius: 12px; font-size: 12px; color: #E5E7EB; }' +
-      '.team-member-tag .remove-member { cursor: pointer; color: #6B7280; font-size: 14px; line-height: 1; }' +
+      '.team-member-tag .remove-member { cursor: pointer; color: var(--fury-neutral); font-size: 14px; line-height: 1; }' +
       '.team-member-tag .remove-member:hover { color: #EF4444; }' +
       '.month-lock-badge { display: inline-flex; align-items: center; gap: 4px; }' +
       '</style>'
@@ -159,7 +159,7 @@ const Settings = {
       '</div>' +
       '<div class="settings-field" style="max-width:300px;">' +
       '<label>Last Updated</label>' +
-      '<div style="padding:8px 0;font-size:13px;color:#6B7280;">' +
+      '<div style="padding:8px 0;font-size:13px;color:var(--fury-neutral);">' +
       (exchangeRate.updated_at ? new Date(exchangeRate.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Never') +
       '</div>' +
       '</div>' +
@@ -177,7 +177,7 @@ const Settings = {
       '</div>' +
       '<div class="settings-field">' +
       '<label>&nbsp;</label>' +
-      '<div style="padding:8px 0;font-size:13px;color:#6B7280;">' +
+      '<div style="padding:8px 0;font-size:13px;color:var(--fury-neutral);">' +
       'Subtracted from monthly working hours (default: 8)' +
       '</div>' +
       '</div>' +
@@ -202,7 +202,7 @@ const Settings = {
 
     if (self.projects.length === 0) {
       rows =
-        '<tr><td colspan="5" style="text-align:center;padding:40px;color:#6B7280;">' +
+        '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--fury-neutral);">' +
         'No projects found.' +
         '</td></tr>';
     } else {
@@ -231,18 +231,18 @@ const Settings = {
 
     return (
       '<div class="fury-flex-between fury-mb-2">' +
-      '<div style="font-size:13px;color:#6B7280;">' + self.projects.length + ' project(s)</div>' +
+      '<div style="font-size:13px;color:var(--fury-neutral);">' + self.projects.length + ' project(s)</div>' +
       '<button class="fury-btn fury-btn-sm fury-btn-primary" id="set-add-project">+ Add Project</button>' +
       '</div>' +
       '<div class="fury-card" style="padding:0;overflow:hidden;">' +
       '<table class="fury-table">' +
       '<thead>' +
       '<tr>' +
-      '<th style="width:120px;">Code</th>' +
-      '<th>Name</th>' +
-      '<th style="width:140px;">Company</th>' +
-      '<th style="width:100px;text-align:center;">Status</th>' +
-      '<th style="width:100px;text-align:right;">Actions</th>' +
+      '<th scope="col" style="width:120px;">Code</th>' +
+      '<th scope="col">Name</th>' +
+      '<th scope="col" style="width:140px;">Company</th>' +
+      '<th scope="col" style="width:100px;text-align:center;">Status</th>' +
+      '<th scope="col" style="width:100px;text-align:right;">Actions</th>' +
       '</tr>' +
       '</thead>' +
       '<tbody id="set-projects-tbody">' + rows + '</tbody>' +
@@ -260,7 +260,7 @@ const Settings = {
 
     if (self.teams.length === 0) {
       rows =
-        '<tr><td colspan="4" style="text-align:center;padding:40px;color:#6B7280;">' +
+        '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--fury-neutral);">' +
         'No teams found.' +
         '</td></tr>';
     } else {
@@ -272,7 +272,7 @@ const Settings = {
         rows +=
           '<tr class="team-expand" data-team-id="' + t.id + '">' +
           '<td style="font-weight:600;">' +
-          '<span style="color:#6B7280;margin-right:6px;font-size:11px;">&#x25B6;</span>' +
+          '<span style="color:var(--fury-neutral);margin-right:6px;font-size:11px;">&#x25B6;</span>' +
           self._escapeHtml(t.name || '') +
           '</td>' +
           '<td>' + self._escapeHtml(t.lead_email || '') + '</td>' +
@@ -298,7 +298,7 @@ const Settings = {
             '</span>';
         }
         if (memberTags === '') {
-          memberTags = '<span style="color:#6B7280;font-size:13px;">No members assigned</span>';
+          memberTags = '<span style="color:var(--fury-neutral);font-size:13px;">No members assigned</span>';
         }
 
         rows +=
@@ -312,17 +312,17 @@ const Settings = {
 
     return (
       '<div class="fury-flex-between fury-mb-2">' +
-      '<div style="font-size:13px;color:#6B7280;">' + self.teams.length + ' team(s)</div>' +
+      '<div style="font-size:13px;color:var(--fury-neutral);">' + self.teams.length + ' team(s)</div>' +
       '<button class="fury-btn fury-btn-sm fury-btn-primary" id="set-add-team">+ Add Team</button>' +
       '</div>' +
       '<div class="fury-card" style="padding:0;overflow:hidden;">' +
       '<table class="fury-table">' +
       '<thead>' +
       '<tr>' +
-      '<th>Team Name</th>' +
-      '<th>Lead (Email)</th>' +
-      '<th style="width:100px;text-align:center;">Members</th>' +
-      '<th style="width:160px;text-align:right;">Actions</th>' +
+      '<th scope="col">Team Name</th>' +
+      '<th scope="col">Lead (Email)</th>' +
+      '<th scope="col" style="width:100px;text-align:center;">Members</th>' +
+      '<th scope="col" style="width:160px;text-align:right;">Actions</th>' +
       '</tr>' +
       '</thead>' +
       '<tbody id="set-teams-tbody">' + rows + '</tbody>' +
@@ -340,7 +340,7 @@ const Settings = {
 
     if (self.profiles.length === 0) {
       rows =
-        '<tr><td colspan="4" style="text-align:center;padding:40px;color:#6B7280;">' +
+        '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--fury-neutral);">' +
         'No user profiles found.' +
         '</td></tr>';
     } else {
@@ -379,17 +379,17 @@ const Settings = {
 
     return (
       '<div class="fury-flex-between fury-mb-2">' +
-      '<div style="font-size:13px;color:#6B7280;">' + self.profiles.length + ' user(s)</div>' +
+      '<div style="font-size:13px;color:var(--fury-neutral);">' + self.profiles.length + ' user(s)</div>' +
       '<button class="fury-btn fury-btn-sm fury-btn-primary" id="set-add-user">+ Add User</button>' +
       '</div>' +
       '<div class="fury-card" style="padding:0;overflow:hidden;">' +
       '<table class="fury-table">' +
       '<thead>' +
       '<tr>' +
-      '<th>Email</th>' +
-      '<th>Name</th>' +
-      '<th style="width:100px;">Role</th>' +
-      '<th style="width:140px;text-align:right;">Change Role</th>' +
+      '<th scope="col">Email</th>' +
+      '<th scope="col">Name</th>' +
+      '<th scope="col" style="width:100px;">Role</th>' +
+      '<th scope="col" style="width:140px;text-align:right;">Change Role</th>' +
       '</tr>' +
       '</thead>' +
       '<tbody id="set-users-tbody">' + rows + '</tbody>' +
@@ -471,12 +471,12 @@ const Settings = {
       '<table class="fury-table">' +
       '<thead>' +
       '<tr>' +
-      '<th>Month</th>' +
-      '<th style="width:80px;">Year</th>' +
-      '<th style="width:100px;text-align:center;">Status</th>' +
-      '<th>Locked By</th>' +
-      '<th>Date</th>' +
-      '<th style="width:100px;text-align:right;">Action</th>' +
+      '<th scope="col">Month</th>' +
+      '<th scope="col" style="width:80px;">Year</th>' +
+      '<th scope="col" style="width:100px;text-align:center;">Status</th>' +
+      '<th scope="col">Locked By</th>' +
+      '<th scope="col">Date</th>' +
+      '<th scope="col" style="width:100px;text-align:right;">Action</th>' +
       '</tr>' +
       '</thead>' +
       '<tbody id="set-months-tbody">' + rows + '</tbody>' +
@@ -515,50 +515,48 @@ const Settings = {
     var self = this;
 
     try {
-      // Load settings
+      // Parallel load: all settings + projects + teams + profiles + locks + team_members
       var settingKeys = ['billed_to', 'payment_terms', 'exchange_rate', 'working_hours_adjustment'];
+      var settingPromises = settingKeys.map(function (key) { return DB.getSetting(key); });
+
+      var parallel = await Promise.all([
+        Promise.all(settingPromises),
+        DB.client.from('projects').select('*').order('name', { ascending: true }),
+        DB.getTeams(),
+        DB.client.from('profiles').select('*').order('email', { ascending: true }),
+        DB.client.from('month_locks').select('*')
+          .order('year', { ascending: false })
+          .order('month', { ascending: false }),
+        // Single query for ALL team_members with employee names (replaces N+1 per team)
+        DB.client.from('team_members').select('*, employees(id, name, work_email)')
+      ]);
+
+      // Settings
+      var settingResults = parallel[0];
       for (var i = 0; i < settingKeys.length; i++) {
-        var key = settingKeys[i];
-        var result = await DB.getSetting(key);
-        if (result && result.data) {
-          self.settings[key] = result.data;
-        } else {
-          self.settings[key] = {};
-        }
+        var result = settingResults[i];
+        self.settings[settingKeys[i]] = (result && result.data) ? result.data : {};
       }
 
-      // Load all projects (including inactive)
-      var projResult = await DB.client
-        .from('projects')
-        .select('*')
-        .order('name', { ascending: true });
-      self.projects = (projResult && projResult.data) ? projResult.data : [];
+      self.projects = (parallel[1] && parallel[1].data) ? parallel[1].data : [];
+      self.teams = (parallel[2] && parallel[2].data) ? parallel[2].data : [];
 
-      // Load teams
-      var teamResult = await DB.getTeams();
-      self.teams = (teamResult && teamResult.data) ? teamResult.data : [];
-
-      // Load members for each team
+      // Group team_members by team_id from single query
       self.teamMembers = {};
       for (var t = 0; t < self.teams.length; t++) {
-        var membersResult = await DB.getTeamMembers(self.teams[t].id);
-        self.teamMembers[self.teams[t].id] = (membersResult && membersResult.data) ? membersResult.data : [];
+        self.teamMembers[self.teams[t].id] = [];
+      }
+      var allMembers = (parallel[5] && parallel[5].data) ? parallel[5].data : [];
+      for (var m = 0; m < allMembers.length; m++) {
+        var member = allMembers[m];
+        if (!self.teamMembers[member.team_id]) {
+          self.teamMembers[member.team_id] = [];
+        }
+        self.teamMembers[member.team_id].push(member);
       }
 
-      // Load profiles
-      var profileResult = await DB.client
-        .from('profiles')
-        .select('*')
-        .order('email', { ascending: true });
-      self.profiles = (profileResult && profileResult.data) ? profileResult.data : [];
-
-      // Load month locks
-      var locksResult = await DB.client
-        .from('month_locks')
-        .select('*')
-        .order('year', { ascending: false })
-        .order('month', { ascending: false });
-      self.monthLocks = (locksResult && locksResult.data) ? locksResult.data : [];
+      self.profiles = (parallel[3] && parallel[3].data) ? parallel[3].data : [];
+      self.monthLocks = (parallel[4] && parallel[4].data) ? parallel[4].data : [];
 
     } catch (err) {
       console.error('[Settings] loadData error:', err);
@@ -579,10 +577,31 @@ const Settings = {
         // Deactivate all tabs
         for (var j = 0; j < tabs.length; j++) {
           tabs[j].classList.remove('active');
+          tabs[j].setAttribute('aria-selected', 'false');
         }
         this.classList.add('active');
+        this.setAttribute('aria-selected', 'true');
         self.activeTab = this.getAttribute('data-tab');
         self.renderActiveTab(container);
+      });
+    }
+
+    // Arrow key navigation for tabs
+    var tabList = container.querySelector('[role="tablist"]');
+    if (tabList) {
+      tabList.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        var currentIdx = Array.prototype.indexOf.call(tabs, document.activeElement);
+        if (currentIdx === -1) return;
+        e.preventDefault();
+        var nextIdx;
+        if (e.key === 'ArrowRight') {
+          nextIdx = (currentIdx + 1) % tabs.length;
+        } else {
+          nextIdx = (currentIdx - 1 + tabs.length) % tabs.length;
+        }
+        tabs[nextIdx].focus();
+        tabs[nextIdx].click();
       });
     }
 
@@ -637,29 +656,65 @@ const Settings = {
     var saveBtn = container.querySelector('#set-save-general');
     if (saveBtn) {
       saveBtn.addEventListener('click', async function () {
+        // Validate before saving
+        var companyName = (container.querySelector('#set-billed-name') || {}).value || '';
+        var companyAddress = (container.querySelector('#set-billed-address') || {}).value || '';
+        var termsText = (container.querySelector('#set-terms-text') || {}).value || '';
+        var dueDaysVal = (container.querySelector('#set-due-days') || {}).value;
+        var rateVal = (container.querySelector('#set-uah-usd') || {}).value;
+        var subtractVal = (container.querySelector('#set-subtract-hours') || {}).value;
+
+        // Validate company name length
+        if (companyName.length > 200) {
+          showToast('Company name must be 200 characters or less.', 'error');
+          return;
+        }
+
+        // Validate due days
+        var dueDays = parseInt(dueDaysVal, 10);
+        if (dueDaysVal !== '' && (!Number.isFinite(dueDays) || dueDays < 1 || dueDays > 365)) {
+          showToast('Due days must be between 1 and 365.', 'error');
+          return;
+        }
+
+        // Validate exchange rate
+        var newRate = parseFloat(rateVal);
+        if (rateVal !== '' && (!Number.isFinite(newRate) || newRate < 0 || newRate > 1000)) {
+          showToast('Exchange rate must be between 0 and 1000.', 'error');
+          return;
+        }
+        if (rateVal === '' || isNaN(newRate)) newRate = 0;
+
+        // Validate subtract hours
+        var subtractHours = parseInt(subtractVal, 10);
+        if (isNaN(subtractHours)) subtractHours = 8;
+        if (subtractHours < 0 || subtractHours > 40) {
+          showToast('Adjustment hours must be between 0 and 40.', 'error');
+          return;
+        }
+
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
 
         try {
           // Billed To
           var billedTo = {
-            name: (container.querySelector('#set-billed-name') || {}).value || '',
-            address: (container.querySelector('#set-billed-address') || {}).value || ''
+            name: companyName,
+            address: companyAddress
           };
           var billedResult = await DB.setSetting('billed_to', billedTo);
           if (billedResult && billedResult.error) throw new Error(billedResult.error.message);
 
           // Payment Terms
           var terms = {
-            text: (container.querySelector('#set-terms-text') || {}).value || '',
-            due_days: parseInt((container.querySelector('#set-due-days') || {}).value, 10) || 7
+            text: termsText,
+            due_days: dueDays || 7
           };
           var termsResult = await DB.setSetting('payment_terms', terms);
           if (termsResult && termsResult.error) throw new Error(termsResult.error.message);
 
           // Exchange Rate
           var currentRate = self.settings.exchange_rate || {};
-          var newRate = parseFloat((container.querySelector('#set-uah-usd') || {}).value) || 0;
           var exchangeRate = {
             uah_usd: newRate,
             updated_at: newRate !== currentRate.uah_usd ? new Date().toISOString() : (currentRate.updated_at || new Date().toISOString())
@@ -668,8 +723,6 @@ const Settings = {
           if (rateResult && rateResult.error) throw new Error(rateResult.error.message);
 
           // Working Hours
-          var subtractHours = parseInt((container.querySelector('#set-subtract-hours') || {}).value, 10);
-          if (isNaN(subtractHours)) subtractHours = 8;
           var workingHours = {
             subtract_hours: subtractHours
           };
@@ -682,7 +735,7 @@ const Settings = {
           self.settings.exchange_rate = exchangeRate;
           self.settings.working_hours_adjustment = workingHours;
 
-          showToast('Settings saved successfully!', 'success');
+          showToast('Settings saved', 'success');
         } catch (err) {
           console.error('[Settings] save general error:', err);
           showToast('Failed to save settings. Please try again.', 'error');
@@ -814,6 +867,8 @@ const Settings = {
         // Lock month
         var lockBtn = e.target.closest('.set-lock-month');
         if (lockBtn) {
+          if (lockBtn.disabled) return;
+          lockBtn.disabled = true;
           var month = parseInt(lockBtn.getAttribute('data-month'), 10);
           var year = parseInt(lockBtn.getAttribute('data-year'), 10);
           self._lockMonth(month, year, container);
@@ -823,6 +878,8 @@ const Settings = {
         // Unlock month
         var unlockBtn = e.target.closest('.set-unlock-month');
         if (unlockBtn) {
+          if (unlockBtn.disabled) return;
+          unlockBtn.disabled = true;
           var unlockMonth = parseInt(unlockBtn.getAttribute('data-month'), 10);
           var unlockYear = parseInt(unlockBtn.getAttribute('data-year'), 10);
           self._unlockMonth(unlockMonth, unlockYear, container);
@@ -836,6 +893,7 @@ const Settings = {
      ═══════════════════════════════════════════════════ */
 
   _openModal(title, bodyHtml, footerHtml) {
+    this._modalTrigger = document.activeElement;
     var overlay = document.querySelector('#settings-modal-overlay');
     var titleEl = document.querySelector('#settings-modal-title');
     var bodyEl = document.querySelector('#settings-modal-body');
@@ -846,26 +904,45 @@ const Settings = {
     if (footerEl) footerEl.innerHTML = footerHtml;
     if (overlay) overlay.classList.add('active');
 
+    // Cleanup previous handlers if any
+    this._cleanupModalHandlers();
+
     // Escape to close
     var self = this;
-    var escHandler = function(e) {
+    this._currentEscHandler = function(e) {
       if (e.key === 'Escape') self._closeModal();
     };
-    document.addEventListener('keydown', escHandler);
-    this._currentEscHandler = escHandler;
+    document.addEventListener('keydown', this._currentEscHandler);
 
     // Enter to submit
-    var enterHandler = function(e) {
+    this._currentEnterHandler = function(e) {
       if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
         e.preventDefault();
         var saveBtn = overlay.querySelector('.fury-btn-primary');
         if (saveBtn && !saveBtn.disabled) saveBtn.click();
       }
     };
-    overlay.addEventListener('keydown', enterHandler);
+    if (overlay) overlay.addEventListener('keydown', this._currentEnterHandler);
 
     // Body scroll lock
     document.body.classList.add('fury-modal-open');
+
+    // Trap focus inside modal
+    if (overlay) {
+      this._currentFocusTrap = function(e) {
+        if (e.key !== 'Tab') return;
+        var focusable = overlay.querySelectorAll('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+        if (focusable.length === 0) return;
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      };
+      overlay.addEventListener('keydown', this._currentFocusTrap);
+    }
 
     // Focus first input
     setTimeout(function() {
@@ -874,18 +951,58 @@ const Settings = {
     }, 100);
   },
 
-  _closeModal() {
-    var overlay = document.querySelector('#settings-modal-overlay');
-    if (overlay) overlay.classList.remove('active');
-
-    // Cleanup Escape handler
+  _cleanupModalHandlers() {
     if (this._currentEscHandler) {
       document.removeEventListener('keydown', this._currentEscHandler);
       this._currentEscHandler = null;
     }
+    var overlay = document.querySelector('#settings-modal-overlay');
+    if (overlay && this._currentEnterHandler) {
+      overlay.removeEventListener('keydown', this._currentEnterHandler);
+      this._currentEnterHandler = null;
+    }
+    if (overlay && this._currentFocusTrap) {
+      overlay.removeEventListener('keydown', this._currentFocusTrap);
+      this._currentFocusTrap = null;
+    }
+  },
+
+  _closeModal() {
+    var overlay = document.querySelector('#settings-modal-overlay');
+    if (overlay) overlay.classList.remove('active');
+
+    // Cleanup all modal handlers
+    this._cleanupModalHandlers();
 
     // Remove body scroll lock
     document.body.classList.remove('fury-modal-open');
+
+    // Return focus to trigger element
+    if (this._modalTrigger && typeof this._modalTrigger.focus === 'function') {
+      this._modalTrigger.focus();
+      this._modalTrigger = null;
+    }
+  },
+
+  /* ── Custom Confirm Dialog (replaces browser confirm()) ── */
+  _confirmDialog(message, onConfirm) {
+    var self = this;
+    var bodyHtml =
+      '<p style="font-size:14px;color:#E5E7EB;line-height:1.6;white-space:pre-line;">' +
+      self._escapeHtml(message) + '</p>';
+    var footerHtml =
+      '<button class="fury-btn fury-btn-secondary" id="modal-confirm-cancel">Cancel</button>' +
+      '<button class="fury-btn fury-btn-danger" id="modal-confirm-ok">Confirm</button>';
+
+    self._openModal('Confirm Action', bodyHtml, footerHtml);
+
+    document.querySelector('#modal-confirm-cancel').addEventListener('click', function () {
+      self._closeModal();
+    });
+    document.querySelector('#modal-confirm-ok').addEventListener('click', function () {
+      self._closeModal();
+      onConfirm();
+    });
   },
 
   /* ═══════════════════════════════════════════════════
@@ -959,6 +1076,22 @@ const Settings = {
         return;
       }
 
+      // Check for duplicate code on new projects
+      if (!isEdit) {
+        var upperCode = code.toUpperCase();
+        var duplicate = self.projects.find(function(p) { return p.code === upperCode; });
+        if (duplicate) {
+          showToast('A project with code "' + upperCode + '" already exists.', 'error');
+          return;
+        }
+      }
+
+      // Validate company against whitelist
+      if (self.COMPANIES.indexOf(company) === -1) {
+        showToast('Invalid company selected.', 'error');
+        return;
+      }
+
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
 
@@ -983,7 +1116,7 @@ const Settings = {
         if (result.error) throw result.error;
 
         self._closeModal();
-        showToast(isEdit ? 'Project updated.' : 'Project created.', 'success');
+        showToast(isEdit ? 'Project updated' : 'Project created', 'success');
 
         // Reload projects
         var projResult = await DB.client
@@ -1041,6 +1174,10 @@ const Settings = {
         showToast('Team name is required.', 'error');
         return;
       }
+      if (name.length > 100) {
+        showToast('Team name must be 100 characters or less.', 'error');
+        return;
+      }
       if (leadEmail && !Validation.isValidEmail(leadEmail)) {
         showToast('Please enter a valid lead email.', 'error');
         return;
@@ -1068,7 +1205,7 @@ const Settings = {
         if (result.error) throw result.error;
 
         self._closeModal();
-        showToast(isEdit ? 'Team updated.' : 'Team created.', 'success');
+        showToast(isEdit ? 'Team updated' : 'Team created', 'success');
 
         // Reload teams
         var teamResult = await DB.getTeams();
@@ -1103,7 +1240,7 @@ const Settings = {
         '</div>';
     }
     if (!memberListHtml) {
-      memberListHtml = '<div style="color:#6B7280;font-size:13px;padding:8px 0;">No members in this team.</div>';
+      memberListHtml = '<div style="color:var(--fury-neutral);font-size:13px;padding:8px 0;">No members in this team.</div>';
     }
 
     // Build employee dropdown (exclude already-assigned members)
@@ -1112,12 +1249,7 @@ const Settings = {
       assignedIds[members[m].employee_id] = true;
     }
 
-    var empOptions = '<option value="">Select employee...</option>';
-    for (var e = 0; e < self.projects.length; e++) {
-      // We need employees, not projects. Load from cached list or...
-      // Actually we need employees. Let's build from what we fetched.
-    }
-    // We might not have all employees loaded. Build options from a separate fetch within the handler.
+    // Employee options loaded asynchronously via _loadEmployeesForMemberSelect
 
     var bodyHtml =
       '<div style="margin-bottom:16px;">' +
@@ -1152,38 +1284,33 @@ const Settings = {
     // Remove member (delegated)
     var membersList = document.querySelector('#modal-members-list');
     if (membersList) {
-      membersList.addEventListener('click', async function (e) {
+      membersList.addEventListener('click', function (e) {
         var removeBtn = e.target.closest('.remove-member');
         if (!removeBtn) return;
 
         var memberId = removeBtn.getAttribute('data-member-id');
-        if (!confirm('Remove this member from the team?')) return;
+        self._closeModal();
+        self._confirmDialog('Remove this member from the team?', async function () {
+          try {
+            var result = await DB.client
+              .from('team_members')
+              .delete()
+              .eq('id', memberId);
 
-        removeBtn.style.pointerEvents = 'none';
-        removeBtn.style.opacity = '0.5';
+            if (result.error) throw result.error;
 
-        try {
-          var result = await DB.client
-            .from('team_members')
-            .delete()
-            .eq('id', memberId);
+            showToast('Member removed', 'success');
 
-          if (result.error) throw result.error;
+            // Reload team members
+            var membersResult = await DB.getTeamMembers(team.id);
+            self.teamMembers[team.id] = (membersResult && membersResult.data) ? membersResult.data : [];
+            self.renderActiveTab(container);
 
-          showToast('Member removed.', 'success');
-          self._closeModal();
-
-          // Reload team members
-          var membersResult = await DB.getTeamMembers(team.id);
-          self.teamMembers[team.id] = (membersResult && membersResult.data) ? membersResult.data : [];
-          self.renderActiveTab(container);
-
-        } catch (err) {
-          console.error('[Settings] remove member error:', err);
-          showToast('Failed to remove member. Please try again.', 'error');
-          removeBtn.style.pointerEvents = '';
-          removeBtn.style.opacity = '';
-        }
+          } catch (err) {
+            console.error('[Settings] remove member error:', err);
+            showToast('Failed to remove member. Please try again.', 'error');
+          }
+        });
       });
     }
 
@@ -1214,7 +1341,7 @@ const Settings = {
 
           if (result.error) throw result.error;
 
-          showToast('Member added.', 'success');
+          showToast('Member added', 'success');
           self._closeModal();
 
           // Reload team members
@@ -1260,6 +1387,7 @@ const Settings = {
 
     } catch (err) {
       console.error('[Settings] loadEmployeesForMemberSelect error:', err);
+      showToast('Failed to load employee list.', 'error');
     }
   },
 
@@ -1307,6 +1435,7 @@ const Settings = {
       var fullName = (document.querySelector('#modal-user-name') || {}).value.trim();
       var role = (document.querySelector('#modal-user-role') || {}).value;
 
+      // Validate email
       if (!email) {
         showToast('Email is required.', 'error');
         return;
@@ -1316,16 +1445,39 @@ const Settings = {
         return;
       }
 
+      // Validate name
+      if (!fullName) {
+        showToast('Full name is required.', 'error');
+        return;
+      }
+      if (fullName.length > 100) {
+        showToast('Full name must be 100 characters or less.', 'error');
+        return;
+      }
+
+      // Validate role against whitelist
+      if (self.ROLES.indexOf(role) === -1) {
+        showToast('Invalid role selected.', 'error');
+        return;
+      }
+
+      // Check for duplicate email
+      var existingUser = self.profiles.find(function(p) { return p.email === email; });
+      if (existingUser) {
+        showToast('A user with this email already exists.', 'error');
+        return;
+      }
+
       saveBtn.disabled = true;
       saveBtn.textContent = 'Creating...';
 
       try {
-        // Generate secure temp password
-        var arr = new Uint8Array(12);
+        // Generate secure temp password (16 chars for better entropy)
+        var arr = new Uint8Array(16);
         crypto.getRandomValues(arr);
         var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
         var tempPassword = '';
-        for (var ci = 0; ci < 12; ci++) {
+        for (var ci = 0; ci < 16; ci++) {
           tempPassword += chars[arr[ci] % chars.length];
         }
 
@@ -1341,16 +1493,37 @@ const Settings = {
 
         self._closeModal();
 
-        // Copy temp password to clipboard
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(tempPassword).then(function() {
-            showToast('User created! Password copied to clipboard.', 'success');
-          }).catch(function() {
-            prompt('User created. Copy the temporary password:', tempPassword);
-          });
-        } else {
-          prompt('User created. Copy the temporary password:', tempPassword);
-        }
+        // Show password in a secure modal (not prompt())
+        var pwBodyHtml =
+          '<p style="font-size:13px;color:#9CA3AF;margin-bottom:12px;">User created successfully. Copy the temporary password below:</p>' +
+          '<div style="display:flex;gap:8px;align-items:center;">' +
+          '<input class="fury-input" id="modal-temp-password" type="text" value="' + self._escapeAttr(tempPassword) + '" readonly ' +
+          'style="font-family:monospace;font-size:14px;letter-spacing:0.05em;">' +
+          '<button class="fury-btn fury-btn-sm fury-btn-primary" id="modal-copy-password">Copy</button>' +
+          '</div>';
+        var pwFooterHtml = '<button class="fury-btn fury-btn-secondary" id="modal-pw-close">Close</button>';
+        self._openModal('User Created', pwBodyHtml, pwFooterHtml);
+
+        document.querySelector('#modal-copy-password').addEventListener('click', function() {
+          var pwInput = document.querySelector('#modal-temp-password');
+          if (pwInput) {
+            pwInput.select();
+            if (navigator.clipboard) {
+              navigator.clipboard.writeText(pwInput.value).then(function() {
+                showToast('Password copied to clipboard.', 'success');
+              }).catch(function() {
+                document.execCommand('copy');
+                showToast('Password copied.', 'success');
+              });
+            } else {
+              document.execCommand('copy');
+              showToast('Password copied.', 'success');
+            }
+          }
+        });
+        document.querySelector('#modal-pw-close').addEventListener('click', function() {
+          self._closeModal();
+        });
 
         // Reload profiles
         var profileResult = await DB.client
@@ -1373,8 +1546,15 @@ const Settings = {
   /* ═══════════════════════════════════════════════════
      ROLE CHANGE
      ═══════════════════════════════════════════════════ */
-  async _changeUserRole(userId, newRole, container) {
+  _changeUserRole(userId, newRole, container) {
     var self = this;
+
+    // Validate role against whitelist
+    if (self.ROLES.indexOf(newRole) === -1) {
+      showToast('Invalid role.', 'error');
+      self.renderActiveTab(container);
+      return;
+    }
 
     // Prevent self-demotion
     if (App.user && App.user.id === userId && newRole !== 'admin') {
@@ -1383,99 +1563,110 @@ const Settings = {
       return;
     }
 
-    try {
-      var result = await DB.client
-        .from('profiles')
-        .update({ role: newRole })
-        .eq('id', userId)
-        .select()
-        .single();
+    // Find user name for confirm message
+    var targetUser = self.profiles.find(function(p) { return p.id === userId; });
+    var userName = targetUser ? (targetUser.full_name || targetUser.email) : userId;
 
-      if (result.error) throw result.error;
+    self._confirmDialog(
+      'Change role for ' + userName + ' to "' + newRole + '"?',
+      async function () {
+        try {
+          var result = await DB.client
+            .from('profiles')
+            .update({ role: newRole })
+            .eq('id', userId)
+            .select()
+            .single();
 
-      // Update local cache
-      for (var i = 0; i < self.profiles.length; i++) {
-        if (self.profiles[i].id === userId) {
-          self.profiles[i].role = newRole;
-          break;
+          if (result.error) throw result.error;
+
+          // Update local cache
+          for (var i = 0; i < self.profiles.length; i++) {
+            if (self.profiles[i].id === userId) {
+              self.profiles[i].role = newRole;
+              break;
+            }
+          }
+
+          showToast('Role updated to ' + newRole + '. User must re-login for full effect.', 'success');
+          self.renderActiveTab(container);
+
+        } catch (err) {
+          console.error('[Settings] change role error:', err);
+          showToast('Failed to change role. Please try again.', 'error');
+          self.renderActiveTab(container);
         }
       }
-
-      showToast('Role updated to ' + newRole + '.', 'success');
-
-    } catch (err) {
-      console.error('[Settings] change role error:', err);
-      showToast('Failed to change role. Please try again.', 'error');
-      // Re-render to reset the select
-      self.renderActiveTab(container);
-    }
+    );
   },
 
   /* ═══════════════════════════════════════════════════
      MONTH LOCK / UNLOCK
      ═══════════════════════════════════════════════════ */
-  async _lockMonth(month, year, container) {
+  _lockMonth(month, year, container) {
     var self = this;
     var monthNames = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
 
-    if (!confirm('Lock ' + monthNames[month - 1] + ' ' + year + '?\n\nTimesheets and invoices for this month will not be editable.')) {
-      return;
-    }
+    self._confirmDialog(
+      'Lock ' + monthNames[month - 1] + ' ' + year + '?\n\nTimesheets and invoices for this month will not be editable.',
+      async function () {
+        try {
+          var result = await DB.lockMonth(month, year);
+          if (result.error) throw result.error;
 
-    try {
-      var result = await DB.lockMonth(month, year);
-      if (result.error) throw result.error;
+          showToast(monthNames[month - 1] + ' ' + year + ' locked', 'success');
 
-      showToast(monthNames[month - 1] + ' ' + year + ' locked.', 'success');
+          // Reload locks
+          var locksResult = await DB.client
+            .from('month_locks')
+            .select('*')
+            .order('year', { ascending: false })
+            .order('month', { ascending: false });
+          self.monthLocks = (locksResult && locksResult.data) ? locksResult.data : [];
+          self.renderActiveTab(container);
 
-      // Reload locks
-      var locksResult = await DB.client
-        .from('month_locks')
-        .select('*')
-        .order('year', { ascending: false })
-        .order('month', { ascending: false });
-      self.monthLocks = (locksResult && locksResult.data) ? locksResult.data : [];
-      self.renderActiveTab(container);
-
-    } catch (err) {
-      console.error('[Settings] lock month error:', err);
-      showToast('Failed to lock month. Please try again.', 'error');
-    }
+        } catch (err) {
+          console.error('[Settings] lock month error:', err);
+          showToast('Failed to lock month. Please try again.', 'error');
+        }
+      }
+    );
   },
 
-  async _unlockMonth(month, year, container) {
+  _unlockMonth(month, year, container) {
     var self = this;
     var monthNames = [
       'January', 'February', 'March', 'April', 'May', 'June',
       'July', 'August', 'September', 'October', 'November', 'December'
     ];
 
-    if (!confirm('Unlock ' + monthNames[month - 1] + ' ' + year + '?\n\nTimesheets and invoices for this month will become editable again.')) {
-      return;
-    }
+    self._confirmDialog(
+      'Unlock ' + monthNames[month - 1] + ' ' + year + '?\n\nTimesheets and invoices for this month will become editable again.',
+      async function () {
+        try {
+          var result = await DB.unlockMonth(month, year);
+          if (result.error) throw result.error;
 
-    try {
-      var result = await DB.unlockMonth(month, year);
-      if (result.error) throw result.error;
+          showToast(monthNames[month - 1] + ' ' + year + ' unlocked', 'success');
 
-      showToast(monthNames[month - 1] + ' ' + year + ' unlocked.', 'success');
+          // Reload locks
+          var locksResult = await DB.client
+            .from('month_locks')
+            .select('*')
+            .order('year', { ascending: false })
+            .order('month', { ascending: false });
+          self.monthLocks = (locksResult && locksResult.data) ? locksResult.data : [];
+          self.renderActiveTab(container);
 
-      // Reload locks
-      var locksResult = await DB.client
-        .from('month_locks')
-        .select('*')
-        .order('year', { ascending: false })
-        .order('month', { ascending: false });
-      self.monthLocks = (locksResult && locksResult.data) ? locksResult.data : [];
-      self.renderActiveTab(container);
-
-    } catch (err) {
-      console.error('[Settings] unlock month error:', err);
-      showToast('Failed to unlock month. Please try again.', 'error');
-    }
+        } catch (err) {
+          console.error('[Settings] unlock month error:', err);
+          showToast('Failed to unlock month. Please try again.', 'error');
+        }
+      }
+    );
   },
 
   /* ═══════════════════════════════════════════════════
@@ -1495,6 +1686,8 @@ const Settings = {
     if (!str) return '';
     return String(str)
       .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
   },
@@ -1515,7 +1708,7 @@ const Settings = {
       'Manage corporate email provisioning requests. When a request is approved and marked as "created", the email is auto-synced to the employee record.' +
       '</p>' +
       '<table class="fury-table"><thead><tr>' +
-      '<th>Employee</th><th>Status</th><th>Requested</th><th>Note/Email</th><th style="width:200px">Actions</th>' +
+      '<th scope="col">Employee</th><th scope="col">Status</th><th scope="col">Requested</th><th scope="col">Note/Email</th><th scope="col" style="width:200px">Actions</th>' +
       '</tr></thead><tbody id="set-email-tbody">';
 
     if (requests.length === 0) {
@@ -1567,7 +1760,8 @@ const Settings = {
       created: 'fury-badge fury-badge-success'
     };
     var label = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected', created: 'Created' };
-    return '<span class="' + (map[status] || 'fury-badge') + '">' + (label[status] || status) + '</span>';
+    var safeStatus = label[status] || this._escapeHtml(status);
+    return '<span class="' + (map[status] || 'fury-badge') + '">' + safeStatus + '</span>';
   },
 
   _bindEmailRequestEvents(container) {
@@ -1581,6 +1775,9 @@ const Settings = {
         contentEl.innerHTML = self.renderEmailRequests();
         self._attachEmailRequestHandlers(container);
       }
+    }).catch(function (err) {
+      console.error('[Settings] load email requests error:', err);
+      showToast('Failed to load email requests.', 'error');
     });
   },
 
@@ -1638,8 +1835,21 @@ const Settings = {
           return;
         }
         btn.disabled = true;
+        var req = (self._emailRequests || []).find(function(r) { return r.id === id; });
         DB.updateEmailRequest(id, { status: 'created', admin_note: note }).then(function () {
-          showToast('Email created and synced!', 'success');
+          if (req && req.employee_id) {
+            return DB.client
+              .from('employees')
+              .update({ work_email: note })
+              .eq('id', req.employee_id);
+          }
+        }).then(function (syncResult) {
+          if (syncResult && syncResult.error) {
+            console.warn('[Settings] work_email sync warning:', syncResult.error);
+            showToast('Request marked created, but email sync failed.', 'warning');
+          } else {
+            showToast('Email created and synced to employee.', 'success');
+          }
           self._bindEmailRequestEvents(container);
         }).catch(function (err) {
           console.error('[Settings] update email error:', err);
@@ -1747,6 +1957,9 @@ const Settings = {
         contentEl.innerHTML = self.renderWorkingHours();
         self._attachWorkingHoursHandlers(container);
       }
+    }).catch(function (err) {
+      console.error('[Settings] load working hours config error:', err);
+      showToast('Failed to load working hours config.', 'error');
     });
   },
 
@@ -1773,20 +1986,43 @@ const Settings = {
     var saveBtn = container.querySelector('#set-wh-save');
     if (saveBtn) {
       saveBtn.addEventListener('click', async function () {
+        // Validate inputs
+        var wdVal = parseInt(container.querySelector('#set-wh-days').value, 10);
+        var hpdVal = parseFloat(container.querySelector('#set-wh-hpd').value);
+        var adjVal = parseFloat(container.querySelector('#set-wh-adj').value);
+        var notesVal = (container.querySelector('#set-wh-notes').value || '').trim();
+
+        if (!Number.isFinite(wdVal) || wdVal < 0 || wdVal > 31) {
+          showToast('Working days must be between 0 and 31.', 'error');
+          return;
+        }
+        if (!Number.isFinite(hpdVal) || hpdVal < 0 || hpdVal > 24) {
+          showToast('Hours per day must be between 0 and 24.', 'error');
+          return;
+        }
+        if (!Number.isFinite(adjVal) || adjVal < -200 || adjVal > 200) {
+          showToast('Adjustment hours must be between -200 and 200.', 'error');
+          return;
+        }
+        if (notesVal.length > 500) {
+          showToast('Notes must be 500 characters or less.', 'error');
+          return;
+        }
+
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
         try {
           var config = {
             month: self._whMonth,
             year: self._whYear,
-            working_days: parseInt(container.querySelector('#set-wh-days').value, 10) || 0,
-            hours_per_day: parseFloat(container.querySelector('#set-wh-hpd').value) || 8,
-            adjustment_hours: parseFloat(container.querySelector('#set-wh-adj').value) || 0,
-            notes: (container.querySelector('#set-wh-notes').value || '').trim()
+            working_days: wdVal,
+            hours_per_day: hpdVal,
+            adjustment_hours: adjVal,
+            notes: notesVal
           };
           var result = await DB.upsertWorkingHoursConfig(config);
           if (result && result.error) throw new Error(result.error.message);
-          showToast('Working hours config saved!', 'success');
+          showToast('Working hours config saved', 'success');
           self._whConfig = config;
           var contentEl = container.querySelector('#settings-content');
           if (contentEl) {
@@ -1804,6 +2040,12 @@ const Settings = {
   },
 
   destroy() {
+    // Cleanup modal event handlers
+    this._cleanupModalHandlers();
+
+    // Remove body scroll lock
+    document.body.classList.remove('fury-modal-open');
+
     // Remove any lingering settings modals
     var modals = document.querySelectorAll('#settings-modal-overlay');
     for (var i = 0; i < modals.length; i++) {
