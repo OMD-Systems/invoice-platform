@@ -1060,13 +1060,24 @@ const Team = {
     var invoice = self.getEmployeeInvoice(emp.id);
     if (!invoice) return;
 
-    if (!confirm('Are you sure you want to delete this invoice? The hours will remain, and you can re-generate the invoice again.')) {
+    var btn = container.querySelector('#team-btn-delete-invoice');
+    if (!btn) return;
+    // Two-click confirmation
+    if (!btn.dataset.confirmPending) {
+      btn.dataset.confirmPending = '1';
+      var btnHtmlSaved = btn.innerHTML;
+      btn.innerHTML = '<span style="color:var(--fury-danger)">Sure? Click again</span>';
+      setTimeout(function () {
+        if (btn.dataset.confirmPending) {
+          delete btn.dataset.confirmPending;
+          btn.innerHTML = btnHtmlSaved;
+        }
+      }, 3000);
       return;
     }
-
-    var btn = container.querySelector('#team-btn-delete-invoice');
-    var btnHtml = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.textContent = 'Deleting...'; }
+    delete btn.dataset.confirmPending;
+    var btnHtml = btn.innerHTML;
+    btn.disabled = true; btn.textContent = 'Deleting...';
 
     try {
       var result = await DB.deleteInvoice(invoice.id);
@@ -1766,7 +1777,22 @@ const Team = {
     if (!emp) return;
 
     if (action === 'delete') {
-      if (!confirm('Delete this invoice? This action cannot be undone.')) return;
+      // Two-click: find the button that was clicked and toggle confirmation
+      var delBtn = container.querySelector('.td-inv-delete[data-invoice-id="' + invoiceId + '"]');
+      if (delBtn && !delBtn.dataset.confirmPending) {
+        delBtn.dataset.confirmPending = '1';
+        delBtn.textContent = 'Sure?';
+        delBtn.style.color = 'var(--fury-danger)';
+        setTimeout(function () {
+          if (delBtn.dataset.confirmPending) {
+            delete delBtn.dataset.confirmPending;
+            delBtn.textContent = '🗑';
+            delBtn.style.color = '';
+          }
+        }, 3000);
+        return;
+      }
+      if (delBtn) delete delBtn.dataset.confirmPending;
       try {
         var result = await DB.deleteInvoice(invoiceId);
         if (result && result.error) throw new Error(result.error.message);
