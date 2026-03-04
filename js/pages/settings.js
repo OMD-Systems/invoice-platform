@@ -1359,7 +1359,8 @@ const Settings = {
 
       } catch (err) {
         console.error('[Settings] add user error:', err);
-        showToast('Failed to create user. Please try again.', 'error');
+        var errMsg = (err && err.message) || (err && err.details) || 'Unknown error';
+        showToast('Failed to create user: ' + errMsg, 'error');
         saveBtn.disabled = false;
         saveBtn.textContent = 'Create User';
       }
