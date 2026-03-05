@@ -2109,16 +2109,15 @@ const Team = {
         return;
       }
 
-      // Download from Supabase Storage (signed URL with Content-Disposition)
+      // Download locally
       var fileName = generator.getFileName(emp);
-      var bucket = docType === 'contract' ? 'contracts' : 'documents';
-      var storagePath = emp.id + '/' + docType + '.docx';
-      var signedResult = await DB.client.storage
-        .from(bucket)
-        .createSignedUrl(storagePath, 60, { download: fileName });
-      if (signedResult.data && signedResult.data.signedUrl) {
-        window.location.href = signedResult.data.signedUrl;
-      }
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 1000);
 
       // Refresh cache
       var freshResult = await DB.getEmployee(emp.id);
