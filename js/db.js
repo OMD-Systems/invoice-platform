@@ -1132,6 +1132,7 @@ const DB = {
         .createSignedUrl(pdfPath, 3600);
 
       if (error) return { data: null, error };
+      if (!data || !data.signedUrl) return { data: null, error: { message: 'Contract file not found' } };
       return { data: data.signedUrl, error: null };
     } catch (err) {
       return { data: null, error: { message: err.message } };
@@ -1221,6 +1222,7 @@ const DB = {
         .createSignedUrl(pdfPath, 3600);
 
       if (error) return { data: null, error };
+      if (!data || !data.signedUrl) return { data: null, error: { message: 'NDA file not found' } };
       return { data: data.signedUrl, error: null };
     } catch (err) {
       return { data: null, error: { message: err.message } };

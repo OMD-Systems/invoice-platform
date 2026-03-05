@@ -344,9 +344,6 @@ const ContractDocx = {
     var C = self.COLORS;
     var agreementDate = self._formatDateLong(emp.agreement_date) || self._formatDateLong(new Date().toISOString());
     var effectiveDate = self._formatDateLong(emp.effective_date) || agreementDate;
-    var dob = self._formatDateLong(emp.date_of_birth);
-    var passIssued = self._formatDateLong(emp.passport_issued);
-    var passExpires = self._formatDateLong(emp.passport_expires);
 
     var elements = [];
 
@@ -747,10 +744,7 @@ const ContractDocx = {
       }),
       new docx.Paragraph({
         children: [
-          new docx.TextRun({ text: 'Consulting Services Agreement  |  CONFIDENTIAL  |  Page ', font: self.FONT_HEADING, size: 16, color: C.TEXT_MUTED }),
-          new docx.SimpleField('PAGE', '1'),
-          new docx.TextRun({ text: ' of ', font: self.FONT_HEADING, size: 16, color: C.TEXT_MUTED }),
-          new docx.SimpleField('NUMPAGES', '1'),
+          new docx.TextRun({ children: ['Consulting Services Agreement  |  CONFIDENTIAL  |  Page ', docx.PageNumber.CURRENT, ' of ', docx.PageNumber.TOTAL_PAGES], font: self.FONT_HEADING, size: 16, color: C.TEXT_MUTED }),
         ],
         alignment: docx.AlignmentType.CENTER,
         spacing: { before: 0, after: 0 },

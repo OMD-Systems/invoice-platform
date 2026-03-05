@@ -167,6 +167,7 @@ const Numbering = {
     var dotMatch = String(dateStr).match(/^\d{2}\.(\d{2})\.(\d{2,4})$/);
     if (dotMatch) {
       m = parseInt(dotMatch[1], 10) - 1;
+      if (m < 0 || m > 11) return '';
       y = dotMatch[2].length === 2 ? '20' + dotMatch[2] : dotMatch[2];
       return months[m] + '-' + y;
     }
@@ -174,6 +175,7 @@ const Numbering = {
     var isoMatch = String(dateStr).match(/^(\d{4})-(\d{2})/);
     if (isoMatch) {
       m = parseInt(isoMatch[2], 10) - 1;
+      if (m < 0 || m > 11) return '';
       return months[m] + '-' + isoMatch[1];
     }
     return '';

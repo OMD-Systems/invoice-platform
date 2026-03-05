@@ -4,6 +4,13 @@
 // Required CF Pages env vars: SUPABASE_URL, SUPABASE_ANON_KEY
 // Set them in: CF Dashboard → Pages → Settings → Environment variables
 
+function escapeForJS(str) {
+  return String(str || '')
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/<\/script>/gi, '<\\/script>');
+}
+
 export async function onRequest(context) {
   const response = await context.next();
 
@@ -15,9 +22,10 @@ export async function onRequest(context) {
 
   const html = await response.text();
 
-  const envScript = `<script>window.__ENV__={SUPABASE_URL:"${context.env.SUPABASE_URL || ''}",SUPABASE_ANON_KEY:"${context.env.SUPABASE_ANON_KEY || ''}"};</script>`;
+  const url = escapeForJS(context.env.SUPABASE_URL);
+  const key = escapeForJS(context.env.SUPABASE_ANON_KEY);
+  const envScript = `<script>window.__ENV__={SUPABASE_URL:"${url}",SUPABASE_ANON_KEY:"${key}"};</script>`;
 
-  // Inject before </head> or at the start of <body>
   const injected = html.replace('<head>', '<head>\n' + envScript);
 
   return new Response(injected, {

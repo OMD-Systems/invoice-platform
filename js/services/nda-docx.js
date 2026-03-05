@@ -634,10 +634,7 @@ const NdaDocx = {
       }),
       new docx.Paragraph({
         children: [
-          new docx.TextRun({ text: 'Non-Disclosure Agreement  |  STRICTLY CONFIDENTIAL  |  Page ', font: self.FONT_HEADING, size: 16, color: C.TEXT_MUTED }),
-          new docx.SimpleField('PAGE', '1'),
-          new docx.TextRun({ text: ' of ', font: self.FONT_HEADING, size: 16, color: C.TEXT_MUTED }),
-          new docx.SimpleField('NUMPAGES', '1'),
+          new docx.TextRun({ children: ['Non-Disclosure Agreement  |  STRICTLY CONFIDENTIAL  |  Page ', docx.PageNumber.CURRENT, ' of ', docx.PageNumber.TOTAL_PAGES], font: self.FONT_HEADING, size: 16, color: C.TEXT_MUTED }),
         ],
         alignment: docx.AlignmentType.CENTER,
         spacing: { before: 0, after: 0 },

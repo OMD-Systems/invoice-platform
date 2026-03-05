@@ -2076,7 +2076,7 @@ const Team = {
      ═══════════════════════════════════════════════════════ */
   async handleGenerateDocument(docType, container) {
     var self = this;
-    var emp = self.detailCache;
+    var emp = self.findEmployee(self.selectedId);
     if (!emp) { showToast('No employee selected', 'error'); return; }
 
     var generator = docType === 'contract' ? ContractDocx : NdaDocx;
@@ -2113,17 +2113,26 @@ const Team = {
       var fileName = (emp.full_name_lat || emp.name || 'employee').replace(/\s+/g, '_') + '_' + label + '.docx';
       if (typeof saveAs !== 'undefined') {
         saveAs(blob, fileName);
+      } else {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 200);
       }
 
       // Refresh cache
       var freshResult = await DB.getEmployee(emp.id);
       if (freshResult.data) {
-        self.detailCache = freshResult.data;
-        // Update list cache too
-        if (self.employees) {
-          for (var i = 0; i < self.employees.length; i++) {
-            if (self.employees[i].id === emp.id) {
-              self.employees[i][uploadedAtField] = freshResult.data[uploadedAtField];
+        // Update both allEmployees and employees caches
+        var caches = [self.allEmployees, self.employees];
+        for (var c = 0; c < caches.length; c++) {
+          if (!caches[c]) continue;
+          for (var i = 0; i < caches[c].length; i++) {
+            if (caches[c][i].id === emp.id) {
+              caches[c][i][uploadedAtField] = freshResult.data[uploadedAtField];
               break;
             }
           }
