@@ -1113,13 +1113,14 @@ const DB = {
    * @param {string} employeeId
    * @returns {Promise<{data: string|null, error: object|null}>}
    */
-  async getContractUrl(employeeId) {
+  async getContractUrl(employeeId, downloadName) {
     try {
+      var opts = downloadName ? { download: downloadName } : {};
       // Try DOCX first
       var docxPath = employeeId + '/contract.docx';
       var { data: docxData, error: docxError } = await this.client.storage
         .from('contracts')
-        .createSignedUrl(docxPath, 3600);
+        .createSignedUrl(docxPath, 3600, opts);
 
       if (!docxError && docxData && docxData.signedUrl) {
         return { data: docxData.signedUrl, error: null };
@@ -1129,7 +1130,7 @@ const DB = {
       var pdfPath = employeeId + '/contract.pdf';
       var { data, error } = await this.client.storage
         .from('contracts')
-        .createSignedUrl(pdfPath, 3600);
+        .createSignedUrl(pdfPath, 3600, opts);
 
       if (error) return { data: null, error };
       if (!data || !data.signedUrl) return { data: null, error: { message: 'Contract file not found' } };
@@ -1203,13 +1204,14 @@ const DB = {
    * @param {string} employeeId
    * @returns {Promise<{data: string|null, error: object|null}>}
    */
-  async getNdaUrl(employeeId) {
+  async getNdaUrl(employeeId, downloadName) {
     try {
+      var opts = downloadName ? { download: downloadName } : {};
       // Try DOCX first
       var docxPath = employeeId + '/nda.docx';
       var { data: docxData, error: docxError } = await this.client.storage
         .from('documents')
-        .createSignedUrl(docxPath, 3600);
+        .createSignedUrl(docxPath, 3600, opts);
 
       if (!docxError && docxData && docxData.signedUrl) {
         return { data: docxData.signedUrl, error: null };
@@ -1219,7 +1221,7 @@ const DB = {
       var pdfPath = employeeId + '/nda.pdf';
       var { data, error } = await this.client.storage
         .from('documents')
-        .createSignedUrl(pdfPath, 3600);
+        .createSignedUrl(pdfPath, 3600, opts);
 
       if (error) return { data: null, error };
       if (!data || !data.signedUrl) return { data: null, error: { message: 'NDA file not found' } };

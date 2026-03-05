@@ -781,9 +781,13 @@ const Team = {
     var contractBtn = container.querySelector('#team-btn-contract');
     if (contractBtn) {
       contractBtn.addEventListener('click', async function () {
-        var result = await DB.getContractUrl(emp.id);
+        var fileName = ContractDocx.getFileName(emp);
+        var result = await DB.getContractUrl(emp.id, fileName);
         if (result && result.data) {
-          window.open(result.data, '_blank');
+          var a = document.createElement('a');
+          a.href = result.data;
+          a.download = fileName;
+          a.click();
         } else {
           showToast('Failed to get contract URL', 'error');
         }
@@ -816,9 +820,13 @@ const Team = {
     var ndaBtn = container.querySelector('#team-btn-nda');
     if (ndaBtn) {
       ndaBtn.addEventListener('click', async function () {
-        var result = await DB.getNdaUrl(emp.id);
+        var fileName = NdaDocx.getFileName(emp);
+        var result = await DB.getNdaUrl(emp.id, fileName);
         if (result && result.data) {
-          window.open(result.data, '_blank');
+          var a = document.createElement('a');
+          a.href = result.data;
+          a.download = fileName;
+          a.click();
         } else {
           showToast('Failed to get NDA URL', 'error');
         }
@@ -2108,16 +2116,6 @@ const Team = {
         showToast(label + ' upload failed: ' + result.error.message, 'error');
         return;
       }
-
-      // Download locally
-      var fileName = generator.getFileName(emp);
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 1000);
 
       // Refresh cache
       var freshResult = await DB.getEmployee(emp.id);
