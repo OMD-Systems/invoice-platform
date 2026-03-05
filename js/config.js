@@ -12,10 +12,10 @@ const CONFIG = {
   // Fallback chain: window.__ENV__ → window.__CONFIG__ → empty (will fail gracefully)
   SUPABASE_URL: (window.__ENV__ && window.__ENV__.SUPABASE_URL)
     || (window.__CONFIG__ && window.__CONFIG__.SUPABASE_URL)
-    || '',
+    || 'https://onabywripmjnkovlhkze.supabase.co',
   SUPABASE_ANON_KEY: (window.__ENV__ && window.__ENV__.SUPABASE_ANON_KEY)
     || (window.__CONFIG__ && window.__CONFIG__.SUPABASE_ANON_KEY)
-    || '',
+    || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9uYWJ5d3JpcG1qbmtvdmxoa3plIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NjE1NTgsImV4cCI6MjA4ODAzNzU1OH0.s5T4zpgN8CdGbu83Hb3WcBgIWq0QjlNXCFmMfzthNDo',
 
   // App settings
   APP_NAME: 'OMD Finance',
