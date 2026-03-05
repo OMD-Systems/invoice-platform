@@ -2109,17 +2109,20 @@ const Team = {
         return;
       }
 
-      // Download locally — wrap with explicit MIME type for reliable download
+      // Download locally — use data URI to bypass Chrome's download attribute restriction
       var fileName = generator.getFileName(emp);
       var downloadBlob = new Blob([blob], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-      var url = URL.createObjectURL(downloadBlob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 1000);
+      var reader = new FileReader();
+      reader.onload = function () {
+        var a = document.createElement('a');
+        a.href = reader.result;
+        a.download = fileName;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { a.remove(); }, 500);
+      };
+      reader.readAsDataURL(downloadBlob);
 
       // Refresh cache
       var freshResult = await DB.getEmployee(emp.id);
