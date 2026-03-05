@@ -2117,7 +2117,7 @@ const Team = {
         .from(bucket)
         .createSignedUrl(storagePath, 60, { download: fileName });
       if (signedResult.data && signedResult.data.signedUrl) {
-        window.open(signedResult.data.signedUrl, '_blank');
+        window.location.href = signedResult.data.signedUrl;
       }
 
       // Refresh cache
