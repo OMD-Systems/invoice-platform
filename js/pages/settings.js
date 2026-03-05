@@ -23,36 +23,44 @@ const Settings = {
 
   /* ── Main Render ── */
   async render(container, ctx) {
+    this._ctx = ctx;
+
+    // Non-admins only see account tab
     if (ctx.role !== 'admin') {
-      container.innerHTML =
-        '<div class="fury-empty">' +
-        '<div class="fury-empty-icon" style="font-size:48px;">&#x26D4;</div>' +
-        '<div class="fury-empty-title">Access Denied</div>' +
-        '<div class="fury-empty-text">This page is restricted to administrators only.</div>' +
-        '</div>';
-      return;
+      this.activeTab = 'account';
     }
 
-    container.innerHTML = this.template();
+    container.innerHTML = this.template(ctx);
     this.bindEvents(container, ctx);
-    await this.loadData();
+
+    // Only load admin data for admins
+    if (ctx.role === 'admin') {
+      await this.loadData();
+    }
+
     this.renderActiveTab(container);
   },
 
   /* ── Page Template ── */
-  template() {
-    return (
-      '<div class="settings-page" style="max-width:1200px;">' +
-
-      /* ── Tabs ── */
-      '<div class="fury-tabs fury-mb-3" role="tablist" aria-label="Settings tabs">' +
+  template(ctx) {
+    var isAdmin = ctx && ctx.role === 'admin';
+    var adminTabs = isAdmin ? (
       '<button class="fury-tab' + (this.activeTab === 'general' ? ' active' : '') + '" data-tab="general">General</button>' +
       '<button class="fury-tab' + (this.activeTab === 'projects' ? ' active' : '') + '" data-tab="projects">Projects</button>' +
       '<button class="fury-tab' + (this.activeTab === 'teams' ? ' active' : '') + '" data-tab="teams">Teams</button>' +
       '<button class="fury-tab' + (this.activeTab === 'users' ? ' active' : '') + '" data-tab="users">Users</button>' +
       '<button class="fury-tab' + (this.activeTab === 'months' ? ' active' : '') + '" data-tab="months">Month Control</button>' +
       '<button class="fury-tab' + (this.activeTab === 'email_requests' ? ' active' : '') + '" data-tab="email_requests">Email Requests</button>' +
-      '<button class="fury-tab' + (this.activeTab === 'working_hours' ? ' active' : '') + '" data-tab="working_hours">Working Hours</button>' +
+      '<button class="fury-tab' + (this.activeTab === 'working_hours' ? ' active' : '') + '" data-tab="working_hours">Working Hours</button>'
+    ) : '';
+
+    return (
+      '<div class="settings-page" style="max-width:1200px;">' +
+
+      /* ── Tabs ── */
+      '<div class="fury-tabs fury-mb-3" role="tablist" aria-label="Settings tabs">' +
+      adminTabs +
+      '<button class="fury-tab' + (this.activeTab === 'account' ? ' active' : '') + '" data-tab="account">Account</button>' +
       '</div>' +
 
       /* ── Tab Content ── */
@@ -90,6 +98,13 @@ const Settings = {
       '.team-member-tag .remove-member { cursor: pointer; color: var(--fury-neutral); font-size: 14px; line-height: 1; }' +
       '.team-member-tag .remove-member:hover { color: #EF4444; }' +
       '.month-lock-badge { display: inline-flex; align-items: center; gap: 4px; }' +
+      '.cp-password-wrap { position: relative; }' +
+      '.cp-password-wrap input { padding-right: 40px; }' +
+      '.cp-toggle-vis { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--fury-text-secondary); cursor: pointer; padding: 4px; font-size: 13px; line-height: 1; }' +
+      '.cp-toggle-vis:hover { color: var(--fury-accent); }' +
+      '.cp-strength { height: 3px; border-radius: 2px; margin-top: 6px; transition: width 0.3s, background 0.3s; }' +
+      '.cp-hint { font-size: 11px; color: var(--fury-text-muted); margin-top: 4px; }' +
+      '.cp-error { color: #EF4444; font-size: 12px; margin-top: 4px; min-height: 16px; }' +
       '</style>'
     );
   },
@@ -501,6 +516,7 @@ const Settings = {
       case 'months': html = this.renderMonths(); break;
       case 'email_requests': html = this.renderEmailRequests(); break;
       case 'working_hours': html = this.renderWorkingHours(); break;
+      case 'account': html = this.renderAccount(); break;
       default: html = this.renderGeneral(); break;
     }
 
@@ -645,6 +661,9 @@ const Settings = {
         break;
       case 'working_hours':
         self._bindWorkingHoursEvents(container);
+        break;
+      case 'account':
+        self._bindAccountEvents(container);
         break;
     }
   },
@@ -2037,6 +2056,160 @@ const Settings = {
         }
       });
     }
+  },
+
+  /* ═══════════════════════════════════════════════════
+     TAB: Account (Change Password) — visible to all users
+     ═══════════════════════════════════════════════════ */
+  renderAccount() {
+    var email = (this._ctx && this._ctx.user) ? this._ctx.user.email : '';
+    return (
+      '<div class="fury-card" style="max-width:480px;">' +
+
+      '<div class="settings-section">' +
+      '<div class="settings-section-title">Account</div>' +
+      '<div style="font-size:13px;color:var(--fury-text-secondary);margin-bottom:20px;">' +
+      'Signed in as <strong style="color:var(--fury-text);">' + this._escapeHtml(email) + '</strong>' +
+      '</div>' +
+      '</div>' +
+
+      '<div class="settings-section">' +
+      '<div class="settings-section-title">Change Password</div>' +
+
+      '<div class="settings-field" style="margin-bottom:16px;">' +
+      '<label for="cp-new-password">New Password</label>' +
+      '<div class="cp-password-wrap">' +
+      '<input class="fury-input" id="cp-new-password" type="password" placeholder="Minimum 8 characters" autocomplete="new-password">' +
+      '<button type="button" class="cp-toggle-vis" data-target="cp-new-password" aria-label="Toggle password visibility">&#x1F441;</button>' +
+      '</div>' +
+      '<div class="cp-strength" id="cp-strength-bar" style="width:0;background:transparent;"></div>' +
+      '<div class="cp-hint" id="cp-strength-text"></div>' +
+      '</div>' +
+
+      '<div class="settings-field" style="margin-bottom:16px;">' +
+      '<label for="cp-confirm-password">Confirm Password</label>' +
+      '<div class="cp-password-wrap">' +
+      '<input class="fury-input" id="cp-confirm-password" type="password" placeholder="Re-enter new password" autocomplete="new-password">' +
+      '<button type="button" class="cp-toggle-vis" data-target="cp-confirm-password" aria-label="Toggle password visibility">&#x1F441;</button>' +
+      '</div>' +
+      '<div class="cp-error" id="cp-match-error"></div>' +
+      '</div>' +
+
+      '<div class="settings-actions" style="border-top:none;padding-top:8px;">' +
+      '<button class="fury-btn fury-btn-primary" id="cp-update-btn" disabled>Update Password</button>' +
+      '</div>' +
+
+      '</div>' +
+      '</div>'
+    );
+  },
+
+  _bindAccountEvents(container) {
+    var self = this;
+    var newPwInput = container.querySelector('#cp-new-password');
+    var confirmPwInput = container.querySelector('#cp-confirm-password');
+    var strengthBar = container.querySelector('#cp-strength-bar');
+    var strengthText = container.querySelector('#cp-strength-text');
+    var matchError = container.querySelector('#cp-match-error');
+    var updateBtn = container.querySelector('#cp-update-btn');
+
+    if (!newPwInput || !updateBtn) return;
+
+    // Toggle visibility buttons
+    var toggleBtns = container.querySelectorAll('.cp-toggle-vis');
+    for (var i = 0; i < toggleBtns.length; i++) {
+      toggleBtns[i].addEventListener('click', function () {
+        var targetId = this.getAttribute('data-target');
+        var input = container.querySelector('#' + targetId);
+        if (input) {
+          var isPassword = input.type === 'password';
+          input.type = isPassword ? 'text' : 'password';
+          this.innerHTML = isPassword ? '&#x1F512;' : '&#x1F441;';
+        }
+      });
+    }
+
+    function getStrength(pw) {
+      if (!pw) return { score: 0, label: '', color: 'transparent' };
+      var score = 0;
+      if (pw.length >= 8) score++;
+      if (pw.length >= 12) score++;
+      if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
+      if (/\d/.test(pw)) score++;
+      if (/[^a-zA-Z0-9]/.test(pw)) score++;
+
+      var levels = [
+        { label: 'Very weak', color: '#EF4444' },
+        { label: 'Weak', color: '#F59E0B' },
+        { label: 'Fair', color: '#EAB308' },
+        { label: 'Strong', color: '#22C55E' },
+        { label: 'Very strong', color: '#10B981' }
+      ];
+      var idx = Math.min(score, levels.length) - 1;
+      if (idx < 0) idx = 0;
+      return { score: score, label: levels[idx].label, color: levels[idx].color };
+    }
+
+    function validate() {
+      var pw = newPwInput.value;
+      var confirm = confirmPwInput.value;
+
+      // Strength indicator
+      var s = getStrength(pw);
+      strengthBar.style.width = pw ? (Math.min(s.score, 5) * 20) + '%' : '0';
+      strengthBar.style.background = s.color;
+      strengthText.textContent = pw ? s.label : '';
+
+      // Match check
+      var valid = true;
+      if (pw.length < 8) {
+        valid = false;
+      }
+      if (confirm && pw !== confirm) {
+        matchError.textContent = 'Passwords do not match';
+        valid = false;
+      } else {
+        matchError.textContent = '';
+      }
+      if (!confirm) valid = false;
+
+      updateBtn.disabled = !valid;
+      return valid;
+    }
+
+    newPwInput.addEventListener('input', validate);
+    confirmPwInput.addEventListener('input', validate);
+
+    // Enter key on confirm field triggers update
+    confirmPwInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !updateBtn.disabled) updateBtn.click();
+    });
+
+    updateBtn.addEventListener('click', async function () {
+      if (!validate()) return;
+
+      var newPassword = newPwInput.value;
+      updateBtn.disabled = true;
+      updateBtn.textContent = 'Updating...';
+
+      try {
+        var { data, error } = await DB.client.auth.updateUser({ password: newPassword });
+        if (error) throw error;
+
+        showToast('Password updated successfully.', 'success');
+        newPwInput.value = '';
+        confirmPwInput.value = '';
+        strengthBar.style.width = '0';
+        strengthBar.style.background = 'transparent';
+        strengthText.textContent = '';
+        matchError.textContent = '';
+      } catch (err) {
+        showToast('Failed to update password: ' + (err.message || 'Unknown error'), 'error');
+      } finally {
+        updateBtn.disabled = true;
+        updateBtn.textContent = 'Update Password';
+      }
+    });
   },
 
   destroy() {

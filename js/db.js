@@ -12,8 +12,10 @@ const DB = {
    * Call this once on app load.
    * @param {string} [url] - Supabase project URL (defaults to CONFIG.SUPABASE_URL)
    * @param {string} [key] - Supabase anon/public key (defaults to CONFIG.SUPABASE_ANON_KEY)
+   * @param {object} [opts] - Extra options
+   * @param {Storage} [opts.storage] - Storage backend (localStorage or sessionStorage)
    */
-  init(url, key) {
+  init(url, key, opts) {
     if (typeof supabase === 'undefined' || typeof supabase.createClient !== 'function') {
       console.error('[DB] Supabase SDK not loaded. Check CDN script tag.');
       if (typeof showToast === 'function') {
@@ -27,7 +29,11 @@ const DB = {
       console.error('[DB] Missing Supabase URL or Key in CONFIG.');
       return;
     }
-    this.client = supabase.createClient(supabaseUrl, supabaseKey);
+    var clientOpts = {};
+    if (opts && opts.storage) {
+      clientOpts.auth = { storage: opts.storage, persistSession: true };
+    }
+    this.client = supabase.createClient(supabaseUrl, supabaseKey, clientOpts);
   },
 
   // ----------------------------------------------------------

@@ -8,8 +8,9 @@ desktop.ini
 tmp_*.js
 .github/workflows/
 
-# Note: js/config.js is committed because GitHub Pages is static (no build step).
-# If you switch to Cloudflare Pages, add js/config.js to gitignore and use env vars.
+# Credentials — injected via Cloudflare Pages env vars
+js/config.js
+js/config.local.js
 
 # Supabase local
 supabase/.temp/

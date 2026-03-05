@@ -1,173 +1,297 @@
 /* ═══════════════════════════════════════════════════════
-   InvoicePreview — HTML Preview Service
+   InvoicePreview — PDF Preview Service
    Invoice Platform · OMD Systems
-   Renders invoices as HTML for modal preview and print-to-PDF.
-   Matches the 5-section DOCX structure exactly.
+   Generates PDF in memory from HTML, displays in iframe.
    ═══════════════════════════════════════════════════════ */
 
 var InvoicePreview = {
 
+  _currentBlobUrl: null,
+  _currentInvoiceData: null,
+
   /**
-   * Show a modal with the invoice rendered as HTML.
+   * Show a modal with the invoice rendered as PDF in an iframe.
+   * Bottom action bar with Download and Print buttons.
    * @param {object} invoiceData - Full invoice data object
-   *   .employee   { full_name_lat, address, phone, iban, swift, receiver_name, bank_name }
-   *   .billedTo   { name, address }
-   *   .invoiceNumber  string
-   *   .invoiceDate    string (formatted)
-   *   .dueDays        string (e.g. "Net 15")
-   *   .items          [{ description, price, qty, total }]
-   *   .subtotal       number
-   *   .discount       number (default 0)
-   *   .tax            number (default 0)
-   *   .taxRate        string (default "0")
-   *   .total          number
-   *   .terms          string
-   *   .status         string (optional, for stamp)
    */
   show: function (invoiceData) {
-    // Store for _printInvoice filename generation
+    var self = this;
     this._currentInvoiceData = invoiceData;
+    this._revokeBlobUrl();
 
-    // Remove any existing preview modal
     var existing = document.querySelector('.invoice-preview-overlay');
     if (existing) existing.remove();
 
-    // Build overlay
     var overlay = document.createElement('div');
     overlay.className = 'fury-modal-overlay active invoice-preview-overlay';
-
-    var mainContainer = document.querySelector('#main-app');
-    if (mainContainer) mainContainer.setAttribute('data-print', 'hide');
+    overlay.style.cssText = 'z-index: 9999;';
 
     overlay.innerHTML =
-      '<div class="fury-modal fury-modal-lg" style="max-width: 860px; max-height: 92vh;">' +
-      '<div class="fury-modal-header">' +
-      '<span class="fury-modal-title">Invoice Preview</span>' +
-      '<div style="display: flex; align-items: center; gap: 8px;">' +
-      '<button class="fury-btn fury-btn-secondary fury-btn-sm no-print" id="ipv-btn-print">' +
-      'Print / PDF' +
-      '</button>' +
-      '<button class="fury-modal-close no-print" id="ipv-btn-close" title="Close">&times;</button>' +
-      '</div>' +
-      '</div>' +
-      '<div class="fury-modal-body" style="padding: 24px; overflow-y: auto;">' +
-      '<div class="invoice-preview">' +
-      this.renderInvoiceHTML(invoiceData) +
-      '</div>' +
-      '</div>' +
+      '<div style="width: 92vw; max-width: 860px; height: 90vh; display: flex; flex-direction: column; ' +
+        'background: var(--fury-card, #111114); border-radius: 12px; overflow: hidden; ' +
+        'box-shadow: 0 25px 50px rgba(0,0,0,0.5);">' +
+
+        // Header
+        '<div style="display: flex; justify-content: space-between; align-items: center; ' +
+          'padding: 12px 20px; background: var(--fury-elevated, #1A1A1F); ' +
+          'border-bottom: 1px solid var(--fury-border, #374151); flex-shrink: 0;">' +
+          '<span style="font-size: 14px; font-weight: 600; color: var(--fury-text, #E5E7EB);">Invoice Preview</span>' +
+          '<button id="ipv-btn-close" style="background: none; border: none; color: var(--fury-text-secondary, #9CA3AF); ' +
+            'font-size: 22px; cursor: pointer; padding: 0 4px; line-height: 1;" title="Close">&times;</button>' +
+        '</div>' +
+
+        // PDF viewer area
+        '<div id="ipv-body" style="flex: 1; overflow: hidden; position: relative; background: #525659;">' +
+          '<div id="ipv-loading" style="display: flex; align-items: center; justify-content: center; ' +
+            'height: 100%; color: #ccc;">' +
+            '<div style="text-align: center;">' +
+              '<div style="font-size: 14px; margin-bottom: 12px;">Generating PDF...</div>' +
+              '<div class="fury-loading" style="margin: 0 auto;"></div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+
+        // Bottom action bar
+        '<div id="ipv-actions" style="display: flex; justify-content: center; align-items: center; gap: 12px; ' +
+          'padding: 12px 20px; background: var(--fury-elevated, #1A1A1F); ' +
+          'border-top: 1px solid var(--fury-border, #374151); flex-shrink: 0;">' +
+          '<button id="ipv-btn-download" class="fury-btn fury-btn-sm" disabled ' +
+            'style="background: var(--fury-accent, #00D4FF); color: #000; border: none; font-weight: 600; ' +
+            'padding: 8px 24px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" ' +
+              'stroke-linecap="round" stroke-linejoin="round">' +
+              '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>' +
+              '<polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>' +
+            '</svg>' +
+            'Download PDF' +
+          '</button>' +
+          '<button id="ipv-btn-print" class="fury-btn fury-btn-secondary fury-btn-sm" disabled ' +
+            'style="padding: 8px 24px; font-size: 13px; display: inline-flex; align-items: center; gap: 6px;">' +
+            '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+              'stroke-linecap="round" stroke-linejoin="round">' +
+              '<polyline points="6 9 6 2 18 2 18 9"/>' +
+              '<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>' +
+              '<rect x="6" y="14" width="12" height="8"/>' +
+            '</svg>' +
+            'Print' +
+          '</button>' +
+        '</div>' +
+
       '</div>';
 
     document.body.appendChild(overlay);
+    document.body.classList.add('fury-modal-open');
 
-    var self = this;
-
-    // Shared close function that cleans up escape handler
+    // Close handlers
     var escHandler;
     var closeOverlay = function () {
       if (escHandler) document.removeEventListener('keydown', escHandler);
+      document.body.classList.remove('fury-modal-open');
       self._closeOverlay(overlay);
     };
-
-    // Close on Escape
-    escHandler = function (e) {
-      if (e.key === 'Escape') closeOverlay();
-    };
+    escHandler = function (e) { if (e.key === 'Escape') closeOverlay(); };
     document.addEventListener('keydown', escHandler);
 
-    // Bind close button
-    var closeBtn = overlay.querySelector('#ipv-btn-close');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', closeOverlay);
-    }
-
-    // Bind print — uses dedicated print container for reliability
-    var printBtn = overlay.querySelector('#ipv-btn-print');
-    if (printBtn) {
-      printBtn.addEventListener('click', function () {
-        self._printInvoice(overlay);
-      });
-    }
-
-    // Close on backdrop click
+    overlay.querySelector('#ipv-btn-close').addEventListener('click', closeOverlay);
     overlay.addEventListener('click', function (e) {
       if (e.target === overlay) closeOverlay();
+    });
+
+    // Generate PDF
+    this._generatePdf(invoiceData, function (blobUrl) {
+      if (!blobUrl) {
+        var loadingEl = overlay.querySelector('#ipv-loading');
+        if (loadingEl) {
+          loadingEl.innerHTML =
+            '<div style="text-align: center; color: var(--fury-danger, #EF4444);">' +
+            '<div style="font-size: 14px;">Failed to generate PDF</div></div>';
+        }
+        return;
+      }
+
+      self._currentBlobUrl = blobUrl;
+      var body = overlay.querySelector('#ipv-body');
+      var loadingDiv = overlay.querySelector('#ipv-loading');
+
+      var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (window.innerWidth < 768);
+
+      if (isMobile) {
+        if (loadingDiv) {
+          loadingDiv.innerHTML =
+            '<div style="text-align: center; padding: 40px 20px;">' +
+            '<div style="font-size: 48px; margin-bottom: 16px; opacity: 0.3;">&#128196;</div>' +
+            '<div style="font-size: 14px; color: #ccc; margin-bottom: 20px;">' +
+            'PDF preview is not available on this device.<br>Use the buttons below to download or print.' +
+            '</div></div>';
+        }
+      } else {
+        if (loadingDiv) loadingDiv.remove();
+        var iframe = document.createElement('iframe');
+        iframe.id = 'ipv-pdf-frame';
+        iframe.src = blobUrl;
+        iframe.type = 'application/pdf';
+        iframe.style.cssText = 'width: 100%; height: 100%; border: none;';
+        body.appendChild(iframe);
+      }
+
+      // Enable action buttons
+      var dlBtn = overlay.querySelector('#ipv-btn-download');
+      var printBtn = overlay.querySelector('#ipv-btn-print');
+
+      if (dlBtn) {
+        dlBtn.disabled = false;
+        dlBtn.addEventListener('click', function () {
+          self._downloadPdf(blobUrl);
+        });
+      }
+      if (printBtn) {
+        printBtn.disabled = false;
+        printBtn.addEventListener('click', function () {
+          self._printPdf(overlay);
+        });
+      }
     });
   },
 
   /**
-   * Print the invoice by extracting content into a dedicated print container.
-   * This avoids CSS specificity wars with modal overlay display:none.
+   * Generate PDF from invoice data using jsPDF + html2canvas.
+   * @param {object} data - Invoice data
+   * @param {function} callback - Called with blob URL or null on error
    */
-  _printInvoice: function (overlay) {
-    var invoiceHtml = overlay.querySelector('.invoice-preview');
-    if (!invoiceHtml) return;
+  _generatePdf: function (data, callback) {
+    var self = this;
 
-    // Create print container outside all modals (hidden on screen, shown by print CSS)
-    var printArea = document.createElement('div');
-    printArea.id = 'invoice-print-area';
-    printArea.className = 'invoice-preview';
-    printArea.style.cssText = 'position:fixed;left:-9999px;top:0;';
-    printArea.innerHTML = invoiceHtml.innerHTML;
-    document.body.appendChild(printArea);
+    var container = document.createElement('div');
+    container.style.cssText =
+      'position: fixed; left: -9999px; top: 0; width: 794px; z-index: -1; ' +
+      'background: #fff; padding: 0; margin: 0;';
 
-    // Hide overlay during print (we show printArea instead)
-    overlay.style.display = 'none';
+    var preview = document.createElement('div');
+    preview.className = 'invoice-preview';
+    preview.style.cssText =
+      'background: #fff; color: #000; font-family: Calibri, Segoe UI, Arial, sans-serif; ' +
+      'font-size: 10pt; line-height: 1.4; padding: 40px; margin: 0; ' +
+      'width: 794px; min-height: auto; box-shadow: none; border-radius: 0;';
+    preview.innerHTML = self.renderInvoiceHTML(data);
+    container.appendChild(preview);
+    document.body.appendChild(container);
 
-    // Set document.title to a meaningful filename for Save as PDF
-    var originalTitle = document.title;
-    document.title = this._getPrintFileName();
+    setTimeout(function () {
+      if (typeof html2canvas === 'undefined' || typeof jspdf === 'undefined') {
+        console.error('[InvoicePreview] jsPDF or html2canvas not loaded');
+        container.remove();
+        callback(null);
+        return;
+      }
 
-    window.print();
+      html2canvas(preview, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        width: 794,
+        windowWidth: 794
+      }).then(function (canvas) {
+        container.remove();
 
-    // Cleanup after print dialog closes
-    document.title = originalTitle;
-    overlay.style.display = '';
-    if (printArea.parentNode) printArea.remove();
+        try {
+          var jsPDF = jspdf.jsPDF;
+          var pdf = new jsPDF('p', 'mm', 'a4');
+          var pdfWidth = 210;
+          var pdfHeight = 297;
+
+          var imgWidth = pdfWidth;
+          var imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+          var imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+          var heightLeft = imgHeight;
+          var position = 0;
+
+          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+          heightLeft -= pdfHeight;
+
+          while (heightLeft > 0) {
+            position = -(imgHeight - heightLeft);
+            pdf.addPage();
+            pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+            heightLeft -= pdfHeight;
+          }
+
+          var blob = pdf.output('blob');
+          var blobUrl = URL.createObjectURL(blob);
+          callback(blobUrl);
+        } catch (err) {
+          console.error('[InvoicePreview] PDF generation error:', err);
+          callback(null);
+        }
+      }).catch(function (err) {
+        console.error('[InvoicePreview] html2canvas error:', err);
+        container.remove();
+        callback(null);
+      });
+    }, 200);
   },
 
-  /**
-   * Generate a PDF-friendly filename from current invoice data.
-   * Reuses Numbering.getFileName() when available, replacing .docx → .pdf.
-   * @returns {string}
-   */
+  _downloadPdf: function (blobUrl) {
+    var filename = this._getPrintFileName() + '.pdf';
+    var a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { a.remove(); }, 100);
+  },
+
+  _printPdf: function (overlay) {
+    var iframe = overlay
+      ? overlay.querySelector('#ipv-pdf-frame')
+      : document.querySelector('#ipv-pdf-frame');
+    if (iframe && iframe.contentWindow) {
+      try {
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+      } catch (e) {
+        window.open(this._currentBlobUrl);
+      }
+    } else if (this._currentBlobUrl) {
+      window.open(this._currentBlobUrl);
+    }
+  },
+
   _getPrintFileName: function () {
     var data = this._currentInvoiceData;
     if (!data) return 'Invoice';
 
-    // Use Numbering for consistent naming, strip .docx extension
     if (typeof Numbering !== 'undefined' && Numbering.getFileName) {
       return Numbering.getFileName(data.employee, data.invoiceNumber, data.invoiceDate)
-        .replace(/\.docx$/i, '');
+        .replace(/\.pdf$/i, '');
     }
 
-    // Fallback: number already has prefix, just add name
     var emp = data.employee || {};
     var name = (emp.full_name_lat || 'Unknown').replace(/\s+/g, '-');
     return (data.invoiceNumber || 'Invoice') + '-' + name;
   },
 
-  /**
-   * Close and remove the overlay with animation.
-   * @param {HTMLElement} overlay
-   */
   _closeOverlay: function (overlay) {
     if (!overlay) return;
     overlay.classList.remove('active');
-
-    var mainContainer = document.querySelector('#main-app');
-    if (mainContainer) mainContainer.removeAttribute('data-print');
+    var self = this;
 
     setTimeout(function () {
       if (overlay.parentNode) overlay.remove();
+      self._revokeBlobUrl();
     }, 260);
   },
 
-  /**
-   * Render the full invoice as HTML matching the DOCX 5-section structure.
-   * Uses CSS classes from invoice-print.css for both screen and print styling.
-   * @param {object} data - Invoice data object (same shape as show())
-   * @returns {string} HTML string
-   */
+  _revokeBlobUrl: function () {
+    if (this._currentBlobUrl) {
+      URL.revokeObjectURL(this._currentBlobUrl);
+      this._currentBlobUrl = null;
+    }
+  },
+
   renderInvoiceHTML: function (data) {
     var emp = data.employee || {};
     var billedTo = data.billedTo || {};
@@ -180,7 +304,6 @@ var InvoicePreview = {
     var terms = data.terms || '';
     var status = data.status || '';
 
-    // Status stamp
     var stampHtml = '';
     if (status === 'paid') {
       stampHtml = '<div class="invoice-stamp-paid">PAID</div>';
@@ -190,17 +313,14 @@ var InvoicePreview = {
       stampHtml = '<div class="invoice-stamp-draft">DRAFT</div>';
     }
 
-    // Build line item rows
     var itemsHtml = '';
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
       var itemPrice = this._parseCurrency(item.price);
       var itemQty = parseFloat(item.qty) || 1;
-      // Use provided total, or compute from price * qty with rounding
       var itemTotal = item.total != null
         ? this._parseCurrency(item.total)
         : Math.round(itemPrice * itemQty * 100) / 100;
-      // Truncate very long descriptions to prevent layout break
       var desc = String(item.description || '');
       if (desc.length > 500) desc = desc.slice(0, 497) + '...';
 
@@ -214,17 +334,26 @@ var InvoicePreview = {
         '</tr>';
     }
 
-    // If no items, show placeholder row
     if (items.length === 0) {
       itemsHtml = '<tr><td colspan="5" style="text-align: center; color: #999; padding: 16pt;">No line items</td></tr>';
     }
 
-    // Compose all 5 sections
+    // Build document hash seed
+    var hashSeed = String(data.invoiceNumber || '') + '|' +
+      String(data.invoiceDate || '') + '|' +
+      String(total) + '|' +
+      String(emp.full_name_lat || emp.name || '');
+
     var html =
-      '<div class="invoice-stamp" style="position: relative;">' +
+      '<div class="invoice-page-frame">' +
+      '<div class="invoice-watermark">OMD SYSTEMS</div>' +
       stampHtml +
 
-      /* ═════ SECTION 1: Header ═════ */
+      '<div class="invoice-brand-header">' +
+      '<div class="invoice-brand-logo">OMD SYSTEMS</div>' +
+      '<div class="invoice-brand-address">Woodenshark LLC &bull; 8 The Green, Suite A, Dover, DE 19901, USA</div>' +
+      '</div>' +
+
       '<div class="invoice-header">' +
       '<div>' +
       '<div class="invoice-company-name" style="color: #205968; font-size: 14pt;">' +
@@ -238,7 +367,6 @@ var InvoicePreview = {
       '</div>' +
       '</div>' +
 
-      /* ═════ SECTION 2: Billing Info ═════ */
       '<div class="invoice-parties">' +
       '<div class="invoice-to">' +
       '<div class="invoice-section-label">BILLED TO</div>' +
@@ -263,7 +391,6 @@ var InvoicePreview = {
       '</div>' +
       '</div>' +
 
-      /* ═════ SECTION 3: Line Items Table ═════ */
       '<table class="invoice-table">' +
       '<thead>' +
       '<tr>' +
@@ -279,7 +406,6 @@ var InvoicePreview = {
       '</tbody>' +
       '</table>' +
 
-      /* ═════ SECTION 4: Totals ═════ */
       '<div class="invoice-totals">' +
       '<table class="invoice-totals-table">' +
       '<tr class="subtotal">' +
@@ -301,7 +427,6 @@ var InvoicePreview = {
       '</table>' +
       '</div>' +
 
-      /* ═════ SECTION 5: Footer (Bank + Terms) ═════ */
       '<div class="invoice-footer-columns">' +
       '<div class="invoice-payment">' +
       '<div class="invoice-payment-title">BANK ACCOUNT</div>' +
@@ -320,18 +445,38 @@ var InvoicePreview = {
         : '') +
       '</div>' +
 
-      '</div>'; // close .invoice-stamp
+      '<div class="invoice-doc-footer">' +
+      '<div class="invoice-doc-footer-line"></div>' +
+      '<div class="invoice-doc-footer-text">' +
+      'Generated by OMD Finance Platform &bull; ' +
+      new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC' +
+      '</div>' +
+      '<div class="invoice-doc-footer-hash" id="doc-hash-' + String(data.invoiceNumber || '0').replace(/[^a-zA-Z0-9]/g, '') + '">' +
+      'Document ID: computing...' +
+      '</div>' +
+      '</div>' +
+
+      '</div>';
+
+    // Async hash injection
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      var encoder = new TextEncoder();
+      crypto.subtle.digest('SHA-256', encoder.encode(hashSeed)).then(function (buf) {
+        var arr = new Uint8Array(buf);
+        var hex = '';
+        for (var h = 0; h < arr.length; h++) {
+          hex += ('0' + arr[h].toString(16)).slice(-2);
+        }
+        var hashEls = document.querySelectorAll('[id^="doc-hash-"]');
+        for (var e = 0; e < hashEls.length; e++) {
+          hashEls[e].textContent = 'Document ID: ' + hex;
+        }
+      });
+    }
 
     return html;
   },
 
-  /* ── Helpers ── */
-
-  /**
-   * Escape HTML entities.
-   * @param {string} str
-   * @returns {string}
-   */
   _esc: function (str) {
     if (!str) return '';
     return String(str)
@@ -342,22 +487,11 @@ var InvoicePreview = {
       .replace(/'/g, '&#39;');
   },
 
-  /**
-   * Convert newlines to <br> tags.
-   * @param {string} str
-   * @returns {string}
-   */
   _nlToBr: function (str) {
     if (!str) return '';
     return str.replace(/\n/g, '<br>');
   },
 
-  /**
-   * Parse a value to a number (handles string inputs like "$1,200.50").
-   * Strips currency symbols, commas, spaces — keeps only digits, dot, minus.
-   * @param {*} val
-   * @returns {number}
-   */
   _parseCurrency: function (val) {
     if (val == null) return 0;
     if (typeof val === 'number') return isNaN(val) ? 0 : val;
@@ -366,23 +500,15 @@ var InvoicePreview = {
     return isNaN(num) ? 0 : Math.round(num * 100) / 100;
   },
 
-  /**
-   * Calculate due date from invoice date + dueDays.
-   * @param {string} invoiceDate - Any date format
-   * @param {number|string} dueDays - Number of days (default 15)
-   * @returns {string} Formatted date string
-   */
   _calcDueDate: function (invoiceDate, dueDays) {
     var days = parseInt(String(dueDays).replace(/\D/g, '')) || 15;
     var base;
     if (invoiceDate) {
-      // Try DD.MM.YY or DD.MM.YYYY first (most common in this app)
       var m = String(invoiceDate).match(/^(\d{2})\.(\d{2})\.(\d{2,4})$/);
       if (m) {
         var yr = m[3].length === 2 ? '20' + m[3] : m[3];
         base = new Date(parseInt(yr), parseInt(m[2]) - 1, parseInt(m[1]));
       } else {
-        // Try ISO (YYYY-MM-DD) — parse components to avoid timezone shift
         var isoMatch = String(invoiceDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
         if (isoMatch) {
           base = new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
@@ -400,16 +526,9 @@ var InvoicePreview = {
     return monthNames[base.getMonth()] + ' ' + base.getDate() + ', ' + base.getFullYear();
   },
 
-  /**
-   * Format a number with 2 decimal places and locale-friendly thousands.
-   * Uses Math.round to avoid floating-point drift (e.g. 0.1 + 0.2).
-   * @param {number} num
-   * @returns {string}
-   */
   _fmtNum: function (num) {
     var n = parseFloat(num);
     if (isNaN(n)) return '0.00';
-    // Round to cents to avoid floating point artifacts
     n = Math.round(n * 100) / 100;
     return n.toLocaleString('en-US', {
       minimumFractionDigits: 2,

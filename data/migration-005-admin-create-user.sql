@@ -41,7 +41,16 @@ BEGIN
     now(), now()
   );
 
-  -- 4. The `on_auth_user_created` trigger will automatically create a profile in `public.profiles`
+  -- 4. Insert into auth.identities (required for GoTrue v2 / signInWithOtp)
+  INSERT INTO auth.identities (
+    id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
+  ) VALUES (
+    v_user_id, v_user_id,
+    jsonb_build_object('sub', v_user_id::text, 'email', p_email, 'email_verified', true),
+    'email', p_email, now(), now(), now()
+  );
+
+  -- 5. The `on_auth_user_created` trigger will automatically create a profile in `public.profiles`
   -- But it creates it with 'viewer' role by default. Let's update it to the requested role.
   UPDATE public.profiles
   SET role = p_role,

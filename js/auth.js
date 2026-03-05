@@ -68,6 +68,18 @@ const Auth = {
         return { data: null, error: { message: 'Please enter a valid email address.' } };
       }
 
+      // Email domain whitelist check
+      var allowedDomains = CONFIG.ALLOWED_EMAIL_DOMAINS || [];
+      if (allowedDomains.length > 0) {
+        var emailDomain = email.trim().toLowerCase().split('@')[1];
+        if (!emailDomain || allowedDomains.indexOf(emailDomain) === -1) {
+          return {
+            data: null,
+            error: { message: 'Email domain is not allowed. Please use a company email address.' }
+          };
+        }
+      }
+
       // Client-side rate limiting
       var cooldown = this.getOtpCooldownStatus();
       if (cooldown.inCooldown) {
@@ -101,8 +113,31 @@ const Auth = {
       // Start cooldown regardless of success/failure
       this._startOtpCooldown();
 
-      return { data, error };
+      // Supabase returns "Signups not allowed for otp" when email not found
+      if (error) {
+        var msg = (error.message || '').toLowerCase();
+        if (msg.indexOf('signups not allowed') !== -1 || msg.indexOf('user not found') !== -1) {
+          return {
+            data: null,
+            error: { message: 'This email is not registered. Contact your administrator.' }
+          };
+        }
+        if (msg.indexOf('rate limit') !== -1 || error.status === 429) {
+          return {
+            data: null,
+            error: { message: 'Too many requests. Please wait a few minutes.' }
+          };
+        }
+        return { data, error };
+      }
+
+      // Success: OTP sent (Supabase may return data with no error even if email silently ignored)
+      return { data: data, error: null, success: true };
     } catch (err) {
+      var errMsg = (err.message || '').toLowerCase();
+      if (errMsg.indexOf('fetch') !== -1 || errMsg.indexOf('network') !== -1 || errMsg.indexOf('failed') !== -1) {
+        return { data: null, error: { message: 'Connection error. Please try again.' } };
+      }
       return { data: null, error: { message: err.message } };
     }
   },
@@ -125,14 +160,24 @@ const Auth = {
         type: 'email'
       });
 
-      // Reset attempts on successful verification
-      if (!error) {
-        this._otpAttempts = 0;
-        this._otpCooldownUntil = 0;
+      if (error) {
+        var msg = (error.message || '').toLowerCase();
+        if (msg.indexOf('token') !== -1 || msg.indexOf('otp') !== -1 || msg.indexOf('expired') !== -1) {
+          return { data: null, error: { message: 'Invalid or expired code. Please check and try again.' } };
+        }
+        return { data, error };
       }
 
-      return { data, error };
+      // Reset attempts on successful verification
+      this._otpAttempts = 0;
+      this._otpCooldownUntil = 0;
+
+      return { data, error: null };
     } catch (err) {
+      var errMsg = (err.message || '').toLowerCase();
+      if (errMsg.indexOf('fetch') !== -1 || errMsg.indexOf('network') !== -1) {
+        return { data: null, error: { message: 'Connection error. Please try again.' } };
+      }
       return { data: null, error: { message: err.message } };
     }
   },
@@ -173,8 +218,9 @@ const Auth = {
    * @param {string} email
    */
   async sendOtp(email) {
-    const { error } = await this.signInWithOTP(email);
-    if (error) throw new Error(error.message || 'Failed to send code');
+    var result = await this.signInWithOTP(email);
+    if (result.error) throw new Error(result.error.message || 'Failed to send code');
+    return { success: true };
   },
 
   /**

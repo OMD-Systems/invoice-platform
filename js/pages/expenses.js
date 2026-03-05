@@ -127,7 +127,7 @@ const Expenses = {
               '</tr>' +
             '</thead>' +
             '<tbody id="expenses-tbody">' +
-              '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--fury-text-muted)">Loading...</td></tr>' +
+              Skeleton.render('table-row', 4, { cols: 7 }) +
             '</tbody>' +
           '</table>' +
         '</div>' +
@@ -445,8 +445,7 @@ const Expenses = {
 
     var tbody = container.querySelector('#expenses-tbody');
     if (tbody) {
-      tbody.innerHTML =
-        '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--fury-text-muted)">Loading...</td></tr>';
+      tbody.innerHTML = Skeleton.render('table-row', 4, { cols: 7 });
     }
 
     try {

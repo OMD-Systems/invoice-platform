@@ -14,7 +14,7 @@
   <meta property="og:type" content="website">
   <meta property="og:locale" content="en_US">
   <!-- Security -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: https://avatars.slack-edge.com https://secure.gravatar.com https://*.slack-edge.com; frame-ancestors 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co; img-src 'self' data: https://avatars.slack-edge.com https://secure.gravatar.com https://*.slack-edge.com; frame-src 'self' blob:; frame-ancestors 'self';">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains">
   <meta name="referrer" content="strict-origin-when-cross-origin">
@@ -27,8 +27,8 @@
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='8' fill='%230D0D0F'/><path d='M20 4L35 12.5V27.5L20 36L5 27.5V12.5Z' stroke='%2300D4FF' stroke-width='1.5' fill='rgba(0,212,255,0.08)'/><path d='M20 10L29 15.2V25.8L20 31L11 25.8V15.2Z' stroke='%2300D4FF' stroke-width='1' fill='none' opacity='0.4'/><text x='20' y='23' text-anchor='middle' fill='%2300D4FF' font-family='Inter,sans-serif' font-size='9' font-weight='700' letter-spacing='1'>OMD</text></svg>">
   <link rel="apple-touch-icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' rx='36' fill='%230D0D0F'/><text x='90' y='110' text-anchor='middle' fill='%2300D4FF' font-family='sans-serif' font-size='48' font-weight='700'>OMD</text></svg>">
-  <link rel="stylesheet" href="css/fury.css?v=5">
-  <link rel="stylesheet" href="css/invoice-print.css?v=5" media="print">
+  <link rel="stylesheet" href="css/fury.css?v=6">
+  <link rel="stylesheet" href="css/invoice-print.css?v=7" media="all">
   <style>
     /* ── Reset & Base ── */
     *,
@@ -166,10 +166,21 @@
     }
 
     .login-error {
-      color: #EF4444;
       font-size: 13px;
       text-align: center;
       min-height: 18px;
+    }
+
+    .login-error.error {
+      color: #EF4444;
+    }
+
+    .login-error.success {
+      color: #10B981;
+    }
+
+    .login-error.info {
+      color: #6B7280;
     }
 
     .login-step {
@@ -181,6 +192,28 @@
 
     .login-step.hidden {
       display: none;
+    }
+
+    .login-remember {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #9CA3AF;
+      user-select: none;
+    }
+
+    .login-remember input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #00D4FF;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    .login-remember span {
+      line-height: 1;
     }
 
     /* ── Main App Layout ── */
@@ -524,6 +557,111 @@
       outline: 2px solid #00D4FF;
       outline-offset: 2px;
     }
+
+    /* ── Session Expiry Modal ── */
+    #session-expiry-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .session-expiry-card {
+      background: #111114;
+      border: 1px solid #1F1F23;
+      border-top: 2px solid #F59E0B;
+      border-radius: 12px;
+      padding: 32px;
+      width: 380px;
+      max-width: 90vw;
+      text-align: center;
+      box-shadow: 0 0 60px rgba(245, 158, 11, 0.12);
+    }
+
+    .session-expiry-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      background: rgba(245, 158, 11, 0.12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #F59E0B;
+      font-size: 24px;
+    }
+
+    .session-expiry-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #E5E7EB;
+      margin-bottom: 8px;
+    }
+
+    .session-expiry-msg {
+      font-size: 13px;
+      color: #9CA3AF;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .session-expiry-timer {
+      font-size: 28px;
+      font-weight: 700;
+      color: #F59E0B;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 24px;
+    }
+
+    .session-expiry-timer.critical {
+      color: #EF4444;
+      animation: pulse-critical 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse-critical {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .session-expiry-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .session-expiry-actions button {
+      flex: 1;
+      padding: 10px 0;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.2s;
+    }
+
+    .session-expiry-actions button:hover {
+      opacity: 0.85;
+    }
+
+    .session-expiry-actions button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-extend-session {
+      background: #00D4FF;
+      color: #0D0D0F;
+    }
+
+    .btn-session-logout {
+      background: #1F1F23;
+      color: #9CA3AF;
+      border: 1px solid #2A2A30 !important;
+    }
   </style>
 </head>
 
@@ -565,6 +703,10 @@
             <label for="login-email">Email</label>
             <input type="email" id="login-email" placeholder="you@omdsystems.com" autocomplete="email">
           </div>
+          <label class="login-remember" for="login-remember">
+            <input type="checkbox" id="login-remember">
+            <span>Remember me</span>
+          </label>
           <button class="login-btn" id="btn-send-code" type="button">Send Code</button>
         </div>
 
@@ -670,36 +812,51 @@
 
     </div>
 
+    <!-- ════════ Session Expiry Warning Modal ════════ -->
+    <div id="session-expiry-overlay" role="dialog" aria-modal="true" aria-labelledby="session-expiry-title">
+      <div class="session-expiry-card">
+        <div class="session-expiry-icon" aria-hidden="true">&#9888;</div>
+        <div class="session-expiry-title" id="session-expiry-title">Session Expiring</div>
+        <div class="session-expiry-msg">Your session is about to expire. Extend it to continue working.</div>
+        <div class="session-expiry-timer" id="session-expiry-timer">5:00</div>
+        <div class="session-expiry-actions">
+          <button class="btn-extend-session" id="btn-extend-session" type="button">Extend Session</button>
+          <button class="btn-session-logout" id="btn-session-logout" type="button">Logout</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- ════════ CDN Libraries (with SRI integrity checks) ════════ -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"
     integrity="sha384-YieCqqg9gQufX7+5HcFvCEg/n3KUEdl8/Jb+A6J0npf1mB740VayvwKjTrtCeUoy"
     crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docx@9.6.0/dist/index.iife.js"
-    integrity="sha384-EnzP2fNDJUs+3si27zZLZyP85ASuHhB5HQqhJZLfMidfEbtNwMuZ/999aXTwlhzB"
-    crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"
-    integrity="sha384-PlRSzpewlarQuj5alIadXwjNUX+2eNMKwr0f07ShWYLy8B6TjEbm7ZlcN/ScSbwy"
-    crossorigin="anonymous"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"
     integrity="sha384-NG/W3xvO3ynQEcDQYIOcZTXRtwUs83cLv1FIl9PuqWPDuNhsMRF6wutlNLFwlb71"
     crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"
+    crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"
+    crossorigin="anonymous"></script>
 
   <!-- ════════ App Modules ════════ -->
-  <script src="js/config.js?v=5"></script>
+  <!-- Local dev: config.local.js sets window.__ENV__ (gitignored, optional) -->
+  <!-- Production: window.__ENV__ injected by CF Pages Functions middleware -->
+  <script src="js/config.local.js" onerror=""></script>
+  <script src="js/config.js?v=6"></script>
+  <script src="js/toast.js?v=5"></script>
   <script src="js/utils.js?v=5"></script>
   <script src="js/validation.js?v=5"></script>
   <script src="js/db.js?v=5"></script>
   <script src="js/auth.js?v=5"></script>
   <script src="js/services/timesheet-parser.js?v=5"></script>
-  <script src="js/services/numbering.js?v=5"></script>
-  <script src="js/services/invoice-docx.js?v=5"></script>
-  <script src="js/services/invoice-preview.js?v=5"></script>
+  <script src="js/services/numbering.js?v=6"></script>
+  <script src="js/services/invoice-preview.js?v=8"></script>
   <script src="js/services/settlements.js?v=5"></script>
 
-  <script src="js/pages/team.js?v=5"></script>
-  <script src="js/pages/invoices.js?v=5"></script>
+  <script src="js/pages/team.js?v=6"></script>
+  <script src="js/pages/invoices.js?v=6"></script>
   <script src="js/pages/expenses.js?v=5"></script>
   <script src="js/pages/settings.js?v=5"></script>
   <script src="js/app.js?v=5"></script>

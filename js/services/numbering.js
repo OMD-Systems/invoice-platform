@@ -92,24 +92,12 @@ const Numbering = {
   /* ── Generate filename based on employee format ── */
   getFileName(employee, number, date) {
     var nameParts = (employee.full_name_lat || 'Unknown').split(' ');
-    var format = employee.invoice_format || 'WS';
-    var fullDate = Numbering._toFullDate(date);
+    var firstName = nameParts[0] || 'Unknown';
+    var lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+    var nameStr = lastName ? firstName + '-' + lastName : firstName;
+    var monthStr = Numbering._toMonthYear(date);
 
-    // number already contains prefix (e.g. "WS-Invoice-001"), use directly
-    var rawName;
-    switch (format) {
-      case 'WS':
-        rawName = number + '-' + nameParts.join('-') + (fullDate ? ' ' + fullDate : '') + '.docx';
-        break;
-      case 'FOP':
-        rawName = nameParts[nameParts.length - 1] + '_' + number + '.docx';
-        break;
-      case 'CUSTOM':
-        rawName = number + '.docx';
-        break;
-      default:
-        rawName = number + '-' + nameParts.join('-') + '.docx';
-    }
+    var rawName = 'Invoice_' + nameStr + '_' + number + (monthStr ? '_' + monthStr : '') + '.pdf';
     return _sanitizeFileName(rawName);
   },
 
@@ -167,6 +155,28 @@ const Numbering = {
       console.error('[Numbering] getNextAvailableNumber exception:', err);
       return { number: 1, prefix: '', formatted: '001' };
     }
+  },
+
+  /* ── Internal: convert date to "Month-YYYY" for filename ── */
+  _toMonthYear(dateStr) {
+    var months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+    if (!dateStr) return '';
+    var m, y;
+    // DD.MM.YY or DD.MM.YYYY
+    var dotMatch = String(dateStr).match(/^\d{2}\.(\d{2})\.(\d{2,4})$/);
+    if (dotMatch) {
+      m = parseInt(dotMatch[1], 10) - 1;
+      y = dotMatch[2].length === 2 ? '20' + dotMatch[2] : dotMatch[2];
+      return months[m] + '-' + y;
+    }
+    // ISO YYYY-MM-DD
+    var isoMatch = String(dateStr).match(/^(\d{4})-(\d{2})/);
+    if (isoMatch) {
+      m = parseInt(isoMatch[2], 10) - 1;
+      return months[m] + '-' + isoMatch[1];
+    }
+    return '';
   },
 
   /* ── Internal: convert date to DD.MM.YYYY ── */

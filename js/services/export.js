@@ -341,11 +341,11 @@ const ExportService = {
   },
 
   /* ═══════════════════════════════════════════════════
-     Single Invoice Export (alternative to DOCX)
+     Single Invoice Export (XLSX)
      ═══════════════════════════════════════════════════ */
 
   /**
-   * Download a single invoice as XLSX (simpler alternative to DOCX).
+   * Download a single invoice as XLSX.
    *
    * @param {object} invoiceData - Invoice with items, employee, etc.
    */

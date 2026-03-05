@@ -98,7 +98,7 @@ const Team = {
       '</div>' +
       '</div>' +
       '<div class="team-list-body" id="team-list-body">' +
-      '<div class="loading" style="padding:40px">Loading...</div>' +
+      Skeleton.render('list-item', 6) +
       '</div>' +
       '<div class="team-list-footer">' +
       '<label class="fury-btn fury-btn-secondary fury-btn-sm team-upload-btn" id="team-upload-label" tabindex="0" role="button">' +
@@ -592,7 +592,7 @@ const Team = {
         : '') +
       '</div>' +
       '<div id="team-invoice-list" class="td-invoice-list" style="margin-top:12px;">' +
-      '<div style="color:var(--fury-text-muted);font-size:13px;padding:12px 0;">Loading...</div>' +
+      Skeleton.render('card', 2) +
       '</div>' +
       '</div>';
 
@@ -1154,7 +1154,7 @@ const Team = {
     }
   },
 
-  /* ── Preview invoice ── */
+  /* ── Preview invoice (uses InvoicePreview.show for PDF preview) ── */
   async handlePreviewInvoice(container) {
     var self = this;
     var emp = self.findEmployee(self.selectedId);
@@ -1164,9 +1164,12 @@ const Team = {
       return;
     }
 
-    if (typeof InvoicePreview !== 'undefined' && typeof InvoicePreview.renderInvoiceHTML === 'function') {
-      try {
-      // Fetch full employee data (with bank details) for preview
+    if (typeof InvoicePreview === 'undefined' || typeof InvoicePreview.show !== 'function') {
+      showToast('Preview module not available', 'error');
+      return;
+    }
+
+    try {
       var fullEmp = emp;
       try {
         var empResult = await DB.getEmployee(emp.id);
@@ -1208,38 +1211,10 @@ const Team = {
         status: invoice.status || 'draft'
       };
 
-      var overlay = container.querySelector('#team-modal-overlay');
-      var modal = container.querySelector('#team-modal');
-      if (overlay && modal) {
-        var furyModal = modal.querySelector('.fury-modal') || modal;
-        furyModal.classList.add('fury-modal-lg');
-        modal.innerHTML =
-          '<div style="padding:0;max-width:800px;width:100%;max-height:90vh;overflow:auto;background:#fff;border-radius:8px">' +
-          '<div style="display:flex;justify-content:flex-end;padding:8px;background:#111114;border-radius:8px 8px 0 0">' +
-          '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-preview-close">&times; Close</button>' +
-          '</div>' +
-          '<div id="team-preview-content" style="padding:20px"><div class="invoice-preview">' +
-          InvoicePreview.renderInvoiceHTML(invoiceData) +
-          '</div></div>' +
-          '</div>';
-        overlay.classList.add('active');
-        document.body.classList.add('fury-modal-open');
-
-        var closeBtn = modal.querySelector('#team-preview-close');
-        if (closeBtn) {
-          closeBtn.addEventListener('click', function () {
-            overlay.classList.remove('active');
-            document.body.classList.remove('fury-modal-open');
-            furyModal.classList.remove('fury-modal-lg');
-          });
-        }
-      }
-      } catch (err) {
-        console.error('[Team] preview error:', err);
-        showToast('Failed to generate preview.', 'error');
-      }
-    } else {
-      showToast('Preview module not available', 'error');
+      InvoicePreview.show(invoiceData);
+    } catch (err) {
+      console.error('[Team] preview error:', err);
+      showToast('Failed to generate preview.', 'error');
     }
   },
 
@@ -1300,14 +1275,18 @@ const Team = {
       status: invoice.status || 'draft'
     };
 
-    // Show preview and auto-trigger print for PDF
-    InvoicePreview.show(invoiceData);
-    setTimeout(function () {
-      var previewOverlay = document.querySelector('.invoice-preview-overlay');
-      if (previewOverlay && typeof InvoicePreview._printInvoice === 'function') {
-        InvoicePreview._printInvoice(previewOverlay);
+    // Generate and download PDF directly
+    showToast('Generating PDF...', 'info');
+    InvoicePreview._currentInvoiceData = invoiceData;
+    InvoicePreview._generatePdf(invoiceData, function (blobUrl) {
+      if (blobUrl) {
+        InvoicePreview._downloadPdf(blobUrl);
+        setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 1000);
+        showToast('PDF downloaded', 'success');
+      } else {
+        showToast('Failed to generate PDF', 'error');
       }
-    }, 300);
+    });
     } catch (err) {
       console.error('[Team] download error:', err);
       showToast('Failed to prepare download.', 'error');
@@ -1462,7 +1441,7 @@ const Team = {
     var self = this;
     var detail = container.querySelector('#team-detail');
     if (detail) {
-      detail.innerHTML = '<div class="loading" style="padding:40px">Loading...</div>';
+      detail.innerHTML = '<div style="padding:24px">' + Skeleton.render('card', 3) + '</div>';
     }
 
     try {
@@ -1997,44 +1976,24 @@ const Team = {
       var invoiceData = await self._buildInvoiceDataForPreview(emp, invoice, items);
 
       if (action === 'preview') {
-        if (typeof InvoicePreview !== 'undefined' && typeof InvoicePreview.renderInvoiceHTML === 'function') {
-          var overlay = container.querySelector('#team-modal-overlay');
-          var modal = container.querySelector('#team-modal');
-          if (overlay && modal) {
-            var furyModal = modal.querySelector('.fury-modal') || modal;
-            furyModal.classList.add('fury-modal-lg');
-            modal.innerHTML =
-              '<div style="padding:0;max-width:800px;width:100%;max-height:90vh;overflow:auto;background:#fff;border-radius:8px">' +
-              '<div style="display:flex;justify-content:flex-end;padding:8px;background:#111114;border-radius:8px 8px 0 0">' +
-              '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-preview-close">&times; Close</button>' +
-              '</div>' +
-              '<div id="team-preview-content" style="padding:20px"><div class="invoice-preview">' +
-              InvoicePreview.renderInvoiceHTML(invoiceData) +
-              '</div></div>' +
-              '</div>';
-            overlay.classList.add('active');
-            document.body.classList.add('fury-modal-open');
-            var closeBtn = modal.querySelector('#team-preview-close');
-            if (closeBtn) {
-              closeBtn.addEventListener('click', function () {
-                overlay.classList.remove('active');
-                document.body.classList.remove('fury-modal-open');
-                furyModal.classList.remove('fury-modal-lg');
-              });
-            }
-          }
+        if (typeof InvoicePreview !== 'undefined' && typeof InvoicePreview.show === 'function') {
+          InvoicePreview.show(invoiceData);
         } else {
           showToast('Preview module not available', 'error');
         }
       } else if (action === 'download') {
-        if (typeof InvoicePreview !== 'undefined' && typeof InvoicePreview.show === 'function') {
-          InvoicePreview.show(invoiceData);
-          setTimeout(function () {
-            var previewOverlay = document.querySelector('.invoice-preview-overlay');
-            if (previewOverlay && typeof InvoicePreview._printInvoice === 'function') {
-              InvoicePreview._printInvoice(previewOverlay);
+        if (typeof InvoicePreview !== 'undefined' && typeof InvoicePreview._generatePdf === 'function') {
+          showToast('Generating PDF...', 'info');
+          InvoicePreview._currentInvoiceData = invoiceData;
+          InvoicePreview._generatePdf(invoiceData, function (blobUrl) {
+            if (blobUrl) {
+              InvoicePreview._downloadPdf(blobUrl);
+              setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 1000);
+              showToast('PDF downloaded', 'success');
+            } else {
+              showToast('Failed to generate PDF', 'error');
             }
-          }, 300);
+          });
         } else {
           showToast('Download module not available', 'error');
         }

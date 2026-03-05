@@ -98,7 +98,7 @@ const Invoices = {
       'Generate Selected' +
       '</button>' +
       '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-batch-download" disabled>' +
-      'Download All DOCX' +
+      'Download All PDF' +
       '</button>' +
       '</div>' +
       '</div>' +
@@ -119,7 +119,7 @@ const Invoices = {
       '</tr>' +
       '</thead>' +
       '<tbody id="inv-tbody">' +
-      '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--fury-text-muted);">Loading...</td></tr>' +
+      Skeleton.render('table-row', 5, { cols: 8 }) +
       '</tbody>' +
       '</table>' +
       '</div>' +
@@ -955,9 +955,7 @@ const Invoices = {
     try {
       var tbody = container.querySelector('#inv-tbody');
       if (tbody) {
-        tbody.innerHTML =
-          '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--fury-text-muted);">' +
-          'Loading...</td></tr>';
+        tbody.innerHTML = Skeleton.render('table-row', 5, { cols: 8 });
       }
       var pendingSection = container.querySelector('#inv-pending-section');
       if (pendingSection) pendingSection.style.display = 'none';
@@ -994,23 +992,30 @@ const Invoices = {
     InvoicePreview.show(previewData);
   },
 
-  /* ── Download PDF for a single invoice (via print dialog) ── */
+  /* ── Download PDF for a single invoice ── */
   _handleDownload: function (invoiceId) {
     var inv = this._findInvoice(invoiceId);
     if (!inv) {
       showToast('Invoice not found', 'error');
-      return;
+      return Promise.resolve();
     }
 
     var previewData = this._buildPreviewData(inv);
-    InvoicePreview.show(previewData);
-    // Auto-trigger print for PDF save
-    setTimeout(function () {
-      var previewOverlay = document.querySelector('.invoice-preview-overlay');
-      if (previewOverlay && typeof InvoicePreview._printInvoice === 'function') {
-        InvoicePreview._printInvoice(previewOverlay);
-      }
-    }, 300);
+    showToast('Generating PDF...', 'info');
+    InvoicePreview._currentInvoiceData = previewData;
+    return new Promise(function (resolve) {
+      InvoicePreview._generatePdf(previewData, function (blobUrl) {
+        if (!blobUrl) {
+          showToast('Failed to generate PDF', 'error');
+          resolve();
+          return;
+        }
+        InvoicePreview._downloadPdf(blobUrl);
+        setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 1000);
+        showToast('PDF downloaded', 'success');
+        resolve();
+      });
+    });
   },
 
   /* ── Status change ── */
@@ -1191,7 +1196,7 @@ const Invoices = {
     await this._reload(container, ctx);
   },
 
-  /* ── Batch download ── */
+  /* ── Batch download (PDF via print dialog, one at a time) ── */
   _handleBatchDownload: async function (container, ctx) {
     var dlBtn = container.querySelector('#btn-batch-download');
     if (dlBtn) {
@@ -1203,25 +1208,17 @@ const Invoices = {
         showToast('No invoices to download', 'error');
         return;
       }
-      if (typeof InvoiceDocx !== 'undefined' && InvoiceDocx.downloadBatch) {
-        var allData = [];
-        for (var i = 0; i < this.invoices.length; i++) {
-          allData.push(this._buildPreviewData(this.invoices[i]));
-        }
-        await InvoiceDocx.downloadBatch(allData);
-        showToast(allData.length + ' invoice(s) downloaded', 'success');
-      } else {
-        for (var j = 0; j < this.invoices.length; j++) {
-          await this._handleDownload(this.invoices[j].id);
-        }
+      for (var i = 0; i < this.invoices.length; i++) {
+        await this._handleDownload(this.invoices[i].id);
       }
+      showToast(this.invoices.length + ' invoice(s) downloaded', 'success');
     } catch (err) {
       console.error('[Invoices] batch download error:', err);
       showToast('Batch download failed. Please try again.', 'error');
     } finally {
       if (dlBtn) {
         dlBtn.disabled = false;
-        dlBtn.textContent = 'Download All DOCX';
+        dlBtn.textContent = 'Download All PDF';
       }
     }
   },
@@ -1476,7 +1473,7 @@ const Invoices = {
       self._saveInvoice(overlay, employee, 'draft', container, ctx, closeModal);
     });
 
-    // Generate & Download DOCX
+    // Generate & Save PDF
     overlay.querySelector('#gen-download').addEventListener('click', function () {
       self._saveAndDownload(overlay, employee, container, ctx, closeModal);
     });
@@ -1532,8 +1529,7 @@ const Invoices = {
     }
 
     // Collect line items
-    // Fields: description, price, qty, total — matches InvoiceDocx (item.price, item.qty)
-    // and InvoicePreview (item.price, item.total) expected shape
+    // Fields: description, price, qty, total — matches InvoicePreview expected shape
     var items = [];
     var liRows = overlay.querySelectorAll('.gen-line-item');
     for (var i = 0; i < liRows.length; i++) {
@@ -1693,7 +1689,7 @@ const Invoices = {
     }
   },
 
-  /* ── Save and Download DOCX ── */
+  /* ── Save and Download PDF ── */
   async _saveAndDownload(overlay, employee, container, ctx, closeCallback) {
     var data = this.collectModalData(overlay, employee);
     if (!data) return null;
@@ -1766,15 +1762,18 @@ const Invoices = {
       // Close the generate modal
       if (closeCallback) closeCallback();
 
-      // Show preview and auto-trigger print for PDF
-      InvoicePreview.show(data);
-      // Small delay to let the DOM render, then auto-print
-      setTimeout(function () {
-        var previewOverlay = document.querySelector('.invoice-preview-overlay');
-        if (previewOverlay && typeof InvoicePreview._printInvoice === 'function') {
-          InvoicePreview._printInvoice(previewOverlay);
+      // Generate and download PDF directly
+      showToast('Generating PDF...', 'info');
+      InvoicePreview._currentInvoiceData = data;
+      InvoicePreview._generatePdf(data, function (blobUrl) {
+        if (blobUrl) {
+          InvoicePreview._downloadPdf(blobUrl);
+          setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 1000);
+          showToast('PDF downloaded', 'success');
+        } else {
+          showToast('Failed to generate PDF', 'error');
         }
-      }, 300);
+      });
 
       await this._reload(container, ctx);
     } catch (err) {
@@ -1850,12 +1849,12 @@ const Invoices = {
      ═══════════════════════════════════════════════════════ */
 
   /* ── Build preview data from an existing invoice record ── */
-  /* Field mapping: DB invoice_items → preview/DOCX data object
+  /* Field mapping: DB invoice_items → preview data object
    *   DB column         →  preview field   →  consumed by
-   *   it.description    →  description     →  InvoiceDocx (item.description), InvoicePreview (item.description)
-   *   it.price_usd      →  price           →  InvoiceDocx (item.price), InvoicePreview (item.price)
-   *   it.qty            →  qty             →  InvoiceDocx (item.qty), InvoicePreview (item.qty)
-   *   it.total_usd      →  total           →  InvoiceDocx (item.price * item.qty fallback), InvoicePreview (item.total)
+   *   it.description    →  description     →  InvoicePreview (item.description)
+   *   it.price_usd      →  price           →  InvoicePreview (item.price)
+   *   it.qty            →  qty             →  InvoicePreview (item.qty)
+   *   it.total_usd      →  total           →  InvoicePreview (item.total)
    *   it.item_order     →  item_order      →  used for sorting only, not passed to services
    */
   _buildPreviewData: function (inv) {
@@ -1863,9 +1862,9 @@ const Invoices = {
     var items = (inv.invoice_items || []).map(function (it) {
       return {
         description: it.description || '',
-        price: it.price_usd || 0,       // DB: price_usd → DOCX/Preview: price
+        price: it.price_usd || 0,       // DB: price_usd → Preview: price
         qty: it.qty || 1,
-        total: it.total_usd || 0,        // DB: total_usd → DOCX/Preview: total
+        total: it.total_usd || 0,        // DB: total_usd → Preview: total
         item_order: it.item_order || 0   // kept for sorting, not used by services
       };
     });

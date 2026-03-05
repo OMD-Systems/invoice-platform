@@ -1,7 +1,7 @@
 /* ============================================================
    INVOICE PRINT STYLESHEET — OMD Finance Platform
    Optimized for A4 printing with professional layout
-   Teal accents matching original DOCX template
+   Teal accents matching original invoice template
    ============================================================ */
 
 /* --- Print Media --- */
@@ -499,6 +499,103 @@
     pointer-events: none;
   }
 
+  /* --- Page Frame (border around content) --- */
+  .invoice-page-frame {
+    position: relative;
+    border: 1.5pt solid #00D4FF !important;
+    padding: 20px 24px 16px !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* --- Watermark --- */
+  .invoice-watermark {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) rotate(-35deg) !important;
+    font-size: 72pt !important;
+    font-weight: 900 !important;
+    color: rgba(0, 212, 255, 0.05) !important;
+    letter-spacing: 12pt !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+    z-index: 0 !important;
+  }
+
+  /* --- OMD Brand Header --- */
+  .invoice-brand-header {
+    text-align: center !important;
+    margin-bottom: 14pt !important;
+    padding-bottom: 8pt !important;
+    border-bottom: 1px solid #e0e0e0 !important;
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
+    z-index: 1 !important;
+  }
+
+  .invoice-brand-logo {
+    font-size: 16pt !important;
+    font-weight: 800 !important;
+    color: #00D4FF !important;
+    letter-spacing: 4pt !important;
+    margin-bottom: 3pt !important;
+  }
+
+  .invoice-brand-address {
+    font-size: 7pt !important;
+    color: #888 !important;
+    letter-spacing: 0.3pt !important;
+  }
+
+  /* --- Document Footer --- */
+  .invoice-doc-footer {
+    margin-top: 20pt !important;
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
+    z-index: 1 !important;
+    page-break-inside: avoid;
+  }
+
+  .invoice-doc-footer-line {
+    border-top: 1px solid #00D4FF !important;
+    margin-bottom: 6pt !important;
+  }
+
+  .invoice-doc-footer-content {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+    gap: 12pt !important;
+  }
+
+  .invoice-doc-footer-left {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 2pt !important;
+  }
+
+  .invoice-doc-footer-brand {
+    font-size: 7pt !important;
+    font-weight: 600 !important;
+    color: #00D4FF !important;
+    letter-spacing: 0.3pt !important;
+  }
+
+  .invoice-doc-footer-time {
+    font-size: 6.5pt !important;
+    color: #999 !important;
+  }
+
+  .invoice-doc-hash {
+    font-size: 6.5pt !important;
+    color: #888 !important;
+    font-family: 'Courier New', monospace !important;
+    text-align: right !important;
+  }
+
   /* --- Print-Specific Helpers --- */
   .print-only {
     display: block !important;
@@ -560,7 +657,7 @@
     max-width: 210mm;
     min-height: 297mm;
     margin: 0 auto;
-    padding: 40px;
+    padding: 12px;
     box-shadow: 0 4px 40px rgba(0, 0, 0, 0.5);
     border-radius: 4px;
   }
@@ -649,7 +746,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5pt;
-    color: #666;
+    color: #444;
     margin-bottom: 2pt;
   }
 
@@ -709,7 +806,7 @@
 
   .invoice-table .item-description {
     font-size: 8pt;
-    color: #666;
+    color: #444;
     margin-top: 2pt;
   }
 
@@ -746,7 +843,7 @@
   }
 
   .invoice-totals-table tr.tax td {
-    color: #666;
+    color: #333;
     font-size: 9pt;
   }
 
@@ -815,7 +912,7 @@
 
   .invoice-notes-text {
     font-size: 9pt;
-    color: #555;
+    color: #333;
     line-height: 1.5;
   }
 
@@ -836,7 +933,7 @@
 
   .invoice-terms-text {
     font-size: 8pt;
-    color: #777;
+    color: #444;
     line-height: 1.5;
   }
 
@@ -929,6 +1026,99 @@
     padding: 6pt 20pt;
     border-radius: 6pt;
     pointer-events: none;
+  }
+
+  /* ── Page Frame (border around content) ── */
+  .invoice-page-frame {
+    position: relative;
+    border: 1.5pt solid #00D4FF;
+    padding: 28px 32px 20px;
+    min-height: 297mm;
+    overflow: hidden;
+  }
+
+  /* ── Watermark ── */
+  .invoice-watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-35deg);
+    font-size: 72pt;
+    font-weight: 900;
+    color: rgba(0, 212, 255, 0.06);
+    letter-spacing: 12pt;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 0;
+    user-select: none;
+  }
+
+  /* ── OMD Brand Header ── */
+  .invoice-brand-header {
+    text-align: center;
+    margin-bottom: 16pt;
+    padding-bottom: 10pt;
+    border-bottom: 1px solid #e0e0e0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .invoice-brand-logo {
+    font-size: 18pt;
+    font-weight: 800;
+    color: #00D4FF;
+    letter-spacing: 4pt;
+    margin-bottom: 4pt;
+  }
+
+  .invoice-brand-address {
+    font-size: 7.5pt;
+    color: #888;
+    letter-spacing: 0.3pt;
+  }
+
+  /* ── Document Footer ── */
+  .invoice-doc-footer {
+    margin-top: 24pt;
+    position: relative;
+    z-index: 1;
+  }
+
+  .invoice-doc-footer-line {
+    border-top: 1px solid #00D4FF;
+    margin-bottom: 8pt;
+  }
+
+  .invoice-doc-footer-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 12pt;
+  }
+
+  .invoice-doc-footer-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2pt;
+  }
+
+  .invoice-doc-footer-brand {
+    font-size: 7.5pt;
+    font-weight: 600;
+    color: #00D4FF;
+    letter-spacing: 0.3pt;
+  }
+
+  .invoice-doc-footer-time {
+    font-size: 7pt;
+    color: #999;
+  }
+
+  .invoice-doc-hash {
+    font-size: 7pt;
+    color: #888;
+    font-family: 'Courier New', monospace;
+    text-align: right;
   }
 
   /* Helpers */

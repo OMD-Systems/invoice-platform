@@ -3,40 +3,7 @@
 // utils.js — Centralized security & formatting functions
 // ============================================================
 
-/* ── Global Toast ── */
-var MAX_TOASTS = 5;
-function showToast(message, type) {
-    type = type || 'success';
-    var container = document.getElementById('toast-container');
-    if (!container) {
-        container = document.createElement('div');
-        container.id = 'toast-container';
-        container.className = 'fury-toast-container';
-        container.setAttribute('aria-live', 'polite');
-        container.setAttribute('role', 'status');
-        document.body.appendChild(container);
-    }
-    // Limit toast stack — remove oldest if exceeding max
-    while (container.children.length >= MAX_TOASTS) {
-        container.removeChild(container.firstChild);
-    }
-    var toast = document.createElement('div');
-    toast.className = 'fury-toast fury-toast-' + type;
-    if (type === 'error' || type === 'danger') {
-        toast.setAttribute('role', 'alert');
-    }
-    toast.textContent = message;
-    container.appendChild(toast);
-    setTimeout(function () { toast.classList.add('show'); }, 10);
-    var dismissMs = type === 'error' ? 6000 : 4000;
-    setTimeout(function () {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(100%)';
-        setTimeout(function () {
-            if (toast.parentNode) toast.remove();
-        }, 300);
-    }, dismissMs);
-}
+// showToast() and Toast.* are now in toast.js
 
 const Utils = {
 
@@ -173,4 +140,56 @@ const Utils = {
             return obj;
         }
     },
+};
+
+/* ── Skeleton Loading ── */
+var Skeleton = {
+    /**
+     * Render skeleton placeholder HTML.
+     * @param {'table-row'|'card'|'list-item'} type
+     * @param {number} count
+     * @param {object} [opts] - { cols: number (for table-row) }
+     * @returns {string} HTML string
+     */
+    render: function (type, count, opts) {
+        count = count || 3;
+        opts = opts || {};
+        var html = '';
+        var i, j;
+
+        if (type === 'table-row') {
+            var cols = opts.cols || 6;
+            var widths = ['35%', '20%', '15%', '12%', '10%', '8%', '18%', '14%'];
+            for (i = 0; i < count; i++) {
+                html += '<tr class="skeleton-table-row">';
+                for (j = 0; j < cols; j++) {
+                    var w = widths[j % widths.length];
+                    html += '<td><div class="skeleton skeleton-cell" style="width:' + w + '"></div></td>';
+                }
+                html += '</tr>';
+            }
+        } else if (type === 'card') {
+            for (i = 0; i < count; i++) {
+                html +=
+                    '<div class="skeleton-card">' +
+                    '<div class="skeleton skeleton-title"></div>' +
+                    '<div class="skeleton skeleton-text"></div>' +
+                    '<div class="skeleton skeleton-text-sm"></div>' +
+                    '</div>';
+            }
+        } else if (type === 'list-item') {
+            for (i = 0; i < count; i++) {
+                html +=
+                    '<div class="skeleton-list-item">' +
+                    '<div class="skeleton skeleton-avatar"></div>' +
+                    '<div style="flex:1">' +
+                    '<div class="skeleton skeleton-text" style="width:' + (50 + (i * 7) % 30) + '%"></div>' +
+                    '<div class="skeleton skeleton-text-sm" style="width:' + (30 + (i * 11) % 25) + '%"></div>' +
+                    '</div>' +
+                    '</div>';
+            }
+        }
+
+        return html;
+    }
 };
