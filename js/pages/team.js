@@ -2109,19 +2109,17 @@ const Team = {
         return;
       }
 
-      // Download locally
-      var fileName = (emp.full_name_lat || emp.name || 'employee').replace(/\s+/g, '_') + '_' + label + '.docx';
-      if (typeof saveAs !== 'undefined') {
-        saveAs(blob, fileName);
-      } else {
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 200);
-      }
+      // Download locally — wrap with explicit MIME type for reliable download
+      var fileName = generator.getFileName(emp);
+      var downloadBlob = new Blob([blob], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      var url = URL.createObjectURL(downloadBlob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { a.remove(); URL.revokeObjectURL(url); }, 1000);
 
       // Refresh cache
       var freshResult = await DB.getEmployee(emp.id);
