@@ -2109,20 +2109,16 @@ const Team = {
         return;
       }
 
-      // Download locally — use data URI to bypass Chrome's download attribute restriction
+      // Download from Supabase Storage (signed URL with Content-Disposition)
       var fileName = generator.getFileName(emp);
-      var downloadBlob = new Blob([blob], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-      var reader = new FileReader();
-      reader.onload = function () {
-        var a = document.createElement('a');
-        a.href = reader.result;
-        a.download = fileName;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function () { a.remove(); }, 500);
-      };
-      reader.readAsDataURL(downloadBlob);
+      var bucket = docType === 'contract' ? 'contracts' : 'documents';
+      var storagePath = emp.id + '/' + docType + '.docx';
+      var signedResult = await DB.client.storage
+        .from(bucket)
+        .createSignedUrl(storagePath, 60, { download: fileName });
+      if (signedResult.data && signedResult.data.signedUrl) {
+        window.open(signedResult.data.signedUrl, '_blank');
+      }
 
       // Refresh cache
       var freshResult = await DB.getEmployee(emp.id);
