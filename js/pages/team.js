@@ -784,10 +784,7 @@ const Team = {
         var fileName = ContractDocx.getFileName(emp);
         var result = await DB.getContractUrl(emp.id, fileName);
         if (result && result.data) {
-          var a = document.createElement('a');
-          a.href = result.data;
-          a.download = fileName;
-          a.click();
+          window.location.href = result.data;
         } else {
           showToast('Failed to get contract URL', 'error');
         }
@@ -823,10 +820,7 @@ const Team = {
         var fileName = NdaDocx.getFileName(emp);
         var result = await DB.getNdaUrl(emp.id, fileName);
         if (result && result.data) {
-          var a = document.createElement('a');
-          a.href = result.data;
-          a.download = fileName;
-          a.click();
+          window.location.href = result.data;
         } else {
           showToast('Failed to get NDA URL', 'error');
         }
@@ -2097,14 +2091,11 @@ const Team = {
       return;
     }
 
-    // If document already exists, confirm re-generation
     var uploadedAtField = docType === 'contract' ? 'contract_uploaded_at' : 'nda_uploaded_at';
-    if (emp[uploadedAtField]) {
-      if (!confirm('Re-generate and replace existing ' + label + '?')) return;
-    }
+    var isRegenerate = !!emp[uploadedAtField];
 
     try {
-      showToast('Generating ' + label + '...', 'info');
+      showToast((isRegenerate ? 'Re-generating' : 'Generating') + ' ' + label + '...', 'info');
 
       // Generate DOCX blob
       var blob = await generator.generate(emp);
@@ -2117,10 +2108,20 @@ const Team = {
         return;
       }
 
+      // Download via signed URL with Content-Disposition
+      var fileName = generator.getFileName(emp);
+      var bucket = docType === 'contract' ? 'contracts' : 'documents';
+      var storagePath = emp.id + '/' + docType + '.docx';
+      var signedResult = await DB.client.storage
+        .from(bucket)
+        .createSignedUrl(storagePath, 60, { download: fileName });
+      if (signedResult.data && signedResult.data.signedUrl) {
+        window.location.href = signedResult.data.signedUrl;
+      }
+
       // Refresh cache
       var freshResult = await DB.getEmployee(emp.id);
       if (freshResult.data) {
-        // Update both allEmployees and employees caches
         var caches = [self.allEmployees, self.employees];
         for (var c = 0; c < caches.length; c++) {
           if (!caches[c]) continue;
