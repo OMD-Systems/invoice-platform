@@ -442,8 +442,8 @@ const Team = {
       '</div>' +
       // Documents row
       '<div class="td-docs-row">' +
-      self._renderDocCard('Contract', emp.contract_uploaded_at, 'team-btn-contract', 'team-file-contract', isAdmin) +
-      self._renderDocCard('NDA', emp.nda_uploaded_at, 'team-btn-nda', 'team-file-nda', isAdmin) +
+      self._renderDocCard('Contract', emp.contract_uploaded_at, 'team-btn-contract', 'team-file-contract', isAdmin, 'team-btn-gen-contract') +
+      self._renderDocCard('NDA', emp.nda_uploaded_at, 'team-btn-nda', 'team-file-nda', isAdmin, 'team-btn-gen-nda') +
       '</div>' +
       '</div>';
 
@@ -602,7 +602,9 @@ const Team = {
   },
 
   /* ── Helper: render document card ── */
-  _renderDocCard(label, uploadedAt, btnId, fileId, isAdmin) {
+  _renderDocCard(label, uploadedAt, btnId, fileId, isAdmin, genBtnId) {
+    var downloadIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    var generateIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>';
     if (uploadedAt) {
       return (
         '<div class="td-doc-card td-doc-ok">' +
@@ -611,26 +613,35 @@ const Team = {
         '</div>' +
         '<div class="td-doc-info">' +
         '<span class="td-doc-label">' + label + '</span>' +
-        '<span class="td-doc-status">Uploaded</span>' +
+        '<span class="td-doc-status">Available</span>' +
         '</div>' +
-        '<button class="td-doc-action" id="' + btnId + '" data-fury-tooltip="Download ' + label + '">' +
-        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>' +
-        '</button>' +
+        '<div class="td-doc-actions">' +
+        '<button class="td-doc-action" id="' + btnId + '" data-fury-tooltip="Download ' + label + '">' + downloadIcon + '</button>' +
+        (isAdmin
+          ? '<button class="td-doc-action td-doc-action-gen" id="' + genBtnId + '" data-fury-tooltip="Re-generate ' + label + '">' + generateIcon + '</button>'
+          : '') +
+        '</div>' +
         '</div>'
       );
     }
     if (isAdmin) {
       return (
-        '<label class="td-doc-card td-doc-missing td-doc-upload">' +
+        '<div class="td-doc-card td-doc-missing">' +
         '<div class="td-doc-icon">' +
-        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' +
         '</div>' +
         '<div class="td-doc-info">' +
         '<span class="td-doc-label">' + label + '</span>' +
-        '<span class="td-doc-status td-doc-status-missing">Upload PDF</span>' +
+        '<span class="td-doc-status td-doc-status-missing">Not generated</span>' +
         '</div>' +
+        '<div class="td-doc-actions">' +
+        '<button class="td-doc-action td-doc-action-gen" id="' + genBtnId + '" data-fury-tooltip="Generate ' + label + '">' + generateIcon + '</button>' +
+        '<label class="td-doc-action" data-fury-tooltip="Upload PDF">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' +
         '<input type="file" accept=".pdf" id="' + fileId + '" style="display:none" />' +
-        '</label>'
+        '</label>' +
+        '</div>' +
+        '</div>'
       );
     }
     return (
@@ -832,6 +843,22 @@ const Team = {
             showToast('NDA upload failed. Please try again.', 'error');
           }
         }
+      });
+    }
+
+    // Generate Contract
+    var genContractBtn = container.querySelector('#team-btn-gen-contract');
+    if (genContractBtn) {
+      genContractBtn.addEventListener('click', function () {
+        self.handleGenerateDocument('contract', container);
+      });
+    }
+
+    // Generate NDA
+    var genNdaBtn = container.querySelector('#team-btn-gen-nda');
+    if (genNdaBtn) {
+      genNdaBtn.addEventListener('click', function () {
+        self.handleGenerateDocument('nda', container);
       });
     }
 
@@ -1509,6 +1536,40 @@ const Team = {
       '</div>' +
 
       '<div class="fury-modal-section" style="margin-bottom: 24px;">' +
+      '<div class="fury-modal-section-title" style="font-size: 14px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; border-bottom: 1px solid #374151; padding-bottom: 8px;">Personal Documents</div>' +
+      '<div class="fury-form-row">' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label" for="team-f-dob">Date of Birth</label>' +
+      '<input type="date" class="fury-input" id="team-f-dob" value="' + self.escapeHtml(emp.date_of_birth || '') + '" />' +
+      '</div>' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label" for="team-f-passport">Passport Number</label>' +
+      '<input type="text" class="fury-input" id="team-f-passport" value="' + self.escapeHtml(emp.passport_number || '') + '" />' +
+      '</div>' +
+      '</div>' +
+      '<div class="fury-form-row fury-mt-2">' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label" for="team-f-passport-issued">Passport Issued</label>' +
+      '<input type="date" class="fury-input" id="team-f-passport-issued" value="' + self.escapeHtml(emp.passport_issued || '') + '" />' +
+      '</div>' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label" for="team-f-passport-expires">Passport Expires</label>' +
+      '<input type="date" class="fury-input" id="team-f-passport-expires" value="' + self.escapeHtml(emp.passport_expires || '') + '" />' +
+      '</div>' +
+      '</div>' +
+      '<div class="fury-form-row fury-mt-2">' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label" for="team-f-agreement-date">Agreement Date</label>' +
+      '<input type="date" class="fury-input" id="team-f-agreement-date" value="' + self.escapeHtml(emp.agreement_date || '') + '" />' +
+      '</div>' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label" for="team-f-effective-date">Effective Date</label>' +
+      '<input type="date" class="fury-input" id="team-f-effective-date" value="' + self.escapeHtml(emp.effective_date || '') + '" />' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+
+      '<div class="fury-modal-section" style="margin-bottom: 24px;">' +
       '<div class="fury-modal-section-title" style="font-size: 14px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; border-bottom: 1px solid #374151; padding-bottom: 8px;">Banking</div>' +
       '<div class="fury-form-group">' +
       '<label class="fury-label" for="team-f-iban">IBAN</label>' +
@@ -1642,7 +1703,13 @@ const Team = {
       invoice_prefix: (modal.querySelector('#team-f-inv-prefix').value || '').trim(),
       next_invoice_number: parseInt(modal.querySelector('#team-f-next-inv').value, 10) || 1,
       service_description: (modal.querySelector('#team-f-service').value || '').trim(),
-      is_active: modal.querySelector('#team-f-active').checked
+      is_active: modal.querySelector('#team-f-active').checked,
+      date_of_birth: (modal.querySelector('#team-f-dob').value || '').trim() || null,
+      passport_number: (modal.querySelector('#team-f-passport').value || '').trim() || null,
+      passport_issued: (modal.querySelector('#team-f-passport-issued').value || '').trim() || null,
+      passport_expires: (modal.querySelector('#team-f-passport-expires').value || '').trim() || null,
+      agreement_date: (modal.querySelector('#team-f-agreement-date').value || '').trim() || null,
+      effective_date: (modal.querySelector('#team-f-effective-date').value || '').trim() || null
     };
 
     if (!data.name) {
@@ -2001,6 +2068,73 @@ const Team = {
     } catch (err) {
       console.error('[Team] history action error:', err);
       showToast('Failed to load invoice data', 'error');
+    }
+  },
+
+  /* ═══════════════════════════════════════════════════════
+     GENERATE DOCUMENT (Contract / NDA)
+     ═══════════════════════════════════════════════════════ */
+  async handleGenerateDocument(docType, container) {
+    var self = this;
+    var emp = self.detailCache;
+    if (!emp) { showToast('No employee selected', 'error'); return; }
+
+    var generator = docType === 'contract' ? ContractDocx : NdaDocx;
+    var label = docType === 'contract' ? 'Contract' : 'NDA';
+
+    // Validate required fields
+    var missing = generator.validateFields(emp);
+    if (missing.length > 0) {
+      showToast('Fill required fields: ' + missing.join(', '), 'error');
+      return;
+    }
+
+    // If document already exists, confirm re-generation
+    var uploadedAtField = docType === 'contract' ? 'contract_uploaded_at' : 'nda_uploaded_at';
+    if (emp[uploadedAtField]) {
+      if (!confirm('Re-generate and replace existing ' + label + '?')) return;
+    }
+
+    try {
+      showToast('Generating ' + label + '...', 'info');
+
+      // Generate DOCX blob
+      var blob = await generator.generate(emp);
+
+      // Upload to Supabase
+      var uploadFn = docType === 'contract' ? DB.uploadContractDocx.bind(DB) : DB.uploadNdaDocx.bind(DB);
+      var result = await uploadFn(emp.id, blob);
+      if (result.error) {
+        showToast(label + ' upload failed: ' + result.error.message, 'error');
+        return;
+      }
+
+      // Download locally
+      var fileName = (emp.full_name_lat || emp.name || 'employee').replace(/\s+/g, '_') + '_' + label + '.docx';
+      if (typeof saveAs !== 'undefined') {
+        saveAs(blob, fileName);
+      }
+
+      // Refresh cache
+      var freshResult = await DB.getEmployee(emp.id);
+      if (freshResult.data) {
+        self.detailCache = freshResult.data;
+        // Update list cache too
+        if (self.employees) {
+          for (var i = 0; i < self.employees.length; i++) {
+            if (self.employees[i].id === emp.id) {
+              self.employees[i][uploadedAtField] = freshResult.data[uploadedAtField];
+              break;
+            }
+          }
+        }
+      }
+
+      showToast(label + ' generated successfully!', 'success');
+      self.renderDetail(container);
+    } catch (err) {
+      console.error('[Team] Generate ' + label + ' error:', err);
+      showToast('Failed to generate ' + label + ': ' + err.message, 'error');
     }
   },
 

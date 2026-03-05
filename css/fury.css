@@ -3847,3 +3847,8 @@ img.td-avatar-sm,
     display: none !important;
   }
 }
+
+/* --- Document Generate Buttons --- */
+.td-doc-actions { display: flex; gap: 4px; align-items: center; }
+.td-doc-action-gen { border-color: var(--fury-accent, #00E5FF); color: var(--fury-accent, #00E5FF); }
+.td-doc-action-gen:hover { background: rgba(0,229,255,0.12); }

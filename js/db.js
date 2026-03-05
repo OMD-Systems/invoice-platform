@@ -108,7 +108,7 @@ const DB = {
     try {
       const { data, error } = await this.client
         .from('employees')
-        .select('id, pin, name, full_name_lat, employee_type, contract_type, is_active, work_email, email, invoice_format, invoice_prefix, next_invoice_number, service_description, rate_usd, address, phone, iban, swift, bank_name, receiver_name, contract_uploaded_at, nda_uploaded_at, created_at, updated_at, avatar_url')
+        .select('id, pin, name, full_name_lat, employee_type, contract_type, is_active, work_email, email, invoice_format, invoice_prefix, next_invoice_number, service_description, rate_usd, address, phone, iban, swift, bank_name, receiver_name, contract_uploaded_at, nda_uploaded_at, created_at, updated_at, avatar_url, date_of_birth, passport_number, passport_issued, passport_expires, agreement_date, effective_date')
         .eq('is_active', true)
         .order('name', { ascending: true });
 
@@ -148,7 +148,9 @@ const DB = {
       var allowed = ['id', 'pin', 'name', 'full_name_lat', 'employee_type', 'contract_type',
         'is_active', 'work_email', 'email', 'phone', 'address', 'rate_usd', 'iban', 'swift',
         'bank_name', 'receiver_name', 'invoice_format', 'invoice_prefix', 'next_invoice_number',
-        'service_description', 'avatar_url', 'updated_at'];
+        'service_description', 'avatar_url', 'updated_at',
+        'date_of_birth', 'passport_number', 'passport_issued', 'passport_expires',
+        'agreement_date', 'effective_date'];
       var cleaned = {};
       for (var i = 0; i < allowed.length; i++) {
         if (employeeData[allowed[i]] !== undefined) cleaned[allowed[i]] = employeeData[allowed[i]];
@@ -202,7 +204,8 @@ const DB = {
             id, pin, name, full_name_lat, employee_type, contract_type, is_active,
             work_email, email, invoice_format, invoice_prefix, next_invoice_number,
             service_description, rate_usd, address, phone, iban, swift, bank_name,
-            receiver_name, contract_uploaded_at, nda_uploaded_at, created_at, updated_at, avatar_url
+            receiver_name, contract_uploaded_at, nda_uploaded_at, created_at, updated_at, avatar_url,
+            date_of_birth, passport_number, passport_issued, passport_expires, agreement_date, effective_date
           )
         `)
         .eq('teams.lead_email', leadEmail)
@@ -1080,16 +1083,53 @@ const DB = {
   },
 
   /**
-   * Get a signed URL for an employee's contract PDF.
+   * Upload a contract DOCX for an employee (generated).
+   * @param {string} employeeId
+   * @param {Blob} blob - DOCX blob
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async uploadContractDocx(employeeId, blob) {
+    try {
+      var path = employeeId + '/contract.docx';
+      var { data, error } = await this.client.storage
+        .from('contracts')
+        .upload(path, blob, { upsert: true, contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+      if (error) return { data: null, error };
+
+      await this.client
+        .from('employees')
+        .update({ contract_uploaded_at: new Date().toISOString() })
+        .eq('id', employeeId);
+
+      return { data, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get a signed URL for an employee's contract. Tries DOCX first, falls back to PDF.
    * @param {string} employeeId
    * @returns {Promise<{data: string|null, error: object|null}>}
    */
   async getContractUrl(employeeId) {
     try {
-      var path = employeeId + '/contract.pdf';
+      // Try DOCX first
+      var docxPath = employeeId + '/contract.docx';
+      var { data: docxData, error: docxError } = await this.client.storage
+        .from('contracts')
+        .createSignedUrl(docxPath, 3600);
+
+      if (!docxError && docxData && docxData.signedUrl) {
+        return { data: docxData.signedUrl, error: null };
+      }
+
+      // Fallback to PDF
+      var pdfPath = employeeId + '/contract.pdf';
       var { data, error } = await this.client.storage
         .from('contracts')
-        .createSignedUrl(path, 3600); // 1 hour
+        .createSignedUrl(pdfPath, 3600);
 
       if (error) return { data: null, error };
       return { data: data.signedUrl, error: null };
@@ -1132,16 +1172,53 @@ const DB = {
   },
 
   /**
-   * Get a signed URL for an employee's NDA PDF.
+   * Upload an NDA DOCX for an employee (generated).
+   * @param {string} employeeId
+   * @param {Blob} blob - DOCX blob
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async uploadNdaDocx(employeeId, blob) {
+    try {
+      var path = employeeId + '/nda.docx';
+      var { data, error } = await this.client.storage
+        .from('documents')
+        .upload(path, blob, { upsert: true, contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+      if (error) return { data: null, error };
+
+      await this.client
+        .from('employees')
+        .update({ nda_uploaded_at: new Date().toISOString() })
+        .eq('id', employeeId);
+
+      return { data, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get a signed URL for an employee's NDA. Tries DOCX first, falls back to PDF.
    * @param {string} employeeId
    * @returns {Promise<{data: string|null, error: object|null}>}
    */
   async getNdaUrl(employeeId) {
     try {
-      var path = employeeId + '/nda.pdf';
+      // Try DOCX first
+      var docxPath = employeeId + '/nda.docx';
+      var { data: docxData, error: docxError } = await this.client.storage
+        .from('documents')
+        .createSignedUrl(docxPath, 3600);
+
+      if (!docxError && docxData && docxData.signedUrl) {
+        return { data: docxData.signedUrl, error: null };
+      }
+
+      // Fallback to PDF
+      var pdfPath = employeeId + '/nda.pdf';
       var { data, error } = await this.client.storage
         .from('documents')
-        .createSignedUrl(path, 3600);
+        .createSignedUrl(pdfPath, 3600);
 
       if (error) return { data: null, error };
       return { data: data.signedUrl, error: null };
