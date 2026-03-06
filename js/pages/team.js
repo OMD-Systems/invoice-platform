@@ -2178,15 +2178,18 @@ const Team = {
         console.warn('[Team] showSaveFilePicker failed, falling back:', err);
       }
     }
-    // Fallback: <a download>
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+    // Fallback: convert to data URI (more reliable than blob URL)
+    var reader = new FileReader();
+    reader.onload = function() {
+      var a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = reader.result;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function() { document.body.removeChild(a); }, 500);
+    };
+    reader.readAsDataURL(blob);
   },
 
   /* ── Download file from URL via fetch → blob ── */
