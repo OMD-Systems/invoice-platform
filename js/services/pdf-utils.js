@@ -10,7 +10,7 @@ var PdfUtils = {
   PAGE_HEIGHT_PX: Math.ceil(297 * 794 / 210), // 1123
   WRAPPER_PAD: 40,
   HEADER_ZONE: 55,  // px reserved at top of each page for header (~14.5mm)
-  FOOTER_ZONE: 95,  // px reserved at bottom for footer (~25mm, covers white rect at y=277mm + safety margin)
+  FOOTER_ZONE: 76,  // px reserved at bottom for footer (20mm = 297-277, exact match to overlay white rect)
 
   renderToPdf: function (html, opts) {
     opts = opts || {};
@@ -45,13 +45,12 @@ var PdfUtils = {
           return;
         }
 
-        // Iterative pagination: footer → header → footer (header spacers can push content into footer zone)
+        // Pagination: footer → header → footer (header spacers may push content into footer zone)
         var fz = overlay ? self.FOOTER_ZONE : 0;
-        for (var _pass = 0; _pass < 3; _pass++) {
+        self._paginateBlocks(content, self.WRAPPER_PAD, fz);
+        if (overlay) {
+          self._addHeaderSpacers(content, self.WRAPPER_PAD);
           self._paginateBlocks(content, self.WRAPPER_PAD, fz);
-          if (overlay) {
-            self._addHeaderSpacers(content, self.WRAPPER_PAD);
-          }
         }
 
         // 3) Tiled watermarks
@@ -130,8 +129,8 @@ var PdfUtils = {
   _paginateBlocks: function (contentEl, padTop, footerZone) {
     var PAGE_H = this.PAGE_HEIGHT_PX;
     var FOOTER = footerZone || 0;
-    var SAFE = 70;
-    var PAD = 70;
+    var HZONE = footerZone ? (this.HEADER_ZONE || 0) : 0;
+    var maxBlockH = PAGE_H - FOOTER - HZONE;
 
     var blocks = contentEl.querySelectorAll('[data-pdf-block]');
     for (var i = 0; i < blocks.length; i++) {
@@ -141,16 +140,13 @@ var PdfUtils = {
       var pageEnd = (Math.floor(wTop / PAGE_H) + 1) * PAGE_H;
       var contentEnd = pageEnd - FOOTER;
 
-      var crosses = wBot > contentEnd && wTop < contentEnd;
-      var inSafe = wTop < contentEnd && (contentEnd - wTop) <= SAFE;
-
-      if (crosses || inSafe) {
-        if (b.offsetHeight < PAGE_H - SAFE - PAD - FOOTER) {
-          var gap = (pageEnd - wTop) + PAD;
-          var sp = document.createElement('div');
-          sp.style.height = gap + 'px';
-          b.parentNode.insertBefore(sp, b);
-        }
+      // Only push if block actually crosses the content boundary (bottom past, top before)
+      if (wBot > contentEnd && wTop < contentEnd && b.offsetHeight < maxBlockH) {
+        // Push to next page past header zone so _addHeaderSpacers won't double-push
+        var gap = pageEnd + HZONE - wTop;
+        var sp = document.createElement('div');
+        sp.style.height = gap + 'px';
+        b.parentNode.insertBefore(sp, b);
       }
     }
   },
