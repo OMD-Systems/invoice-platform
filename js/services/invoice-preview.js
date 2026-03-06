@@ -366,11 +366,11 @@ var InvoicePreview = {
 
     var html =
       '<div class="invoice-page-frame">' +
-      '<div class="invoice-watermark">OMD SYSTEMS</div>' +
+      '<div class="invoice-watermark">WOODENSHARK LLC</div>' +
       stampHtml +
 
       '<div class="invoice-brand-header">' +
-      '<div class="invoice-brand-logo">OMD SYSTEMS</div>' +
+      '<div class="invoice-brand-logo">WOODENSHARK LLC</div>' +
       '<div class="invoice-brand-address">Woodenshark LLC &bull; 8 The Green, Suite A, Dover, DE 19901, USA</div>' +
       '</div>' +
 

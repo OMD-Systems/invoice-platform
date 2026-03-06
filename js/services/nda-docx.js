@@ -29,8 +29,6 @@ const NdaDocx = {
   /* ── Company constants ── */
   WS_NAME:      'Woodenshark LLC',
   WS_ADDRESS:   '3411 Silverside Road, Suite 104\nWilmington, DE 19810, USA',
-  OMD_NAME:     'OMD Systems Inc',
-  OMD_ADDRESS:  '836 Corriente Pointe Dr\nRedwood City, CA 94065, USA',
 
   /* ── Required fields ── */
   REQUIRED_FIELDS: [
@@ -208,8 +206,8 @@ const NdaDocx = {
     // Brand
     elements.push(new docx.Paragraph({
       children: [
-        new docx.TextRun({ text: 'OMD', font: self.FONT_HEADING, size: 64, bold: true, color: C.DARK_RED }),
-        new docx.TextRun({ text: ' SYSTEMS', font: self.FONT_HEADING, size: 64, bold: true, color: C.CRIMSON }),
+        new docx.TextRun({ text: 'WOODENSHARK', font: self.FONT_HEADING, size: 64, bold: true, color: C.DARK_RED }),
+        new docx.TextRun({ text: ' LLC', font: self.FONT_HEADING, size: 64, bold: true, color: C.CRIMSON }),
       ],
       spacing: { before: 0, after: 60 },
     }));
@@ -255,7 +253,7 @@ const NdaDocx = {
       ['EFFECTIVE DATE', effectiveDate],
       ['DURATION', '5 years'],
       ['', ''],
-      ['DISCLOSING PARTIES', self.WS_NAME + ' / ' + self.OMD_NAME],
+      ['DISCLOSING PARTY', self.WS_NAME],
       ['RECEIVING PARTY', emp.full_name_lat || ''],
     ];
 
@@ -356,11 +354,9 @@ const NdaDocx = {
     var leftBorder = { style: docx.BorderStyle.SINGLE, size: 16, color: C.RED_ACCENT };
 
     var disclosingCell = self._cell([
-      self._para(self._text('DISCLOSING PARTIES', { font: self.FONT_HEADING, size: 18, color: C.DEEP_RED, bold: true }), { spacing: { before: 0, after: 60 } }),
+      self._para(self._text('DISCLOSING PARTY', { font: self.FONT_HEADING, size: 18, color: C.DEEP_RED, bold: true }), { spacing: { before: 0, after: 60 } }),
       self._para(self._text(self.WS_NAME, { bold: true }), { spacing: { before: 0, after: 20 } }),
-      self._para(self._multiText(self.WS_ADDRESS, { size: 18, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 60 } }),
-      self._para(self._text(self.OMD_NAME, { bold: true }), { spacing: { before: 0, after: 20 } }),
-      self._para(self._multiText(self.OMD_ADDRESS, { size: 18, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 0 } }),
+      self._para(self._multiText(self.WS_ADDRESS, { size: 18, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 0 } }),
     ], {
       width: 4536,
       margins: { top: 80, bottom: 80, left: 160, right: 80 },
@@ -425,7 +421,7 @@ const NdaDocx = {
 
     // 1. DEFINITIONS
     elements.push(self._sectionHeading('DEFINITIONS', sn)); sn++;
-    elements.push(self._subPara('\u201cCompany\u201d shall mean Woodenshark LLC and OMD Systems Inc, collectively, as the Disclosing Parties under this Agreement.', '1.1'));
+    elements.push(self._subPara('\u201cCompany\u201d shall mean Woodenshark LLC, as the Disclosing Party under this Agreement.', '1.1'));
     elements.push(self._subPara('\u201cConfidential Information\u201d shall mean any and all non-public, proprietary, or trade secret information, whether in oral, written, electronic, visual, or any other form, that is disclosed by or on behalf of the Company to the Receiving Party, including but not limited to the categories set forth in Section 2.', '1.2'));
     elements.push(self._subPara('\u201cReceiving Party\u201d shall mean the Party receiving Confidential Information.', '1.3'));
     elements.push(self._subPara('\u201cRepresentatives\u201d shall mean officers, directors, employees, agents, contractors, advisors, attorneys, and accountants who have a legitimate need to know the Confidential Information and who are bound by obligations of confidentiality no less restrictive than those set forth herein.', '1.4'));
@@ -582,14 +578,7 @@ const NdaDocx = {
       'WOODENSHARK LLC',
       '3411 Silverside Road\nSuite 104, Wilmington\nDE 19810, USA',
       '____________________',
-      3119
-    );
-
-    var omdCell = buildSigCell(
-      'OMD SYSTEMS INC',
-      '836 Corriente Pointe Dr\nRedwood City\nCA 94065, USA',
-      '____________________',
-      3119
+      4678
     );
 
     var empCell = self._cell([
@@ -605,13 +594,13 @@ const NdaDocx = {
       self._para(self._text('Name: ' + (emp.full_name_lat || ''), { size: 16, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 40 } }),
       self._para(self._text('Date: ____________________', { size: 16, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 0 } }),
     ], {
-      width: 3118,
+      width: 4678,
       margins: { top: 80, bottom: 40, left: 60, right: 40 },
       borders: { top: topBorder, bottom: nb, left: nb, right: nb },
     });
 
     elements.push(new docx.Table({
-      rows: [new docx.TableRow({ children: [wsCell, omdCell, empCell] })],
+      rows: [new docx.TableRow({ children: [wsCell, empCell] })],
       width: { size: 9356, type: docx.WidthType.DXA },
       layout: docx.TableLayoutType.FIXED,
     }));
@@ -648,7 +637,7 @@ const NdaDocx = {
       }),
       new docx.Paragraph({
         children: [
-          new docx.TextRun({ text: 'OMD SYSTEMS', font: self.FONT_HEADING, size: 16, color: C.CRIMSON, bold: true }),
+          new docx.TextRun({ text: 'WOODENSHARK LLC', font: self.FONT_HEADING, size: 16, color: C.CRIMSON, bold: true }),
           new docx.TextRun({ text: '                                                                                           ', font: self.FONT_HEADING, size: 16, color: C.TEXT_MUTED }),
           new docx.TextRun({ text: 'Non-Disclosure Agreement', font: self.FONT_HEADING, size: 16, color: C.TEXT_MUTED }),
         ],

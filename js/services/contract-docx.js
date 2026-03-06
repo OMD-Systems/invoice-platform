@@ -262,8 +262,8 @@ const ContractDocx = {
     // Brand: OMD SYSTEMS
     elements.push(new docx.Paragraph({
       children: [
-        new docx.TextRun({ text: 'OMD', font: self.FONT_HEADING, size: 64, bold: true, color: C.NAVY }),
-        new docx.TextRun({ text: ' SYSTEMS', font: self.FONT_HEADING, size: 64, bold: true, color: C.CYAN_DARK }),
+        new docx.TextRun({ text: 'WOODENSHARK', font: self.FONT_HEADING, size: 64, bold: true, color: C.NAVY }),
+        new docx.TextRun({ text: ' LLC', font: self.FONT_HEADING, size: 64, bold: true, color: C.CYAN_DARK }),
       ],
       spacing: { before: 0, after: 60 },
     }));
@@ -745,7 +745,7 @@ const ContractDocx = {
       new docx.Paragraph({
         children: [
           new docx.TextRun({
-            text: 'CONFIDENTIAL  \u2014  OMD SYSTEMS PROPRIETARY',
+            text: 'CONFIDENTIAL  \u2014  WOODENSHARK LLC PROPRIETARY',
             font: self.FONT_HEADING, size: 15, color: C.WHITE, bold: true,
             characterSpacing: 50,
           }),
@@ -756,7 +756,7 @@ const ContractDocx = {
       }),
       new docx.Paragraph({
         children: [
-          new docx.TextRun({ text: 'OMD SYSTEMS', font: self.FONT_HEADING, size: 16, color: C.DARK, bold: true }),
+          new docx.TextRun({ text: 'WOODENSHARK LLC', font: self.FONT_HEADING, size: 16, color: C.DARK, bold: true }),
           new docx.TextRun({ text: '                                                                                           ', font: self.FONT_HEADING, size: 16, color: C.TEXT_MUTED }),
           new docx.TextRun({ text: 'Consulting Agreement', font: self.FONT_HEADING, size: 16, color: C.TEXT_MUTED }),
         ],
@@ -782,7 +782,7 @@ const ContractDocx = {
       new docx.Paragraph({
         children: [
           new docx.TextRun({
-            text: 'CONFIDENTIAL  \u2014  OMD SYSTEMS PROPRIETARY',
+            text: 'CONFIDENTIAL  \u2014  WOODENSHARK LLC PROPRIETARY',
             font: self.FONT_HEADING, size: 14, color: C.WHITE, bold: true,
             characterSpacing: 50,
           }),
