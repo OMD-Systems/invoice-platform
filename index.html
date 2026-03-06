@@ -14,7 +14,7 @@
   <meta property="og:type" content="website">
   <meta property="og:locale" content="en_US">
   <!-- Security -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net; img-src 'self' data: blob: https://avatars.slack-edge.com https://secure.gravatar.com https://*.slack-edge.com; frame-src 'self' blob:; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self';">
+  <!-- CSP defined in _headers (Cloudflare Pages); meta tag removed to avoid conflicts -->
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains">
   <meta name="referrer" content="strict-origin-when-cross-origin">
@@ -831,10 +831,10 @@
   <!-- ════════ CDN Libraries (with SRI integrity checks) ════════ -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"
     integrity="sha384-YieCqqg9gQufX7+5HcFvCEg/n3KUEdl8/Jb+A6J0npf1mB740VayvwKjTrtCeUoy"
-    crossorigin="anonymous"></script>
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"
     integrity="sha384-NG/W3xvO3ynQEcDQYIOcZTXRtwUs83cLv1FIl9PuqWPDuNhsMRF6wutlNLFwlb71"
-    crossorigin="anonymous"></script>
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"
     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"
@@ -847,7 +847,7 @@
   <script defer src="js/toast.js?v=5"></script>
   <script defer src="js/utils.js?v=5"></script>
   <script defer src="js/validation.js?v=5"></script>
-  <script defer src="js/db.js?v=8"></script>
+  <script defer src="js/db.js?v=9"></script>
   <script defer src="js/auth.js?v=6"></script>
   <script defer src="js/services/timesheet-parser.js?v=5"></script>
   <script defer src="js/services/numbering.js?v=7"></script>

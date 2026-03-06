@@ -49,11 +49,16 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Authentication required';
+  END IF;
+
   INSERT INTO audit_log (user_id, action, table_name, record_id, details)
   VALUES (auth.uid(), p_action, p_table, p_record_id, p_details);
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION log_audit(TEXT, TEXT, TEXT, JSONB) FROM public;
 GRANT EXECUTE ON FUNCTION log_audit(TEXT, TEXT, TEXT, JSONB) TO authenticated;
 
 COMMIT;

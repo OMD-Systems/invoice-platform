@@ -1156,32 +1156,6 @@ const DB = {
   },
 
   /**
-   * Upload a contract DOCX for an employee (generated).
-   * @param {string} employeeId
-   * @param {Blob} blob - DOCX blob
-   * @returns {Promise<{data: object|null, error: object|null}>}
-   */
-  async uploadContractDocx(employeeId, blob) {
-    try {
-      var path = employeeId + '/contract.docx';
-      var { data, error } = await this.client.storage
-        .from('contracts')
-        .upload(path, blob, { upsert: true, contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-
-      if (error) return { data: null, error };
-
-      await this.client
-        .from('employees')
-        .update({ contract_uploaded_at: new Date().toISOString() })
-        .eq('id', employeeId);
-
-      return { data, error: null };
-    } catch (err) {
-      return { data: null, error: { message: err.message } };
-    }
-  },
-
-  /**
    * Upload a generated contract PDF for an employee.
    * @param {string} employeeId
    * @param {Blob} blob - PDF blob
@@ -1265,32 +1239,6 @@ const DB = {
       if (updateErr) {
         console.warn('[DB] nda timestamp update failed:', updateErr);
       }
-
-      return { data, error: null };
-    } catch (err) {
-      return { data: null, error: { message: err.message } };
-    }
-  },
-
-  /**
-   * Upload an NDA DOCX for an employee (generated).
-   * @param {string} employeeId
-   * @param {Blob} blob - DOCX blob
-   * @returns {Promise<{data: object|null, error: object|null}>}
-   */
-  async uploadNdaDocx(employeeId, blob) {
-    try {
-      var path = employeeId + '/nda.docx';
-      var { data, error } = await this.client.storage
-        .from('documents')
-        .upload(path, blob, { upsert: true, contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-
-      if (error) return { data: null, error };
-
-      await this.client
-        .from('employees')
-        .update({ nda_uploaded_at: new Date().toISOString() })
-        .eq('id', employeeId);
 
       return { data, error: null };
     } catch (err) {
