@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════
    ContractPdf — Consulting Agreement PDF Generator
    HTML → html2canvas → jsPDF (replaces contract-docx.js)
-   Invoice Platform · OMD Systems
+   Invoice Platform · Woodenshark
    ═══════════════════════════════════════════════════════ */
 
 var ContractPdf = {
@@ -15,7 +15,6 @@ var ContractPdf = {
     TEXT_SECONDARY: '#4A4A4A',
     TEXT_MUTED:     '#6B6B6B',
     LIGHT_GRAY:     '#D0D0D0',
-    ALT_ROW:        '#F4F6F8',
     CYAN_TINT:      '#E8F5F7',
     WHITE:          '#FFFFFF',
     FAFBFC:         '#FAFBFC',
@@ -157,6 +156,7 @@ var ContractPdf = {
     var esc = PdfUtils.esc;
     var fmtDate = PdfUtils.formatDateLong;
     var C = self.COLORS;
+    var titleH = PdfUtils.PAGE_HEIGHT_PX - PdfUtils.WRAPPER_PAD;
 
     var agreementDate = fmtDate(emp.agreement_date) || fmtDate(new Date().toISOString());
     var effectiveDate = fmtDate(emp.effective_date) || agreementDate;
@@ -176,63 +176,63 @@ var ContractPdf = {
 
     // ── CSS ──
     html += '<style>' +
-      'body,div,p,td,th{margin:0;padding:0;font-family:Cambria,Calibri,serif;color:#1A1A1A;font-size:10.5pt;line-height:1.45;}' +
-      '.title-page{page-break-after:always;min-height:680px;padding:20px 0;}' +
-      '.brand{font-family:Calibri,sans-serif;font-size:32pt;font-weight:700;margin-bottom:6px;}' +
+      'body,div,p,td,th{margin:0;padding:0;font-family:Cambria,Georgia,Calibri,serif;color:#1A1A1A;font-size:11pt;line-height:1.2;}' +
+      '.title-page{height:' + titleH + 'px;display:flex;flex-direction:column;overflow:hidden;padding:20px 0 10px;}' +
+      '.brand{font-family:Calibri,sans-serif;font-size:32pt;font-weight:700;margin-bottom:4px;}' +
       '.brand .w{color:' + C.NAVY + ';}' +
       '.brand .llc{color:' + C.CYAN_DARK + ';}' +
-      '.cyan-line{height:4px;background:' + C.CYAN + ';margin-bottom:40px;}' +
-      '.doc-title{font-family:Calibri,sans-serif;font-size:28pt;font-weight:700;color:' + C.NAVY + ';letter-spacing:3px;margin-bottom:6px;}' +
-      '.navy-line{height:6px;background:' + C.NAVY + ';margin-bottom:8px;}' +
-      '.subtitle{font-family:Calibri,sans-serif;font-size:14pt;color:' + C.TEXT_SECONDARY + ';margin-bottom:40px;}' +
-      '.info-tbl{border-collapse:collapse;width:100%;margin-bottom:40px;}' +
-      '.info-tbl td{padding:5px 8px;vertical-align:top;border:none;}' +
+      '.cyan-line{height:1.5px;background:' + C.CYAN + ';margin-bottom:36px;}' +
+      '.doc-title{font-family:Calibri,sans-serif;font-size:28pt;font-weight:700;color:' + C.NAVY + ';letter-spacing:3px;margin-bottom:4px;}' +
+      '.navy-line{height:2.5px;background:' + C.NAVY + ';margin-bottom:6px;}' +
+      '.subtitle{font-family:Calibri,sans-serif;font-size:14pt;color:' + C.TEXT_SECONDARY + ';margin-bottom:32px;}' +
+      '.title-spacer{flex-grow:1;}' +
+      '.info-tbl{border-collapse:collapse;width:100%;margin-bottom:24px;}' +
+      '.info-tbl td{padding:4px 8px;vertical-align:top;border:none;}' +
       '.info-tbl .lbl{font-family:Calibri,sans-serif;font-size:8.5pt;color:' + C.TEXT_MUTED + ';width:140px;}' +
-      '.info-tbl .val{font-weight:700;}' +
-      '.info-tbl .sep td{border-bottom:1px solid ' + C.LIGHT_GRAY + ';padding:3px 0;}' +
+      '.info-tbl .val{font-weight:700;font-size:11pt;}' +
+      '.info-tbl .sep td{border-bottom:1px solid ' + C.LIGHT_GRAY + ';padding:2px 0;}' +
       '.classification{font-family:Calibri,sans-serif;font-size:9pt;}' +
       '.classification .badge{background:' + C.NAVY + ';color:#fff;font-weight:700;padding:2px 8px;font-size:9pt;}' +
       '.hdr-bar{background:' + C.NAVY + ';color:#fff;text-align:center;font-family:Calibri,sans-serif;font-size:7.5pt;font-weight:700;letter-spacing:4px;padding:4px 0;margin-bottom:4px;}' +
-      '.hdr-line{display:flex;justify-content:space-between;font-family:Calibri,sans-serif;font-size:8pt;border-bottom:2px solid ' + C.CYAN + ';padding-bottom:4px;margin-bottom:16px;}' +
+      '.hdr-line{display:flex;justify-content:space-between;font-family:Calibri,sans-serif;font-size:8pt;border-bottom:1.5px solid ' + C.CYAN + ';padding-bottom:4px;margin-bottom:14px;}' +
       '.hdr-line .co{color:' + C.DARK + ';font-weight:700;}' +
       '.hdr-line .dt{color:' + C.TEXT_MUTED + ';}' +
-      '.preamble{text-align:justify;margin-bottom:12px;}' +
-      '.between{text-align:center;font-family:Calibri,sans-serif;font-size:12pt;color:' + C.DARK + ';font-weight:700;margin:12px 0;}' +
-      '.parties{display:flex;gap:16px;margin-bottom:16px;}' +
-      '.party-box{flex:1;background:' + C.FAFBFC + ';border-left:5px solid ' + C.CYAN + ';padding:12px 14px;}' +
-      '.party-label{font-family:Calibri,sans-serif;font-size:9pt;color:' + C.CYAN_DARK + ';font-weight:700;margin-bottom:6px;}' +
-      '.party-name{font-weight:700;margin-bottom:4px;}' +
+      '.preamble{text-align:justify;margin-bottom:10px;}' +
+      '.between{text-align:center;font-family:Calibri,sans-serif;font-size:12pt;color:' + C.DARK + ';font-weight:700;margin:10px 0;}' +
+      '.parties{display:flex;gap:14px;margin-bottom:14px;}' +
+      '.party-box{flex:1;background:' + C.FAFBFC + ';border-left:3px solid ' + C.CYAN + ';padding:10px 12px;}' +
+      '.party-label{font-family:Calibri,sans-serif;font-size:9pt;color:' + C.CYAN_DARK + ';font-weight:700;margin-bottom:4px;}' +
+      '.party-name{font-weight:700;margin-bottom:3px;}' +
       '.party-addr{font-size:10pt;color:' + C.TEXT_SECONDARY + ';}' +
-      '.party-role{font-size:10pt;color:' + C.TEXT_MUTED + ';font-style:italic;margin-top:6px;}' +
-      '.bg-heading{font-family:Calibri,sans-serif;font-size:13pt;font-weight:700;color:' + C.DARK + ';border-bottom:3px solid ' + C.CYAN + ';padding-bottom:3px;margin-top:20px;margin-bottom:8px;}' +
+      '.party-role{font-size:10pt;color:' + C.TEXT_MUTED + ';font-style:italic;margin-top:4px;}' +
+      '.bg-heading{font-family:Calibri,sans-serif;font-size:13pt;font-weight:700;color:' + C.DARK + ';border-bottom:1.5px solid ' + C.CYAN + ';padding-bottom:2px;margin-top:18px;margin-bottom:6px;}' +
       '.bg-heading .num{color:' + C.CYAN + ';}' +
-      '.sec-heading{font-family:Calibri,sans-serif;font-size:13pt;font-weight:700;color:' + C.DARK + ';border-bottom:3px solid ' + C.CYAN + ';padding-bottom:3px;margin-top:22px;margin-bottom:8px;}' +
+      '.sec-heading{font-family:Calibri,sans-serif;font-size:13pt;font-weight:700;color:' + C.DARK + ';border-bottom:1.5px solid ' + C.CYAN + ';padding-bottom:2px;margin-top:20px;margin-bottom:6px;}' +
       '.sec-heading .num{color:' + C.CYAN + ';}' +
-      '.body-para{text-align:justify;margin-bottom:6px;}' +
-      '.callout{background:' + C.CYAN_TINT + ';border-left:6px solid ' + C.CYAN + ';border:1px solid ' + C.LIGHT_GRAY + ';border-left:6px solid ' + C.CYAN + ';padding:10px 14px;text-align:center;font-family:Calibri,sans-serif;font-size:13pt;font-weight:700;color:' + C.DARK + ';margin:8px 0;}' +
-      '.notice-box{border-bottom:1px solid ' + C.LIGHT_GRAY + ';padding:6px 12px;margin-bottom:4px;}' +
+      '.body-para{text-align:justify;margin-bottom:5px;}' +
+      '.callout{background:' + C.CYAN_TINT + ';border:1px solid ' + C.LIGHT_GRAY + ';border-left:4px solid ' + C.CYAN + ';padding:8px 12px;text-align:center;font-family:Calibri,sans-serif;font-size:13pt;font-weight:700;color:' + C.DARK + ';margin:6px 0;}' +
+      '.notice-box{border-bottom:1px solid ' + C.LIGHT_GRAY + ';padding:5px 10px;margin-bottom:3px;}' +
       '.notice-box .nm{font-weight:700;}' +
       '.notice-box .ct{color:' + C.TEXT_SECONDARY + ';}' +
-      '.in-consideration{text-align:justify;margin-top:12px;margin-bottom:8px;}' +
-      '.sig-line{height:6px;background:' + C.NAVY + ';margin-top:24px;margin-bottom:16px;}' +
-      '.witness{text-align:justify;font-style:italic;margin-bottom:16px;}' +
-      '.sig-table{display:flex;gap:16px;}' +
-      '.sig-cell{flex:1;border-top:3px solid ' + C.CYAN + ';padding-top:10px;}' +
-      '.sig-label{font-family:Calibri,sans-serif;font-size:9pt;color:' + C.CYAN_DARK + ';font-weight:700;margin-bottom:6px;}' +
-      '.sig-name{font-weight:700;margin-bottom:4px;}' +
+      '.in-consideration{text-align:justify;margin-top:10px;margin-bottom:6px;}' +
+      '.sig-line{height:3px;background:' + C.NAVY + ';margin-top:20px;margin-bottom:12px;}' +
+      '.witness{text-align:justify;font-style:italic;margin-bottom:12px;}' +
+      '.sig-table{display:flex;gap:14px;}' +
+      '.sig-cell{flex:1;border-top:1.5px solid ' + C.CYAN + ';padding-top:8px;}' +
+      '.sig-label{font-family:Calibri,sans-serif;font-size:9pt;color:' + C.CYAN_DARK + ';font-weight:700;margin-bottom:4px;}' +
+      '.sig-name{font-weight:700;margin-bottom:3px;}' +
       '.sig-detail{font-size:9pt;color:' + C.TEXT_SECONDARY + ';margin-bottom:2px;}' +
-      '.sig-bank{font-family:Calibri,sans-serif;font-size:9pt;color:' + C.TEXT_MUTED + ';font-weight:700;margin-top:6px;margin-bottom:2px;}' +
-      '.sig-underline{color:' + C.NAVY + ';margin-top:16px;margin-bottom:2px;}' +
+      '.sig-bank{font-family:Calibri,sans-serif;font-size:9pt;color:' + C.TEXT_MUTED + ';font-weight:700;margin-top:4px;margin-bottom:2px;}' +
+      '.sig-underline{color:' + C.NAVY + ';margin-top:12px;margin-bottom:2px;}' +
       '.sig-caption{font-family:Calibri,sans-serif;font-size:8pt;color:' + C.TEXT_MUTED + ';}' +
-      '.ftr-bar{background:' + C.NAVY + ';color:#fff;text-align:center;font-family:Calibri,sans-serif;font-size:7pt;font-weight:700;letter-spacing:4px;padding:3px 0;margin-top:20px;}' +
+      '.ftr-bar{background:' + C.NAVY + ';color:#fff;text-align:center;font-family:Calibri,sans-serif;font-size:7pt;font-weight:700;letter-spacing:4px;padding:3px 0;margin-top:16px;}' +
     '</style>';
 
-    // ── TITLE PAGE ──
+    // ── TITLE PAGE (exact height = 1 PDF page) ──
     html += '<div class="title-page">';
-    html += '<div style="height:30px;"></div>';
+    html += '<div style="height:20px;"></div>';
     html += '<div class="brand"><span class="w">WOODENSHARK</span><span class="llc"> LLC</span></div>';
     html += '<div class="cyan-line"></div>';
-    html += '<div style="height:20px;"></div>';
     html += '<div class="doc-title">CONSULTING AGREEMENT</div>';
     html += '<div class="navy-line"></div>';
     html += '<div class="subtitle">Professional Services &amp; Technical Consulting</div>';
@@ -245,18 +245,27 @@ var ContractPdf = {
     html += '<tr><td class="lbl">PARTY B (CONSULTANT)</td><td class="val">' + esc(emp.full_name_lat || '') + '</td></tr>';
     html += '</table>';
 
+    html += '<div class="title-spacer"></div>';
     html += '<div class="classification"><span style="color:' + C.TEXT_MUTED + ';">CLASSIFICATION: </span><span class="badge">CONFIDENTIAL</span></div>';
     html += '</div>';
 
+    // ── PAGE 2 TOP MARGIN ──
+    html += '<div style="height:36px;"></div>';
+
     // ── HEADER BAR ──
+    html += '<div data-pdf-block>';
     html += '<div class="hdr-bar">CONFIDENTIAL &mdash; WOODENSHARK LLC PROPRIETARY</div>';
     html += '<div class="hdr-line"><span class="co">WOODENSHARK LLC</span><span class="dt">Consulting Agreement</span></div>';
+    html += '</div>';
 
     // ── PREAMBLE ──
+    html += '<div data-pdf-block>';
     html += '<div class="preamble"><b>THIS CONSULTING AGREEMENT</b> (the \u201cAgreement\u201d) dated <b>' + esc(agreementDate) + '</b></div>';
     html += '<div class="between">BETWEEN:</div>';
+    html += '</div>';
 
-    // Parties
+    // ── PARTIES ──
+    html += '<div data-pdf-block>';
     html += '<div class="parties">';
     html += '<div class="party-box">';
     html += '<div class="party-label">CLIENT</div>';
@@ -271,50 +280,76 @@ var ContractPdf = {
     html += '<div class="party-role">(the \u201cConsultant\u201d)</div>';
     html += '</div>';
     html += '</div>';
+    html += '</div>';
 
     // ── BACKGROUND (Section 1) ──
+    html += '<div data-pdf-block>';
     html += '<div class="bg-heading"><span class="num">1. </span>BACKGROUND</div>';
     html += '<div class="body-para">The Client is of the opinion that the Consultant has the necessary qualifications, experience and abilities to provide consulting services to the Client.</div>';
-    html += '<div class="body-para">The Consultant agrees to provide such consulting services to the Client on the terms and conditions set out in this Agreement.</div>';
-    html += '<div class="body-para">This Consulting Agreement (hereinafter the \u201cAgreement\u201d) states the terms and conditions that govern the contractual agreement by and between</div>';
+    html += '</div>';
 
-    html += '<div class="body-para"><b>' + esc(self.CLIENT_NAME) + '</b>, a company incorporated and registered in the United States of America whose registered office is at ' + esc(self.CLIENT_ADDRESS.replace(/\n/g, ', ')) + ' <b>(hereinafter the \u201cClient\u201d)</b></div>';
+    html += '<div data-pdf-block><div class="body-para">The Consultant agrees to provide such consulting services to the Client on the terms and conditions set out in this Agreement.</div></div>';
 
-    html += '<div class="body-para"><b>' + esc(emp.full_name_lat || '') + '</b>, with the date of birth <b>' + esc(dob) + '</b>, the holder of Ukrainian Foreign Passport \u2116 <b>' + esc(emp.passport_number || '') + '</b> issued on <b>' + esc(passIssued) + '</b> and valid till <b>' + esc(passExpires) + '</b>, with the primary address of residence <b>' + esc(emp.address || '') + '</b></div>';
+    html += '<div data-pdf-block><div class="body-para">This Consulting Agreement (hereinafter the \u201cAgreement\u201d) states the terms and conditions that govern the contractual agreement by and between</div></div>';
 
-    html += '<div class="in-consideration"><b>IN CONSIDERATION OF</b> the matters described above and of the mutual benefits and obligations set forth in this Agreement, the receipt and sufficiency of which consideration is hereby acknowledged, the Client and the Consultant (individually, the \u201cParty\u201d and collectively the \u201cParties\u201d to this Agreement) agree as follows:</div>';
+    html += '<div data-pdf-block><div class="body-para"><b>' + esc(self.CLIENT_NAME) + '</b>, a company incorporated and registered in the United States of America whose registered office is at ' + esc(self.CLIENT_ADDRESS.replace(/\n/g, ', ')) + ' <b>(hereinafter the \u201cClient\u201d)</b></div></div>';
 
-    // ── SECTIONS ──
+    html += '<div data-pdf-block><div class="body-para"><b>' + esc(emp.full_name_lat || '') + '</b>, with the date of birth <b>' + esc(dob) + '</b>, the holder of Ukrainian Foreign Passport \u2116 <b>' + esc(emp.passport_number || '') + '</b> issued on <b>' + esc(passIssued) + '</b> and valid till <b>' + esc(passExpires) + '</b>, with the primary address of residence <b>' + esc(emp.address || '') + '</b></div></div>';
+
+    html += '<div data-pdf-block><div class="in-consideration"><b>IN CONSIDERATION OF</b> the matters described above and of the mutual benefits and obligations set forth in this Agreement, the receipt and sufficiency of which consideration is hereby acknowledged, the Client and the Consultant (individually, the \u201cParty\u201d and collectively the \u201cParties\u201d to this Agreement) agree as follows:</div></div>';
+
+    // ── SECTIONS (2–23) ──
     var sn = 2;
     for (var s = 0; s < self.SECTIONS.length; s++) {
       var sec = self.SECTIONS[s];
+      var firstContent = true;
+
+      html += '<div data-pdf-block>';
       html += '<div class="sec-heading"><span class="num">' + sn + '. </span>' + esc(sec.title) + '</div>';
 
       for (var p = 0; p < sec.paragraphs.length; p++) {
         var text = sec.paragraphs[p];
+
         if (text === null) {
+          var special = '';
           if (sec.title === 'SERVICES PROVIDED') {
-            html += '<div class="callout">' + esc(emp.service_description || 'UAV Systems Development Services') + '</div>';
+            special = '<div class="callout">' + esc(emp.service_description || 'UAV Systems Development Services') + '</div>';
           } else if (sec.title === 'NOTICE') {
-            html += '<div class="notice-box"><span class="nm">' + esc(self.CLIENT_NAME) + '</span>, <span class="ct">mitgor@woodenshark.com</span></div>';
-            html += '<div class="notice-box"><span class="nm">' + esc(emp.full_name_lat || '') + '</span>, <span class="ct">' + esc(emp.work_email || emp.phone || '') + '</span></div>';
+            special = '<div class="notice-box"><span class="nm">' + esc(self.CLIENT_NAME) + '</span>, <span class="ct">mitgor@woodenshark.com</span></div>';
+            special += '<div class="notice-box"><span class="nm">' + esc(emp.full_name_lat || '') + '</span>, <span class="ct">' + esc(emp.work_email || emp.phone || '') + '</span></div>';
           } else if (sec.title === 'COMPENSATION') {
-            html += '<div class="body-para">The Consultant will charge the Client for the Services at the rate of ' + rateFmt + ' (' + rateWords + ') USD plus 6% tax, totaling ' + totalFmt + ' (' + totalWords + ') USD per month (the \u201cCompensation\u201d) for full time employment.</div>';
+            special = '<div class="body-para">The Consultant will charge the Client for the Services at the rate of ' + rateFmt + ' (' + rateWords + ') USD plus 6% tax, totaling ' + totalFmt + ' (' + totalWords + ') USD per month (the \u201cCompensation\u201d) for full time employment.</div>';
+          }
+
+          if (firstContent) {
+            html += special + '</div>';
+            firstContent = false;
+          } else {
+            html += '<div data-pdf-block>' + special + '</div>';
           }
           continue;
         }
-        html += '<div class="body-para">' + esc(text) + '</div>';
+
+        if (firstContent) {
+          html += '<div class="body-para">' + esc(text) + '</div>';
+          html += '</div>';
+          firstContent = false;
+        } else {
+          html += '<div data-pdf-block><div class="body-para">' + esc(text) + '</div></div>';
+        }
       }
+
+      if (firstContent) html += '</div>';
       sn++;
     }
 
-    // ── SIGNATURE BLOCK ──
+    // ── SIGNATURE BLOCK (kept together) ──
+    html += '<div data-pdf-block>';
     html += '<div class="sig-line"></div>';
     html += '<div class="witness"><b>IN WITNESS WHEREOF</b> the Parties have duly affixed their signatures under hand and seal on <b>' + esc(effectiveDate) + '</b>.</div>';
 
     html += '<div class="sig-table">';
 
-    // Client signature
     html += '<div class="sig-cell">';
     html += '<div class="sig-label">CLIENT</div>';
     html += '<div class="sig-name">' + esc(self.CLIENT_NAME) + '</div>';
@@ -327,7 +362,6 @@ var ContractPdf = {
     html += '<div class="sig-caption">Signature</div>';
     html += '</div>';
 
-    // Consultant signature
     html += '<div class="sig-cell">';
     html += '<div class="sig-label">CONSULTANT</div>';
     html += '<div class="sig-name">' + esc(emp.full_name_lat || '') + '</div>';
@@ -341,9 +375,12 @@ var ContractPdf = {
     html += '</div>';
 
     html += '</div>';
+    html += '</div>';
 
-    // Footer bar
+    // ── FOOTER ──
+    html += '<div data-pdf-block>';
     html += '<div class="ftr-bar">CONFIDENTIAL &mdash; WOODENSHARK LLC PROPRIETARY</div>';
+    html += '</div>';
 
     return html;
   },
