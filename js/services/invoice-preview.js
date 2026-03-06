@@ -380,7 +380,63 @@ var InvoicePreview = {
 
     var hashDisplay = hash ? 'Document ID: ' + hash : 'Document ID: N/A';
 
-    var html =
+    // Inline styles — self-contained for html2canvas capture
+    var css =
+      '<style>' +
+      '.invoice-page-frame{position:relative;border:1.5pt solid #00D4FF;padding:20px 28px 14px;overflow:hidden;}' +
+      '.invoice-watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-size:72pt;font-weight:900;color:rgba(0,212,255,0.06);letter-spacing:12pt;white-space:nowrap;pointer-events:none;z-index:0;user-select:none;}' +
+      '.invoice-brand-header{text-align:center;margin-bottom:10pt;padding-bottom:6pt;border-bottom:1px solid #e0e0e0;position:relative;z-index:1;}' +
+      '.invoice-brand-logo{font-size:18pt;font-weight:800;color:#00D4FF;letter-spacing:4pt;margin-bottom:4pt;}' +
+      '.invoice-brand-address{font-size:7.5pt;color:#888;letter-spacing:0.3pt;}' +
+      '.invoice-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14pt;padding-bottom:8pt;border-bottom:2pt solid #205968;}' +
+      '.invoice-title{font-size:22pt;font-weight:700;color:#205968;text-transform:uppercase;letter-spacing:1pt;text-align:right;margin:0;}' +
+      '.invoice-company-name{font-size:12pt;font-weight:700;color:#000;margin-bottom:2pt;}' +
+      '.invoice-address,.invoice-contact{font-size:9pt;color:#333;line-height:1.5;}' +
+      '.invoice-parties{display:flex;justify-content:space-between;margin-bottom:14pt;gap:20pt;}' +
+      '.invoice-to{flex:1;}' +
+      '.invoice-section-label{font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:0.5pt;color:#205968;margin-bottom:6pt;padding-bottom:3pt;border-bottom:1px solid #205968;}' +
+      '.invoice-meta-item{text-align:right;}' +
+      '.invoice-meta-label{font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:0.5pt;color:#444;margin-bottom:2pt;}' +
+      '.invoice-meta-value{font-size:10pt;font-weight:600;color:#000;}' +
+      '.invoice-table{width:100%;border-collapse:collapse;margin-bottom:14pt;font-size:9pt;}' +
+      '.invoice-table thead{background:#205968;}' +
+      '.invoice-table thead th{padding:7pt 10pt;font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:0.5pt;color:#fff;text-align:left;border:1px solid #205968;}' +
+      '.invoice-table thead th:last-child,.invoice-table thead th.text-right{text-align:right;}' +
+      '.invoice-table tbody td{padding:7pt 10pt;color:#000;border:1px solid #ccc;vertical-align:top;font-size:9pt;}' +
+      '.invoice-table tbody tr:nth-child(even){background:#f5f7f8;}' +
+      '.invoice-table tbody td:last-child,.invoice-table tbody td.text-right{text-align:right;}' +
+      '.invoice-table tbody td.text-center{text-align:center;}' +
+      '.invoice-totals{display:flex;justify-content:flex-end;margin-bottom:14pt;}' +
+      '.invoice-totals-table{width:250pt;border-collapse:collapse;}' +
+      '.invoice-totals-table tr td{padding:4pt 10pt;font-size:9pt;color:#333;}' +
+      '.invoice-totals-table tr td:first-child{text-align:left;font-weight:500;}' +
+      '.invoice-totals-table tr td:last-child{text-align:right;font-variant-numeric:tabular-nums;}' +
+      '.invoice-totals-table tr.subtotal td{border-top:1px solid #ccc;padding-top:8pt;}' +
+      '.invoice-totals-table tr.tax td{color:#333;}' +
+      '.invoice-totals-table tr.discount td{color:#c0392b;}' +
+      '.invoice-totals-table tr.total td{border-top:2pt solid #205968;padding-top:8pt;font-size:12pt;font-weight:700;color:#000;}' +
+      '.invoice-totals-table tr.total td:first-child{color:#205968;}' +
+      '.invoice-total-amount{font-size:14pt;font-weight:700;color:#000;}' +
+      '.invoice-footer-columns{display:flex;flex-direction:row;justify-content:space-between;align-items:flex-start;gap:24pt;margin-top:10pt;}' +
+      '.invoice-footer-columns>.invoice-payment{flex:1 1 45%;min-width:0;margin-bottom:0;}' +
+      '.invoice-footer-columns>.invoice-terms{flex:1 1 45%;min-width:0;margin-top:0;padding-top:0;border-top:none;}' +
+      '.invoice-payment{margin-bottom:16pt;padding:10pt 12pt;border:1px solid #ccc;border-left:3pt solid #205968;background:#f9fafb;}' +
+      '.invoice-payment-title{font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:0.5pt;color:#205968;margin-bottom:6pt;}' +
+      '.invoice-payment-details{font-size:9pt;color:#333;line-height:1.6;}' +
+      '.invoice-payment-details strong{color:#000;}' +
+      '.invoice-terms{margin-top:16pt;padding-top:10pt;border-top:1px solid #ddd;}' +
+      '.invoice-terms-title{font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:0.5pt;color:#205968;margin-bottom:4pt;}' +
+      '.invoice-terms-text{font-size:8pt;color:#444;line-height:1.5;}' +
+      '.invoice-doc-footer{margin-top:12pt;position:relative;z-index:1;}' +
+      '.invoice-doc-footer-line{border-top:1px solid #00D4FF;margin-bottom:4pt;}' +
+      '.invoice-doc-footer-text{font-size:7pt;color:#999;}' +
+      '.invoice-doc-footer-hash{font-size:7pt;color:#888;font-family:"Courier New",monospace;}' +
+      '.invoice-stamp-paid{position:absolute;top:30%;right:10%;transform:rotate(-15deg);font-size:36pt;font-weight:900;color:rgba(34,197,94,0.25);text-transform:uppercase;letter-spacing:4pt;border:4pt solid rgba(34,197,94,0.25);padding:6pt 20pt;border-radius:6pt;pointer-events:none;}' +
+      '.invoice-stamp-overdue{position:absolute;top:30%;right:10%;transform:rotate(-15deg);font-size:36pt;font-weight:900;color:rgba(239,68,68,0.25);text-transform:uppercase;letter-spacing:4pt;border:4pt solid rgba(239,68,68,0.25);padding:6pt 20pt;border-radius:6pt;pointer-events:none;}' +
+      '.invoice-stamp-draft{position:absolute;top:30%;right:10%;transform:rotate(-15deg);font-size:36pt;font-weight:900;color:rgba(107,114,128,0.2);text-transform:uppercase;letter-spacing:4pt;border:4pt solid rgba(107,114,128,0.2);padding:6pt 20pt;border-radius:6pt;pointer-events:none;}' +
+      '</style>';
+
+    var html = css +
       '<div class="invoice-page-frame">' +
       '<div class="invoice-watermark">WOODENSHARK LLC</div>' +
       stampHtml +
