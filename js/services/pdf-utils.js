@@ -46,7 +46,7 @@ var PdfUtils = {
         }
 
         // 1) Regular pagination (prevent mid-element cuts)
-        self._paginateBlocks(content, self.WRAPPER_PAD);
+        self._paginateBlocks(content, self.WRAPPER_PAD, overlay ? self.FOOTER_ZONE : 0);
 
         // 2) Header spacers — ensure no content in header zone of each page
         if (overlay) {
@@ -126,8 +126,9 @@ var PdfUtils = {
   },
 
   /** Push blocks away from page boundaries so nothing is cut */
-  _paginateBlocks: function (contentEl, padTop) {
+  _paginateBlocks: function (contentEl, padTop, footerZone) {
     var PAGE_H = this.PAGE_HEIGHT_PX;
+    var FOOTER = footerZone || 0;
     var SAFE = 70;
     var PAD = 70;
 
@@ -137,12 +138,13 @@ var PdfUtils = {
       var wTop = padTop + b.offsetTop;
       var wBot = wTop + b.offsetHeight;
       var pageEnd = (Math.floor(wTop / PAGE_H) + 1) * PAGE_H;
+      var contentEnd = pageEnd - FOOTER;
 
-      var crosses = wBot > pageEnd && wTop < pageEnd;
-      var inSafe = (pageEnd - wTop) > 0 && (pageEnd - wTop) <= SAFE;
+      var crosses = wBot > contentEnd && wTop < contentEnd;
+      var inSafe = wTop < contentEnd && (contentEnd - wTop) <= SAFE;
 
       if (crosses || inSafe) {
-        if (b.offsetHeight < PAGE_H - SAFE - PAD) {
+        if (b.offsetHeight < PAGE_H - SAFE - PAD - FOOTER) {
           var gap = (pageEnd - wTop) + PAD;
           var sp = document.createElement('div');
           sp.style.height = gap + 'px';

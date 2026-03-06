@@ -393,7 +393,7 @@ var ContractPdf = {
 
     // ── FOOTER: white bg → gray line → page info → navy bar ──
     pdf.setFillColor(255, 255, 255);
-    pdf.rect(0, 282, 210, 15, 'F');
+    pdf.rect(0, 277, 210, 20, 'F');
 
     pdf.setDrawColor(208, 208, 208);
     pdf.setLineWidth(0.15);

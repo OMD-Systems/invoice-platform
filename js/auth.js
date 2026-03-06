@@ -128,6 +128,12 @@ const Auth = {
             error: { message: 'Too many requests. Please wait a few minutes.' }
           };
         }
+        if (msg.indexOf('database error') !== -1) {
+          return {
+            data: null,
+            error: { message: 'Server error. Please try again in a few minutes. If the problem persists, contact your administrator.' }
+          };
+        }
         return { data, error };
       }
 
