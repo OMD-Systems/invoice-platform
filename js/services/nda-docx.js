@@ -62,27 +62,7 @@ const NdaDocx = {
 
   _text(text, opts) {
     opts = opts || {};
-    var str = String(text);
-    // Handle \n by splitting into multiple TextRun with break
-    if (str.indexOf('\n') !== -1) {
-      var parts = str.split('\n');
-      var runs = [];
-      for (var i = 0; i < parts.length; i++) {
-        var runOpts = {
-          text: parts[i],
-          font: opts.font || this.FONT_BODY,
-          size: opts.size || 22,
-          bold: opts.bold || false,
-          italics: opts.italics || false,
-          color: opts.color || this.COLORS.TEXT_PRIMARY,
-          characterSpacing: opts.characterSpacing || undefined,
-          shading: opts.shading || undefined,
-        };
-        if (i > 0) runOpts.break = 1;
-        runs.push(new docx.TextRun(runOpts));
-      }
-      return runs;
-    }
+    var str = String(text).replace(/\n/g, ' ');
     return new docx.TextRun({
       text: str,
       font: opts.font || this.FONT_BODY,
@@ -95,10 +75,32 @@ const NdaDocx = {
     });
   },
 
+  /* Returns array of TextRuns with line breaks for multiline text */
+  _multiText(text, opts) {
+    opts = opts || {};
+    var parts = String(text).split('\n');
+    var runs = [];
+    for (var i = 0; i < parts.length; i++) {
+      var runOpts = {
+        text: parts[i],
+        font: opts.font || this.FONT_BODY,
+        size: opts.size || 22,
+        bold: opts.bold || false,
+        italics: opts.italics || false,
+        color: opts.color || this.COLORS.TEXT_PRIMARY,
+        characterSpacing: opts.characterSpacing || undefined,
+        shading: opts.shading || undefined,
+      };
+      if (i > 0) runOpts.break = 1;
+      runs.push(new docx.TextRun(runOpts));
+    }
+    return runs;
+  },
+
   _para(children, opts) {
     opts = opts || {};
     if (!Array.isArray(children)) children = [children];
-    // Flatten nested arrays (from _text with \n)
+    // Flatten nested arrays (from _multiText)
     var flat = [];
     for (var i = 0; i < children.length; i++) {
       if (Array.isArray(children[i])) {
@@ -356,9 +358,9 @@ const NdaDocx = {
     var disclosingCell = self._cell([
       self._para(self._text('DISCLOSING PARTIES', { font: self.FONT_HEADING, size: 18, color: C.DEEP_RED, bold: true }), { spacing: { before: 0, after: 60 } }),
       self._para(self._text(self.WS_NAME, { bold: true }), { spacing: { before: 0, after: 20 } }),
-      self._para(self._text(self.WS_ADDRESS, { size: 18, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 60 } }),
+      self._para(self._multiText(self.WS_ADDRESS, { size: 18, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 60 } }),
       self._para(self._text(self.OMD_NAME, { bold: true }), { spacing: { before: 0, after: 20 } }),
-      self._para(self._text(self.OMD_ADDRESS, { size: 18, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 0 } }),
+      self._para(self._multiText(self.OMD_ADDRESS, { size: 18, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 0 } }),
     ], {
       width: 4536,
       margins: { top: 80, bottom: 80, left: 160, right: 80 },
@@ -369,7 +371,7 @@ const NdaDocx = {
     var receivingCell = self._cell([
       self._para(self._text('RECEIVING PARTY', { font: self.FONT_HEADING, size: 18, color: C.DEEP_RED, bold: true }), { spacing: { before: 0, after: 60 } }),
       self._para(self._text(emp.full_name_lat || '', { bold: true }), { spacing: { before: 0, after: 40 } }),
-      self._para(self._text(
+      self._para(self._multiText(
         'Born: ' + dob + '\n' +
         'Passport: ' + (emp.passport_number || '') + '\n' +
         'Issued: ' + passIssued + '\n' +
@@ -563,7 +565,7 @@ const NdaDocx = {
     var buildSigCell = function(title, details, nameLabel, width) {
       return self._cell([
         self._para(self._text(title, { font: self.FONT_HEADING, size: 16, color: C.DEEP_RED, bold: true }), { spacing: { before: 0, after: 40 } }),
-        self._para(self._text(details, { size: 16, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 160 } }),
+        self._para(self._multiText(details, { size: 16, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 160 } }),
         self._para(self._text('________________________', { size: 20, color: C.DARK_RED }), { spacing: { before: 0, after: 20 } }),
         self._para(self._text('Signature', { font: self.FONT_HEADING, size: 14, color: C.TEXT_MUTED }), { spacing: { before: 0, after: 80 } }),
         self._para(self._text('Name: ' + nameLabel, { size: 16, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 40 } }),
@@ -593,7 +595,7 @@ const NdaDocx = {
     var empCell = self._cell([
       self._para(self._text('RECEIVING PARTY', { font: self.FONT_HEADING, size: 16, color: C.DEEP_RED, bold: true }), { spacing: { before: 0, after: 40 } }),
       self._para(self._text(emp.full_name_lat || '', { size: 18, bold: true }), { spacing: { before: 0, after: 20 } }),
-      self._para(self._text(
+      self._para(self._multiText(
         'Passport: ' + (emp.passport_number || '') + '\n' +
         (emp.work_email || ''),
         { size: 16, color: C.TEXT_SECONDARY }

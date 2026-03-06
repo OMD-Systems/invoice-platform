@@ -145,25 +145,7 @@ const ContractDocx = {
 
   _text(text, opts) {
     opts = opts || {};
-    var str = String(text);
-    // Handle \n by splitting into multiple TextRun with break
-    if (str.indexOf('\n') !== -1) {
-      var parts = str.split('\n');
-      var runs = [];
-      for (var i = 0; i < parts.length; i++) {
-        var runOpts = {
-          text: parts[i],
-          font: opts.font || this.FONT_BODY,
-          size: opts.size || 22,
-          bold: opts.bold || false,
-          italics: opts.italics || false,
-          color: opts.color || this.COLORS.TEXT_PRIMARY,
-        };
-        if (i > 0) runOpts.break = 1;
-        runs.push(new docx.TextRun(runOpts));
-      }
-      return runs;
-    }
+    var str = String(text).replace(/\n/g, ' ');
     return new docx.TextRun({
       text: str,
       font: opts.font || this.FONT_BODY,
@@ -174,10 +156,30 @@ const ContractDocx = {
     });
   },
 
+  /* Returns array of TextRuns with line breaks for multiline text */
+  _multiText(text, opts) {
+    opts = opts || {};
+    var parts = String(text).split('\n');
+    var runs = [];
+    for (var i = 0; i < parts.length; i++) {
+      var runOpts = {
+        text: parts[i],
+        font: opts.font || this.FONT_BODY,
+        size: opts.size || 22,
+        bold: opts.bold || false,
+        italics: opts.italics || false,
+        color: opts.color || this.COLORS.TEXT_PRIMARY,
+      };
+      if (i > 0) runOpts.break = 1;
+      runs.push(new docx.TextRun(runOpts));
+    }
+    return runs;
+  },
+
   _para(children, opts) {
     opts = opts || {};
     if (!Array.isArray(children)) children = [children];
-    // Flatten nested arrays (from _text with \n)
+    // Flatten nested arrays (from _multiText)
     var flat = [];
     for (var i = 0; i < children.length; i++) {
       if (Array.isArray(children[i])) {
@@ -397,7 +399,7 @@ const ContractDocx = {
     var clientCell = self._cell([
       self._para(self._text('CLIENT', { font: self.FONT_HEADING, size: 18, color: C.CYAN_DARK, bold: true }), { spacing: { before: 0, after: 60 } }),
       self._para(self._text(self.CLIENT_NAME, { bold: true }), { spacing: { before: 0, after: 40 } }),
-      self._para(self._text(self.CLIENT_ADDRESS, { size: 20, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 60 } }),
+      self._para(self._multiText(self.CLIENT_ADDRESS, { size: 20, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 60 } }),
       self._para(self._text('(the \u201cClient\u201d)', { size: 20, color: C.TEXT_MUTED, italics: true }), { spacing: { before: 0, after: 0 } }),
     ], {
       width: 4536,
@@ -670,7 +672,7 @@ const ContractDocx = {
     var clientSigCell = self._cell([
       self._para(self._text('CLIENT', { font: self.FONT_HEADING, size: 18, color: C.CYAN_DARK, bold: true }), { spacing: { before: 0, after: 60 } }),
       self._para(self._text(self.CLIENT_NAME, { bold: true }), { spacing: { before: 0, after: 40 } }),
-      self._para(self._text(self.CLIENT_ADDRESS, { size: 18, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 80 } }),
+      self._para(self._multiText(self.CLIENT_ADDRESS, { size: 18, color: C.TEXT_SECONDARY }), { spacing: { before: 0, after: 80 } }),
       self._para(self._text('Bank account:', { font: self.FONT_HEADING, size: 18, color: C.TEXT_MUTED, bold: true }), { spacing: { before: 0, after: 20 } }),
       new docx.Paragraph({ children: [
         self._text('SWIFT: ', { size: 18, color: C.TEXT_MUTED }),

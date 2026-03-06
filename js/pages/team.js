@@ -2112,6 +2112,12 @@ const Team = {
 
       // Generate DOCX blob
       var blob = await generator.generate(emp);
+      console.log('[Team] Generated blob:', blob, 'size:', blob && blob.size, 'type:', blob && blob.type);
+
+      if (!blob || blob.size === 0) {
+        showToast(label + ' generation produced empty file', 'error');
+        return;
+      }
 
       // Upload to Supabase
       var uploadFn = docType === 'contract' ? DB.uploadContractDocx.bind(DB) : DB.uploadNdaDocx.bind(DB);
@@ -2152,8 +2158,10 @@ const Team = {
 
   /* ── Download blob as file via <a download> ── */
   _downloadBlob(blob, fileName) {
+    console.log('[Team] _downloadBlob called, size:', blob && blob.size, 'fileName:', fileName);
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
+    a.style.display = 'none';
     a.href = url;
     a.download = fileName;
     document.body.appendChild(a);
@@ -2161,7 +2169,7 @@ const Team = {
     setTimeout(function() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    }, 100);
+    }, 1000);
   },
 
   /* ── Download file from URL via fetch → blob → <a download> ── */
