@@ -296,10 +296,9 @@ const Expenses = {
     if (expense._invoice) {
       var inv = expense._invoice;
       var empName = (inv.employees && inv.employees.name) ? inv.employees.name : '';
-      var prefix = (inv.employees && inv.employees.invoice_prefix) ? inv.employees.invoice_prefix : '';
       invoiceDisplay =
         '<span class="fury-badge fury-badge-info" style="cursor:pointer" data-invoice-id="' + inv.id + '" title="Go to Invoices page">' +
-        self.escapeHtml(prefix + '-' + inv.invoice_number) +
+        self.escapeHtml(String(inv.invoice_number || '')) +
         '</span>';
       if (empName) {
         invoiceDisplay += '<br><span style="font-size:11px;color:var(--fury-text-muted)">' + self.escapeHtml(empName) + '</span>';
@@ -567,8 +566,7 @@ const Expenses = {
     for (var i = 0; i < self.invoices.length; i++) {
       var inv = self.invoices[i];
       var empName = (inv.employees && inv.employees.name) ? inv.employees.name : '';
-      var prefix = (inv.employees && inv.employees.invoice_prefix) ? inv.employees.invoice_prefix : 'INV';
-      var label = prefix + '-' + inv.invoice_number;
+      var label = String(inv.invoice_number || '');
       if (empName) label += ' (' + empName + ')';
       var selected = (expense && expense.invoice_id === inv.id) ? ' selected' : '';
       invoiceOptions += '<option value="' + inv.id + '"' + selected + '>' + self.escapeHtml(label) + '</option>';

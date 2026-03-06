@@ -336,8 +336,7 @@ const Invoices = {
       for (var r = 0; r < sorted.length; r++) {
         var inv = sorted[r];
         var empName = (inv.employees && inv.employees.name) || 'Unknown';
-        var prefix = (inv.employees && inv.employees.invoice_prefix) || '';
-        var invNum = prefix ? prefix + '-' + inv.invoice_number : String(inv.invoice_number);
+        var invNum = String(inv.invoice_number || '');
         var subtotal = parseFloat(inv.subtotal_usd) || 0;
         var discount = parseFloat(inv.discount_usd) || 0;
         var invTotal = parseFloat(inv.total_usd) || 0;
@@ -536,8 +535,7 @@ const Invoices = {
       for (var i = 0; i < sorted.length; i++) {
         var inv = sorted[i];
         var t = parseFloat(inv.total_usd) || 0; gt += t;
-        var prefix = (inv.employees && inv.employees.invoice_prefix) || '';
-        var invNum = prefix ? prefix + '-' + inv.invoice_number : String(inv.invoice_number);
+        var invNum = String(inv.invoice_number || '');
         wsData.push([i + 1, (inv.employees && inv.employees.name) || '', invNum,
         inv.invoice_date || '', parseFloat(inv.subtotal_usd) || 0, parseFloat(inv.discount_usd) || 0, t, (inv.status || 'draft')]);
       }
@@ -1674,6 +1672,13 @@ const Invoices = {
         return null;
       }
 
+      // Advance next_invoice_number for this employee
+      try {
+        await Numbering.incrementNumberAtomic(employee.id);
+      } catch (e) {
+        console.warn('[Invoices] Failed to increment invoice number:', e);
+      }
+
       if (closeCallback) closeCallback();
       showToast('Invoice saved', 'success');
       await this._reload(container, ctx);
@@ -1759,6 +1764,13 @@ const Invoices = {
         return;
       }
 
+      // Advance next_invoice_number for this employee
+      try {
+        await Numbering.incrementNumberAtomic(employee.id);
+      } catch (e) {
+        console.warn('[Invoices] Failed to increment invoice number:', e);
+      }
+
       // Close the generate modal
       if (closeCallback) closeCallback();
 
@@ -1839,6 +1851,13 @@ const Invoices = {
     var result = await DB.createInvoice(invoicePayload, itemsPayload);
     if (!result || result.error) {
       throw new Error(result && result.error ? result.error.message : 'DB error');
+    }
+
+    // Advance next_invoice_number so subsequent invoices get a fresh number
+    try {
+      await Numbering.incrementNumberAtomic(employee.id);
+    } catch (e) {
+      console.warn('[Invoices] Failed to increment invoice number:', e);
     }
 
     return result.data;

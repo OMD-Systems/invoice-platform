@@ -14,7 +14,7 @@
   <meta property="og:type" content="website">
   <meta property="og:locale" content="en_US">
   <!-- Security -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net; img-src 'self' data: blob: https://avatars.slack-edge.com https://secure.gravatar.com https://*.slack-edge.com; frame-src 'self' blob:; frame-ancestors 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' blob: https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net; img-src 'self' data: blob: https://avatars.slack-edge.com https://secure.gravatar.com https://*.slack-edge.com; frame-src 'self' blob:; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self';">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta http-equiv="Strict-Transport-Security" content="max-age=31536000; includeSubDomains">
   <meta name="referrer" content="strict-origin-when-cross-origin">
@@ -841,9 +841,6 @@
     crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/docx@9.1.0/build/index.umd.min.js"
     crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"
-    crossorigin="anonymous"></script>
-
   <!-- ════════ App Modules ════════ -->
   <!-- Local dev: config.local.js sets window.__ENV__ (gitignored, optional) -->
   <!-- Production: window.__ENV__ injected by CF Pages Functions middleware -->
@@ -855,16 +852,16 @@
   <script src="js/db.js?v=6"></script>
   <script src="js/auth.js?v=5"></script>
   <script src="js/services/timesheet-parser.js?v=5"></script>
-  <script src="js/services/numbering.js?v=6"></script>
-  <script src="js/services/invoice-preview.js?v=8"></script>
+  <script src="js/services/numbering.js?v=7"></script>
+  <script src="js/services/invoice-preview.js?v=9"></script>
   <script src="js/services/settlements.js?v=5"></script>
-  <script src="js/services/contract-docx.js?v=2"></script>
-  <script src="js/services/nda-docx.js?v=2"></script>
+  <script src="js/services/contract-docx.js?v=3"></script>
+  <script src="js/services/nda-docx.js?v=3"></script>
 
-  <script src="js/pages/team.js?v=8"></script>
-  <script src="js/pages/invoices.js?v=6"></script>
-  <script src="js/pages/expenses.js?v=5"></script>
-  <script src="js/pages/settings.js?v=5"></script>
+  <script src="js/pages/team.js?v=9"></script>
+  <script src="js/pages/invoices.js?v=7"></script>
+  <script src="js/pages/expenses.js?v=6"></script>
+  <script src="js/pages/settings.js?v=6"></script>
   <script src="js/app.js?v=5"></script>
 
 </body>

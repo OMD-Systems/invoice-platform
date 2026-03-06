@@ -2006,10 +2006,18 @@ const Settings = {
     if (saveBtn) {
       saveBtn.addEventListener('click', async function () {
         // Validate inputs
-        var wdVal = parseInt(container.querySelector('#set-wh-days').value, 10);
-        var hpdVal = parseFloat(container.querySelector('#set-wh-hpd').value);
-        var adjVal = parseFloat(container.querySelector('#set-wh-adj').value);
-        var notesVal = (container.querySelector('#set-wh-notes').value || '').trim();
+        var wdEl = container.querySelector('#set-wh-days');
+        var hpdEl = container.querySelector('#set-wh-hpd');
+        var adjEl = container.querySelector('#set-wh-adj');
+        var notesEl = container.querySelector('#set-wh-notes');
+        if (!wdEl || !hpdEl || !adjEl || !notesEl) {
+          showToast('Working hours form elements not found.', 'error');
+          return;
+        }
+        var wdVal = parseInt(wdEl.value, 10);
+        var hpdVal = parseFloat(hpdEl.value);
+        var adjVal = parseFloat(adjEl.value);
+        var notesVal = (notesEl.value || '').trim();
 
         if (!Number.isFinite(wdVal) || wdVal < 0 || wdVal > 31) {
           showToast('Working days must be between 0 and 31.', 'error');
@@ -2213,6 +2221,9 @@ const Settings = {
   },
 
   destroy() {
+    // Reset active tab to default
+    this.activeTab = 'general';
+
     // Cleanup modal event handlers
     this._cleanupModalHandlers();
 

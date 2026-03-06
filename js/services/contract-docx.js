@@ -145,8 +145,27 @@ const ContractDocx = {
 
   _text(text, opts) {
     opts = opts || {};
+    var str = String(text);
+    // Handle \n by splitting into multiple TextRun with break
+    if (str.indexOf('\n') !== -1) {
+      var parts = str.split('\n');
+      var runs = [];
+      for (var i = 0; i < parts.length; i++) {
+        var runOpts = {
+          text: parts[i],
+          font: opts.font || this.FONT_BODY,
+          size: opts.size || 22,
+          bold: opts.bold || false,
+          italics: opts.italics || false,
+          color: opts.color || this.COLORS.TEXT_PRIMARY,
+        };
+        if (i > 0) runOpts.break = 1;
+        runs.push(new docx.TextRun(runOpts));
+      }
+      return runs;
+    }
     return new docx.TextRun({
-      text: String(text),
+      text: str,
       font: opts.font || this.FONT_BODY,
       size: opts.size || 22,
       bold: opts.bold || false,
@@ -158,8 +177,17 @@ const ContractDocx = {
   _para(children, opts) {
     opts = opts || {};
     if (!Array.isArray(children)) children = [children];
+    // Flatten nested arrays (from _text with \n)
+    var flat = [];
+    for (var i = 0; i < children.length; i++) {
+      if (Array.isArray(children[i])) {
+        for (var j = 0; j < children[i].length; j++) flat.push(children[i][j]);
+      } else {
+        flat.push(children[i]);
+      }
+    }
     return new docx.Paragraph({
-      children: children,
+      children: flat,
       alignment: opts.alignment || docx.AlignmentType.LEFT,
       spacing: opts.spacing || { before: 0, after: 0 },
     });

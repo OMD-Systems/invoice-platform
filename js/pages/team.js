@@ -781,12 +781,17 @@ const Team = {
     var contractBtn = container.querySelector('#team-btn-contract');
     if (contractBtn) {
       contractBtn.addEventListener('click', async function () {
-        var fileName = ContractDocx.getFileName(emp);
-        var result = await DB.getContractUrl(emp.id, fileName);
-        if (result && result.data) {
-          window.location.href = result.data;
-        } else {
-          showToast('Failed to get contract URL', 'error');
+        try {
+          var fileName = ContractDocx.getFileName(emp);
+          var result = await DB.getContractUrl(emp.id, fileName);
+          if (result && result.data) {
+            await self._downloadFromUrl(result.data, fileName);
+          } else {
+            showToast('Failed to get contract URL', 'error');
+          }
+        } catch (err) {
+          console.error('[Team] contract download error:', err);
+          showToast('Failed to download contract', 'error');
         }
       });
     }
@@ -817,12 +822,17 @@ const Team = {
     var ndaBtn = container.querySelector('#team-btn-nda');
     if (ndaBtn) {
       ndaBtn.addEventListener('click', async function () {
-        var fileName = NdaDocx.getFileName(emp);
-        var result = await DB.getNdaUrl(emp.id, fileName);
-        if (result && result.data) {
-          window.location.href = result.data;
-        } else {
-          showToast('Failed to get NDA URL', 'error');
+        try {
+          var fileName = NdaDocx.getFileName(emp);
+          var result = await DB.getNdaUrl(emp.id, fileName);
+          if (result && result.data) {
+            await self._downloadFromUrl(result.data, fileName);
+          } else {
+            showToast('Failed to get NDA URL', 'error');
+          }
+        } catch (err) {
+          console.error('[Team] NDA download error:', err);
+          showToast('Failed to download NDA', 'error');
         }
       });
     }
@@ -2078,8 +2088,10 @@ const Team = {
      ═══════════════════════════════════════════════════════ */
   async handleGenerateDocument(docType, container) {
     var self = this;
+    if (self._generatingDoc) return;
+    self._generatingDoc = true;
     var emp = self.findEmployee(self.selectedId);
-    if (!emp) { showToast('No employee selected', 'error'); return; }
+    if (!emp) { showToast('No employee selected', 'error'); self._generatingDoc = false; return; }
 
     var generator = docType === 'contract' ? ContractDocx : NdaDocx;
     var label = docType === 'contract' ? 'Contract' : 'NDA';
@@ -2088,6 +2100,7 @@ const Team = {
     var missing = generator.validateFields(emp);
     if (missing.length > 0) {
       showToast('Fill required fields: ' + missing.join(', '), 'error');
+      self._generatingDoc = false;
       return;
     }
 
@@ -2108,16 +2121,9 @@ const Team = {
         return;
       }
 
-      // Download via signed URL with Content-Disposition
+      // Download blob directly from memory (no re-fetch needed)
       var fileName = generator.getFileName(emp);
-      var bucket = docType === 'contract' ? 'contracts' : 'documents';
-      var storagePath = emp.id + '/' + docType + '.docx';
-      var signedResult = await DB.client.storage
-        .from(bucket)
-        .createSignedUrl(storagePath, 60, { download: fileName });
-      if (signedResult.data && signedResult.data.signedUrl) {
-        window.location.href = signedResult.data.signedUrl;
-      }
+      self._downloadBlob(blob, fileName);
 
       // Refresh cache
       var freshResult = await DB.getEmployee(emp.id);
@@ -2139,7 +2145,30 @@ const Team = {
     } catch (err) {
       console.error('[Team] Generate ' + label + ' error:', err);
       showToast('Failed to generate ' + label + ': ' + err.message, 'error');
+    } finally {
+      self._generatingDoc = false;
     }
+  },
+
+  /* ── Download blob as file via <a download> ── */
+  _downloadBlob(blob, fileName) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  },
+
+  /* ── Download file from URL via fetch → blob → <a download> ── */
+  async _downloadFromUrl(url, fileName) {
+    var response = await fetch(url);
+    var blob = await response.blob();
+    this._downloadBlob(blob, fileName);
   },
 
   escapeHtml(str) {

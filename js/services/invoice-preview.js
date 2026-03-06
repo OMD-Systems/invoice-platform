@@ -161,76 +161,100 @@ var InvoicePreview = {
   _generatePdf: function (data, callback) {
     var self = this;
 
-    var container = document.createElement('div');
-    container.style.cssText =
-      'position: fixed; left: -9999px; top: 0; width: 794px; z-index: -1; ' +
-      'background: #fff; padding: 0; margin: 0;';
+    self._computeHash(data).then(function (hash) {
+      var container = document.createElement('div');
+      container.style.cssText =
+        'position: fixed; left: -9999px; top: 0; width: 794px; z-index: -1; ' +
+        'background: #fff; padding: 0; margin: 0;';
 
-    var preview = document.createElement('div');
-    preview.className = 'invoice-preview';
-    preview.style.cssText =
-      'background: #fff; color: #000; font-family: Calibri, Segoe UI, Arial, sans-serif; ' +
-      'font-size: 10pt; line-height: 1.4; padding: 40px; margin: 0; ' +
-      'width: 794px; min-height: auto; box-shadow: none; border-radius: 0;';
-    preview.innerHTML = self.renderInvoiceHTML(data);
-    container.appendChild(preview);
-    document.body.appendChild(container);
+      var preview = document.createElement('div');
+      preview.className = 'invoice-preview';
+      preview.style.cssText =
+        'background: #fff; color: #000; font-family: Calibri, Segoe UI, Arial, sans-serif; ' +
+        'font-size: 10pt; line-height: 1.4; padding: 40px; margin: 0; ' +
+        'width: 794px; min-height: auto; box-shadow: none; border-radius: 0;';
+      preview.innerHTML = self.renderInvoiceHTML(data, hash);
+      container.appendChild(preview);
+      document.body.appendChild(container);
 
-    setTimeout(function () {
-      if (typeof html2canvas === 'undefined' || typeof jspdf === 'undefined') {
-        console.error('[InvoicePreview] jsPDF or html2canvas not loaded');
-        container.remove();
-        callback(null);
-        return;
-      }
+      setTimeout(function () {
+        if (typeof html2canvas === 'undefined' || typeof jspdf === 'undefined') {
+          console.error('[InvoicePreview] jsPDF or html2canvas not loaded');
+          container.remove();
+          callback(null);
+          return;
+        }
 
-      html2canvas(preview, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        width: 794,
-        windowWidth: 794
-      }).then(function (canvas) {
-        container.remove();
+        html2canvas(preview, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          width: 794,
+          windowWidth: 794
+        }).then(function (canvas) {
+          container.remove();
 
-        try {
-          var jsPDF = jspdf.jsPDF;
-          var pdf = new jsPDF('p', 'mm', 'a4');
-          var pdfWidth = 210;
-          var pdfHeight = 297;
+          try {
+            var jsPDF = jspdf.jsPDF;
+            var pdf = new jsPDF('p', 'mm', 'a4');
+            var pdfWidth = 210;
+            var pdfHeight = 297;
 
-          var imgWidth = pdfWidth;
-          var imgHeight = (canvas.height * pdfWidth) / canvas.width;
+            var imgWidth = pdfWidth;
+            var imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
-          var imgData = canvas.toDataURL('image/jpeg', 0.95);
+            var imgData = canvas.toDataURL('image/jpeg', 0.95);
 
-          var heightLeft = imgHeight;
-          var position = 0;
+            var heightLeft = imgHeight;
+            var position = 0;
 
-          pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pdfHeight;
-
-          while (heightLeft > 0) {
-            position = -(imgHeight - heightLeft);
-            pdf.addPage();
             pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
             heightLeft -= pdfHeight;
-          }
 
-          var blob = pdf.output('blob');
-          var blobUrl = URL.createObjectURL(blob);
-          callback(blobUrl);
-        } catch (err) {
-          console.error('[InvoicePreview] PDF generation error:', err);
+            while (heightLeft > 0) {
+              position = -(imgHeight - heightLeft);
+              pdf.addPage();
+              pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
+              heightLeft -= pdfHeight;
+            }
+
+            var blob = pdf.output('blob');
+            var blobUrl = URL.createObjectURL(blob);
+            callback(blobUrl);
+          } catch (err) {
+            console.error('[InvoicePreview] PDF generation error:', err);
+            callback(null);
+          }
+        }).catch(function (err) {
+          console.error('[InvoicePreview] html2canvas error:', err);
+          container.remove();
           callback(null);
+        });
+      }, 200);
+    });
+  },
+
+  _computeHash: function (data) {
+    var emp = data.employee || {};
+    var total = parseFloat(data.total) || 0;
+    var hashSeed = String(data.invoiceNumber || '') + '|' +
+      String(data.invoiceDate || '') + '|' +
+      String(total) + '|' +
+      String(emp.full_name_lat || emp.name || '');
+
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      var encoder = new TextEncoder();
+      return crypto.subtle.digest('SHA-256', encoder.encode(hashSeed)).then(function (buf) {
+        var arr = new Uint8Array(buf);
+        var hex = '';
+        for (var h = 0; h < arr.length; h++) {
+          hex += ('0' + arr[h].toString(16)).slice(-2);
         }
-      }).catch(function (err) {
-        console.error('[InvoicePreview] html2canvas error:', err);
-        container.remove();
-        callback(null);
+        return hex;
       });
-    }, 200);
+    }
+    return Promise.resolve('');
   },
 
   _downloadPdf: function (blobUrl) {
@@ -292,7 +316,7 @@ var InvoicePreview = {
     }
   },
 
-  renderInvoiceHTML: function (data) {
+  renderInvoiceHTML: function (data, hash) {
     var emp = data.employee || {};
     var billedTo = data.billedTo || {};
     var items = data.items || [];
@@ -338,11 +362,7 @@ var InvoicePreview = {
       itemsHtml = '<tr><td colspan="5" style="text-align: center; color: #999; padding: 16pt;">No line items</td></tr>';
     }
 
-    // Build document hash seed
-    var hashSeed = String(data.invoiceNumber || '') + '|' +
-      String(data.invoiceDate || '') + '|' +
-      String(total) + '|' +
-      String(emp.full_name_lat || emp.name || '');
+    var hashDisplay = hash ? 'Document ID: ' + hash : 'Document ID: N/A';
 
     var html =
       '<div class="invoice-page-frame">' +
@@ -451,28 +471,12 @@ var InvoicePreview = {
       'Generated by OMD Finance Platform &bull; ' +
       new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC' +
       '</div>' +
-      '<div class="invoice-doc-footer-hash" id="doc-hash-' + String(data.invoiceNumber || '0').replace(/[^a-zA-Z0-9]/g, '') + '">' +
-      'Document ID: computing...' +
+      '<div class="invoice-doc-footer-hash">' +
+      this._esc(hashDisplay) +
       '</div>' +
       '</div>' +
 
       '</div>';
-
-    // Async hash injection
-    if (typeof crypto !== 'undefined' && crypto.subtle) {
-      var encoder = new TextEncoder();
-      crypto.subtle.digest('SHA-256', encoder.encode(hashSeed)).then(function (buf) {
-        var arr = new Uint8Array(buf);
-        var hex = '';
-        for (var h = 0; h < arr.length; h++) {
-          hex += ('0' + arr[h].toString(16)).slice(-2);
-        }
-        var hashEls = document.querySelectorAll('[id^="doc-hash-"]');
-        for (var e = 0; e < hashEls.length; e++) {
-          hashEls[e].textContent = 'Document ID: ' + hex;
-        }
-      });
-    }
 
     return html;
   },

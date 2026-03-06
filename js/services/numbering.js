@@ -161,10 +161,13 @@ const Numbering = {
   _toMonthYear(dateStr) {
     var months = ['January','February','March','April','May','June',
                   'July','August','September','October','November','December'];
+    var shortMonths = ['Jan','Feb','Mar','Apr','May','Jun',
+                       'Jul','Aug','Sep','Oct','Nov','Dec'];
     if (!dateStr) return '';
-    var m, y;
+    var s = String(dateStr);
+    var m, y, i;
     // DD.MM.YY or DD.MM.YYYY
-    var dotMatch = String(dateStr).match(/^\d{2}\.(\d{2})\.(\d{2,4})$/);
+    var dotMatch = s.match(/^\d{2}\.(\d{2})\.(\d{2,4})$/);
     if (dotMatch) {
       m = parseInt(dotMatch[1], 10) - 1;
       if (m < 0 || m > 11) return '';
@@ -172,11 +175,22 @@ const Numbering = {
       return months[m] + '-' + y;
     }
     // ISO YYYY-MM-DD
-    var isoMatch = String(dateStr).match(/^(\d{4})-(\d{2})/);
+    var isoMatch = s.match(/^(\d{4})-(\d{2})/);
     if (isoMatch) {
       m = parseInt(isoMatch[2], 10) - 1;
       if (m < 0 || m > 11) return '';
       return months[m] + '-' + isoMatch[1];
+    }
+    // Human-readable: "January 5, 2026" or "Jan 5, 2026"
+    var humanMatch = s.match(/^([A-Za-z]+)\s+\d{1,2},?\s+(\d{4})$/);
+    if (humanMatch) {
+      var monthName = humanMatch[1];
+      y = humanMatch[2];
+      for (i = 0; i < 12; i++) {
+        if (months[i] === monthName || shortMonths[i] === monthName) {
+          return months[i] + '-' + y;
+        }
+      }
     }
     return '';
   },
