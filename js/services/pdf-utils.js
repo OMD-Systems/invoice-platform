@@ -10,7 +10,7 @@ var PdfUtils = {
   PAGE_HEIGHT_PX: Math.ceil(297 * 794 / 210), // 1123
   WRAPPER_PAD: 40,
   HEADER_ZONE: 55,  // px reserved at top of each page for header (~14.5mm)
-  FOOTER_ZONE: 80,  // px reserved at bottom for footer (~21mm, covers white rect at y=277mm)
+  FOOTER_ZONE: 95,  // px reserved at bottom for footer (~25mm, covers white rect at y=277mm + safety margin)
 
   renderToPdf: function (html, opts) {
     opts = opts || {};
@@ -45,12 +45,13 @@ var PdfUtils = {
           return;
         }
 
-        // 1) Regular pagination (prevent mid-element cuts)
-        self._paginateBlocks(content, self.WRAPPER_PAD, overlay ? self.FOOTER_ZONE : 0);
-
-        // 2) Header spacers — ensure no content in header zone of each page
-        if (overlay) {
-          self._addHeaderSpacers(content, self.WRAPPER_PAD);
+        // Iterative pagination: footer → header → footer (header spacers can push content into footer zone)
+        var fz = overlay ? self.FOOTER_ZONE : 0;
+        for (var _pass = 0; _pass < 3; _pass++) {
+          self._paginateBlocks(content, self.WRAPPER_PAD, fz);
+          if (overlay) {
+            self._addHeaderSpacers(content, self.WRAPPER_PAD);
+          }
         }
 
         // 3) Tiled watermarks
