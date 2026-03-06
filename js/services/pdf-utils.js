@@ -1,22 +1,23 @@
 /* ═══════════════════════════════════════════════════════
    PdfUtils — Shared PDF generation utilities
-   HTML → html2canvas → jsPDF with pagination, watermark & encryption
+   HTML → html2canvas → jsPDF with pagination, watermark,
+   repeating headers/footers & encryption
    Invoice Platform · Woodenshark
    ═══════════════════════════════════════════════════════ */
 
 var PdfUtils = {
 
-  PAGE_HEIGHT_PX: Math.ceil(297 * 794 / 210), // 1123 — A4 height in CSS px at 794px width
+  PAGE_HEIGHT_PX: Math.ceil(297 * 794 / 210), // 1123
   WRAPPER_PAD: 40,
+  HEADER_ZONE: 55,  // px reserved at top of each page for header (~14.5mm)
+  FOOTER_ZONE: 55,  // px reserved at bottom for footer (~14.5mm)
 
-  /**
-   * Render an HTML string to a protected PDF blob.
-   * Handles pagination (no mid-element cuts), tiled watermarks, page numbers.
-   */
   renderToPdf: function (html, opts) {
     opts = opts || {};
     var scale = opts.scale || 2;
     var watermark = opts.watermark || 'WOODENSHARK LLC CONFIDENTIAL';
+    var overlay = opts.overlay || null;
+    var skipOverlayP1 = opts.skipOverlayOnPage1 !== false;
     var self = this;
 
     return new Promise(function (resolve, reject) {
@@ -44,15 +45,19 @@ var PdfUtils = {
           return;
         }
 
-        // Paginate: insert spacers so no element is cut across pages
-        self.paginateContainer(content, self.WRAPPER_PAD);
+        // 1) Regular pagination (prevent mid-element cuts)
+        self._paginateBlocks(content, self.WRAPPER_PAD);
 
-        // Tiled watermarks (one per page, centered)
+        // 2) Header spacers — ensure no content in header zone of each page
+        if (overlay) {
+          self._addHeaderSpacers(content, self.WRAPPER_PAD);
+        }
+
+        // 3) Tiled watermarks
         if (watermark) {
           self._addWatermarks(wrapper, watermark);
         }
 
-        // Wait for reflow after DOM changes
         setTimeout(function () {
           html2canvas(wrapper, {
             scale: scale,
@@ -77,8 +82,7 @@ var PdfUtils = {
               }
 
               var pdf = new jsPDF(pdfOpts);
-              var pdfW = 210;
-              var pdfH = 297;
+              var pdfW = 210, pdfH = 297;
               var imgW = pdfW;
               var imgH = (canvas.height * pdfW) / canvas.width;
               var imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -95,13 +99,17 @@ var PdfUtils = {
                 heightLeft -= pdfH;
               }
 
-              // Page numbers
+              // Draw overlay (header/footer) on each page
               var totalPages = pdf.getNumberOfPages();
               for (var p = 1; p <= totalPages; p++) {
                 pdf.setPage(p);
-                pdf.setFontSize(8);
-                pdf.setTextColor(150, 150, 150);
-                pdf.text('Page ' + p + ' of ' + totalPages, 105, 290, { align: 'center' });
+                if (overlay && !(skipOverlayP1 && p === 1)) {
+                  overlay(pdf, p, totalPages);
+                } else if (!overlay) {
+                  pdf.setFontSize(8);
+                  pdf.setTextColor(150, 150, 150);
+                  pdf.text('Page ' + p + ' of ' + totalPages, 105, 290, { align: 'center' });
+                }
               }
 
               resolve(pdf.output('blob'));
@@ -117,51 +125,70 @@ var PdfUtils = {
     });
   },
 
-  /**
-   * Insert spacers before [data-pdf-block] elements that would be cut by page boundaries.
-   * Reads live offsetTop after each spacer insert so subsequent elements auto-adjust.
-   */
-  paginateContainer: function (contentEl, wrapperPadTop) {
+  /** Push blocks away from page boundaries so nothing is cut */
+  _paginateBlocks: function (contentEl, padTop) {
     var PAGE_H = this.PAGE_HEIGHT_PX;
-    var BOTTOM_SAFE = 60;   // don't start a block within last 60px of a page
-    var NEW_PAGE_PAD = 36;  // top margin on new page
+    var SAFE = 70;
+    var PAD = 70;
 
     var blocks = contentEl.querySelectorAll('[data-pdf-block]');
-
     for (var i = 0; i < blocks.length; i++) {
-      var block = blocks[i];
-      var y = block.offsetTop;
-      var h = block.offsetHeight;
-      var wTop = wrapperPadTop + y;
-      var wBot = wTop + h;
-
+      var b = blocks[i];
+      var wTop = padTop + b.offsetTop;
+      var wBot = wTop + b.offsetHeight;
       var pageEnd = (Math.floor(wTop / PAGE_H) + 1) * PAGE_H;
 
-      var crossesPage = wBot > pageEnd && wTop < pageEnd;
-      var inSafeZone = (pageEnd - wTop) > 0 && (pageEnd - wTop) < BOTTOM_SAFE;
+      var crosses = wBot > pageEnd && wTop < pageEnd;
+      var inSafe = (pageEnd - wTop) > 0 && (pageEnd - wTop) <= SAFE;
 
-      if (crossesPage || inSafeZone) {
-        // Only push if block can fit on one page
-        if (h < PAGE_H - NEW_PAGE_PAD - BOTTOM_SAFE) {
-          var gap = (pageEnd - wTop) + NEW_PAGE_PAD;
-          var spacer = document.createElement('div');
-          spacer.style.height = gap + 'px';
-          block.parentNode.insertBefore(spacer, block);
+      if (crosses || inSafe) {
+        if (b.offsetHeight < PAGE_H - SAFE - PAD) {
+          var gap = (pageEnd - wTop) + PAD;
+          var sp = document.createElement('div');
+          sp.style.height = gap + 'px';
+          b.parentNode.insertBefore(sp, b);
         }
       }
     }
   },
 
-  /**
-   * Add tiled watermark instances — one centered per page.
-   */
+  /** Ensure no content sits in the header zone at top of each page (except p1) */
+  _addHeaderSpacers: function (contentEl, padTop) {
+    var PAGE_H = this.PAGE_HEIGHT_PX;
+    var HZONE = this.HEADER_ZONE;
+
+    for (var iter = 0; iter < 8; iter++) {
+      var totalH = padTop + contentEl.scrollHeight;
+      var stable = true;
+
+      for (var boundary = PAGE_H; boundary < totalH; boundary += PAGE_H) {
+        var blocks = contentEl.querySelectorAll('[data-pdf-block]');
+        for (var j = 0; j < blocks.length; j++) {
+          var b = blocks[j];
+          var bTop = padTop + b.offsetTop;
+          if (bTop >= boundary && bTop < boundary + HZONE) {
+            var needed = boundary + HZONE - bTop;
+            if (needed > 2) {
+              var sp = document.createElement('div');
+              sp.style.height = needed + 'px';
+              b.parentNode.insertBefore(sp, b);
+              stable = false;
+            }
+            break;
+          }
+        }
+      }
+      if (stable) break;
+    }
+  },
+
   _addWatermarks: function (wrapper, text) {
     var totalH = wrapper.scrollHeight;
     var PAGE_H = this.PAGE_HEIGHT_PX;
     var pages = Math.ceil(totalH / PAGE_H);
 
-    var wmContainer = document.createElement('div');
-    wmContainer.style.cssText =
+    var wc = document.createElement('div');
+    wc.style.cssText =
       'position:absolute;top:0;left:0;width:100%;height:' + totalH + 'px;' +
       'pointer-events:none;z-index:0;overflow:hidden;';
 
@@ -176,10 +203,9 @@ var PdfUtils = {
         'color:rgba(0,0,0,0.06);white-space:nowrap;letter-spacing:8px;' +
         'font-family:Calibri,Arial,sans-serif;user-select:none;">' +
         PdfUtils.esc(text) + '</div>';
-      wmContainer.appendChild(wm);
+      wc.appendChild(wm);
     }
-
-    wrapper.insertBefore(wmContainer, wrapper.firstChild);
+    wrapper.insertBefore(wc, wrapper.firstChild);
   },
 
   esc: function (str) {

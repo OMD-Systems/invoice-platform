@@ -84,10 +84,6 @@ var NdaPdf = {
       '.info-tbl .sep td{border-bottom:1px solid ' + C.LIGHT_GRAY + ';padding:2px 0;}' +
       '.classification{font-family:Calibri,sans-serif;font-size:9pt;}' +
       '.classification .badge{background:' + C.DARK_RED + ';color:' + C.GOLD_LIGHT + ';font-weight:700;padding:2px 8px;font-size:9pt;}' +
-      '.hdr-bar{background:' + C.DARK_RED + ';color:' + C.GOLD_LIGHT + ';text-align:center;font-family:Calibri,sans-serif;font-size:7.5pt;font-weight:700;letter-spacing:4px;padding:4px 0;margin-bottom:4px;}' +
-      '.hdr-line{display:flex;justify-content:space-between;font-family:Calibri,sans-serif;font-size:8pt;border-bottom:1.5px solid ' + C.RED_ACCENT + ';padding-bottom:4px;margin-bottom:14px;}' +
-      '.hdr-line .co{color:' + C.CRIMSON + ';font-weight:700;}' +
-      '.hdr-line .dt{color:' + C.TEXT_MUTED + ';}' +
       '.preamble{text-align:justify;margin-bottom:10px;}' +
       '.between{text-align:center;font-family:Calibri,sans-serif;font-size:12pt;color:' + C.CRIMSON + ';font-weight:700;margin:10px 0;}' +
       '.parties{display:flex;gap:14px;margin-bottom:14px;}' +
@@ -112,7 +108,6 @@ var NdaPdf = {
       '.sig-underline{color:' + C.DARK_RED + ';margin-top:12px;margin-bottom:2px;}' +
       '.sig-caption{font-family:Calibri,sans-serif;font-size:8pt;color:' + C.TEXT_MUTED + ';}' +
       '.sig-field{font-size:8pt;color:' + C.TEXT_SECONDARY + ';margin-bottom:3px;}' +
-      '.ftr-bar{background:' + C.DARK_RED + ';color:' + C.GOLD_LIGHT + ';text-align:center;font-family:Calibri,sans-serif;font-size:7pt;font-weight:700;letter-spacing:4px;padding:3px 0;margin-top:16px;}' +
     '</style>';
 
     // ── TITLE PAGE (exact height = 1 PDF page) ──
@@ -136,14 +131,7 @@ var NdaPdf = {
     html += '<div class="classification"><span style="color:' + C.TEXT_MUTED + ';">CLASSIFICATION: </span><span class="badge">STRICTLY CONFIDENTIAL</span></div>';
     html += '</div>';
 
-    // ── PAGE 2 TOP MARGIN ──
-    html += '<div style="height:36px;"></div>';
-
-    // ── HEADER BAR ──
-    html += '<div data-pdf-block>';
-    html += '<div class="hdr-bar">STRICTLY CONFIDENTIAL &mdash; PROPRIETARY &amp; RESTRICTED</div>';
-    html += '<div class="hdr-line"><span class="co">WOODENSHARK LLC</span><span class="dt">Non-Disclosure Agreement</span></div>';
-    html += '</div>';
+    // ── PREAMBLE (header drawn by jsPDF overlay) ──
 
     // ── PREAMBLE ──
     html += '<div data-pdf-block>';
@@ -373,20 +361,64 @@ var NdaPdf = {
     html += '</div>';
     html += '</div>';
 
-    // ── FOOTER ──
-    html += '<div data-pdf-block>';
-    html += '<div class="ftr-bar">STRICTLY CONFIDENTIAL &mdash; PROPRIETARY &amp; RESTRICTED</div>';
-    html += '</div>';
-
     return html;
   },
 
+  _drawOverlay: function (pdf, page, total) {
+    var C = this.COLORS;
+    // ── HEADER: white bg → dark-red bar → company line → red line ──
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, 210, 15, 'F');
+
+    pdf.setFillColor(26, 0, 0);
+    pdf.rect(0, 0, 210, 7, 'F');
+    pdf.setFontSize(6);
+    pdf.setTextColor(212, 160, 23);
+    pdf.text('STRICTLY CONFIDENTIAL  \u2014  PROPRIETARY & RESTRICTED', 105, 4.5, { align: 'center', charSpace: 1.2 });
+
+    pdf.setFontSize(7);
+    pdf.setTextColor(139, 0, 0);
+    pdf.setFont(undefined, 'bold');
+    pdf.text('WOODENSHARK LLC', 18, 11);
+    pdf.setFont(undefined, 'normal');
+    pdf.setTextColor(107, 107, 107);
+    pdf.text('Non-Disclosure Agreement', 192, 11, { align: 'right' });
+
+    pdf.setDrawColor(198, 40, 40);
+    pdf.setLineWidth(0.4);
+    pdf.line(18, 13, 192, 13);
+
+    // ── FOOTER: white bg → gray line → page info → dark-red bar ──
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 282, 210, 15, 'F');
+
+    pdf.setDrawColor(208, 208, 208);
+    pdf.setLineWidth(0.15);
+    pdf.line(18, 283, 192, 283);
+
+    pdf.setFontSize(7);
+    pdf.setTextColor(107, 107, 107);
+    pdf.setFont(undefined, 'normal');
+    pdf.text('Non-Disclosure Agreement  |  STRICTLY CONFIDENTIAL  |  Page ' + page + ' of ' + total, 105, 286.5, { align: 'center' });
+
+    pdf.setFillColor(26, 0, 0);
+    pdf.rect(0, 289, 210, 8, 'F');
+    pdf.setFontSize(6);
+    pdf.setTextColor(212, 160, 23);
+    pdf.text('STRICTLY CONFIDENTIAL  \u2014  PROPRIETARY & RESTRICTED', 105, 293.5, { align: 'center', charSpace: 1.2 });
+  },
+
   async generate(emp) {
+    var self = this;
     var html = this.renderHTML(emp);
     var ownerPassword = 'WS-' + emp.id.slice(0, 8) + '-' + Date.now();
     return PdfUtils.renderToPdf(html, {
       ownerPassword: ownerPassword,
-      watermark: 'WOODENSHARK LLC CONFIDENTIAL'
+      watermark: 'WOODENSHARK LLC CONFIDENTIAL',
+      skipOverlayOnPage1: true,
+      overlay: function (pdf, page, total) {
+        self._drawOverlay(pdf, page, total);
+      }
     });
   },
 

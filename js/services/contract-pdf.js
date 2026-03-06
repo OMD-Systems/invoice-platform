@@ -193,10 +193,6 @@ var ContractPdf = {
       '.info-tbl .sep td{border-bottom:1px solid ' + C.LIGHT_GRAY + ';padding:2px 0;}' +
       '.classification{font-family:Calibri,sans-serif;font-size:9pt;}' +
       '.classification .badge{background:' + C.NAVY + ';color:#fff;font-weight:700;padding:2px 8px;font-size:9pt;}' +
-      '.hdr-bar{background:' + C.NAVY + ';color:#fff;text-align:center;font-family:Calibri,sans-serif;font-size:7.5pt;font-weight:700;letter-spacing:4px;padding:4px 0;margin-bottom:4px;}' +
-      '.hdr-line{display:flex;justify-content:space-between;font-family:Calibri,sans-serif;font-size:8pt;border-bottom:1.5px solid ' + C.CYAN + ';padding-bottom:4px;margin-bottom:14px;}' +
-      '.hdr-line .co{color:' + C.DARK + ';font-weight:700;}' +
-      '.hdr-line .dt{color:' + C.TEXT_MUTED + ';}' +
       '.preamble{text-align:justify;margin-bottom:10px;}' +
       '.between{text-align:center;font-family:Calibri,sans-serif;font-size:12pt;color:' + C.DARK + ';font-weight:700;margin:10px 0;}' +
       '.parties{display:flex;gap:14px;margin-bottom:14px;}' +
@@ -225,7 +221,6 @@ var ContractPdf = {
       '.sig-bank{font-family:Calibri,sans-serif;font-size:9pt;color:' + C.TEXT_MUTED + ';font-weight:700;margin-top:4px;margin-bottom:2px;}' +
       '.sig-underline{color:' + C.NAVY + ';margin-top:12px;margin-bottom:2px;}' +
       '.sig-caption{font-family:Calibri,sans-serif;font-size:8pt;color:' + C.TEXT_MUTED + ';}' +
-      '.ftr-bar{background:' + C.NAVY + ';color:#fff;text-align:center;font-family:Calibri,sans-serif;font-size:7pt;font-weight:700;letter-spacing:4px;padding:3px 0;margin-top:16px;}' +
     '</style>';
 
     // ── TITLE PAGE (exact height = 1 PDF page) ──
@@ -249,14 +244,7 @@ var ContractPdf = {
     html += '<div class="classification"><span style="color:' + C.TEXT_MUTED + ';">CLASSIFICATION: </span><span class="badge">CONFIDENTIAL</span></div>';
     html += '</div>';
 
-    // ── PAGE 2 TOP MARGIN ──
-    html += '<div style="height:36px;"></div>';
-
-    // ── HEADER BAR ──
-    html += '<div data-pdf-block>';
-    html += '<div class="hdr-bar">CONFIDENTIAL &mdash; WOODENSHARK LLC PROPRIETARY</div>';
-    html += '<div class="hdr-line"><span class="co">WOODENSHARK LLC</span><span class="dt">Consulting Agreement</span></div>';
-    html += '</div>';
+    // ── PREAMBLE (header drawn by jsPDF overlay) ──
 
     // ── PREAMBLE ──
     html += '<div data-pdf-block>';
@@ -377,20 +365,63 @@ var ContractPdf = {
     html += '</div>';
     html += '</div>';
 
-    // ── FOOTER ──
-    html += '<div data-pdf-block>';
-    html += '<div class="ftr-bar">CONFIDENTIAL &mdash; WOODENSHARK LLC PROPRIETARY</div>';
-    html += '</div>';
-
     return html;
   },
 
+  _drawOverlay: function (pdf, page, total) {
+    // ── HEADER: white bg → navy bar → company line → cyan line ──
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, 210, 15, 'F');
+
+    pdf.setFillColor(10, 14, 23);
+    pdf.rect(0, 0, 210, 7, 'F');
+    pdf.setFontSize(6);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text('CONFIDENTIAL  \u2014  WOODENSHARK LLC PROPRIETARY', 105, 4.5, { align: 'center', charSpace: 1.2 });
+
+    pdf.setFontSize(7);
+    pdf.setTextColor(13, 17, 23);
+    pdf.setFont(undefined, 'bold');
+    pdf.text('WOODENSHARK LLC', 18, 11);
+    pdf.setFont(undefined, 'normal');
+    pdf.setTextColor(107, 107, 107);
+    pdf.text('Consulting Agreement', 192, 11, { align: 'right' });
+
+    pdf.setDrawColor(0, 188, 212);
+    pdf.setLineWidth(0.4);
+    pdf.line(18, 13, 192, 13);
+
+    // ── FOOTER: white bg → gray line → page info → navy bar ──
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 282, 210, 15, 'F');
+
+    pdf.setDrawColor(208, 208, 208);
+    pdf.setLineWidth(0.15);
+    pdf.line(18, 283, 192, 283);
+
+    pdf.setFontSize(7);
+    pdf.setTextColor(107, 107, 107);
+    pdf.setFont(undefined, 'normal');
+    pdf.text('Consulting Services Agreement  |  CONFIDENTIAL  |  Page ' + page + ' of ' + total, 105, 286.5, { align: 'center' });
+
+    pdf.setFillColor(10, 14, 23);
+    pdf.rect(0, 289, 210, 8, 'F');
+    pdf.setFontSize(6);
+    pdf.setTextColor(255, 255, 255);
+    pdf.text('CONFIDENTIAL  \u2014  WOODENSHARK LLC PROPRIETARY', 105, 293.5, { align: 'center', charSpace: 1.2 });
+  },
+
   async generate(emp) {
+    var self = this;
     var html = this.renderHTML(emp);
     var ownerPassword = 'WS-' + emp.id.slice(0, 8) + '-' + Date.now();
     return PdfUtils.renderToPdf(html, {
       ownerPassword: ownerPassword,
-      watermark: 'WOODENSHARK LLC CONFIDENTIAL'
+      watermark: 'WOODENSHARK LLC CONFIDENTIAL',
+      skipOverlayOnPage1: true,
+      overlay: function (pdf, page, total) {
+        self._drawOverlay(pdf, page, total);
+      }
     });
   },
 
