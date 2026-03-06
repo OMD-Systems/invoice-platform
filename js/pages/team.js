@@ -2156,9 +2156,29 @@ const Team = {
     }
   },
 
-  /* ── Download blob as file via <a download> ── */
-  _downloadBlob(blob, fileName) {
-    console.log('[Team] _downloadBlob called, size:', blob && blob.size, 'fileName:', fileName);
+  /* ── Download blob as file ── */
+  async _downloadBlob(blob, fileName) {
+    // Try native File System Access API first (Chrome 86+)
+    if (window.showSaveFilePicker) {
+      try {
+        var ext = fileName.split('.').pop() || 'docx';
+        var mimeMap = { docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', pdf: 'application/pdf' };
+        var accept = {};
+        accept[mimeMap[ext] || 'application/octet-stream'] = ['.' + ext];
+        var handle = await window.showSaveFilePicker({
+          suggestedName: fileName,
+          types: [{ description: fileName, accept: accept }],
+        });
+        var writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.warn('[Team] showSaveFilePicker failed, falling back:', err);
+      }
+    }
+    // Fallback: <a download>
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.style.display = 'none';
@@ -2166,17 +2186,14 @@ const Team = {
     a.download = fileName;
     document.body.appendChild(a);
     a.click();
-    setTimeout(function() {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 1000);
+    setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
   },
 
-  /* ── Download file from URL via fetch → blob → <a download> ── */
+  /* ── Download file from URL via fetch → blob ── */
   async _downloadFromUrl(url, fileName) {
     var response = await fetch(url);
     var blob = await response.blob();
-    this._downloadBlob(blob, fileName);
+    await this._downloadBlob(blob, fileName);
   },
 
   escapeHtml(str) {
