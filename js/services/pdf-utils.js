@@ -23,11 +23,11 @@ var PdfUtils = {
     return new Promise(function (resolve, reject) {
       var container = document.createElement('div');
       container.style.cssText =
-        'position:fixed;left:-9999px;top:0;width:794px;z-index:-1;background:#fff;padding:0;margin:0;';
+        'position:absolute;left:-9999px;top:0;width:794px;z-index:-1;background:#fff;padding:0;margin:0;';
 
       var wrapper = document.createElement('div');
       wrapper.style.cssText =
-        'background:#fff;color:#000;font-family:Calibri,Cambria,Segoe UI,Arial,sans-serif;' +
+        'background:#fff;color:#000;font-family:Calibri,Cambria,"Segoe UI",Arial,Helvetica,sans-serif;' +
         'font-size:10pt;line-height:1.4;padding:' + self.WRAPPER_PAD + 'px;margin:0;' +
         'width:794px;min-height:auto;position:relative;overflow:hidden;';
 
@@ -71,7 +71,7 @@ var PdfUtils = {
 
             try {
               var jsPDF = jspdf.jsPDF;
-              var pdfOpts = { orientation: 'p', unit: 'mm', format: 'a4' };
+              var pdfOpts = { orientation: 'p', unit: 'mm', format: 'a4', compress: true };
 
               if (opts.ownerPassword) {
                 pdfOpts.encryption = {
@@ -202,7 +202,7 @@ var PdfUtils = {
         'display:flex;align-items:center;justify-content:center;pointer-events:none;';
       wm.innerHTML =
         '<div style="transform:rotate(-45deg);font-size:54px;font-weight:700;' +
-        'color:rgba(0,0,0,0.06);white-space:nowrap;letter-spacing:8px;' +
+        'color:rgba(0,0,0,0.11);white-space:nowrap;letter-spacing:8px;' +
         'font-family:Calibri,Arial,sans-serif;user-select:none;">' +
         PdfUtils.esc(text) + '</div>';
       wc.appendChild(wm);

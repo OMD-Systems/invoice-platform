@@ -146,7 +146,9 @@ const Expenses = {
       var parallel = await Promise.all([
         DB.getSetting('uah_usd_rate'),
         DB.getInvoices({ month: self.month, year: self.year }),
-        // Single query replaces N+1 loop (was: getExpenses(inv.id) per invoice)
+        // TODO: move to db.js — cannot use DB.getExpensesByMonth(month, year) here because
+        // that method uses `!inner` join and only returns linked expenses; this query
+        // intentionally loads ALL expenses and filters unlinked ones by created_at month/year.
         DB.client
           .from('expenses')
           .select('*')

@@ -7,6 +7,23 @@
 const DB = {
   client: null,
 
+  _cache: {},
+  _cacheTTL: 120000, // 2 minutes
+
+  _getCached: function(key) {
+    var entry = this._cache[key];
+    if (entry && Date.now() - entry.ts < this._cacheTTL) return entry.data;
+    return null;
+  },
+
+  _setCache: function(key, data) {
+    this._cache[key] = { data: data, ts: Date.now() };
+  },
+
+  clearCache: function() {
+    this._cache = {};
+  },
+
   /**
    * Initialize the Supabase client.
    * Call this once on app load.
@@ -106,13 +123,17 @@ const DB = {
    */
   async getEmployees() {
     try {
+      var cached = this._getCached('employees');
+      if (cached) return cached;
       const { data, error } = await this.client
         .from('employees')
         .select('id, pin, name, full_name_lat, employee_type, contract_type, is_active, work_email, email, invoice_format, invoice_prefix, next_invoice_number, service_description, rate_usd, address, phone, iban, swift, bank_name, receiver_name, contract_uploaded_at, nda_uploaded_at, created_at, updated_at, avatar_url, date_of_birth, passport_number, passport_issued, passport_expires, agreement_date, effective_date')
         .eq('is_active', true)
         .order('name', { ascending: true });
 
-      return { data: data || [], error };
+      var result = { data: data || [], error };
+      if (!error) this._setCache('employees', result);
+      return result;
     } catch (err) {
       return { data: [], error: { message: err.message } };
     }
@@ -293,13 +314,17 @@ const DB = {
    */
   async getProjects() {
     try {
+      var cached = this._getCached('projects');
+      if (cached) return cached;
       const { data, error } = await this.client
         .from('projects')
         .select('*')
         .eq('is_active', true)
         .order('name', { ascending: true });
 
-      return { data: data || [], error };
+      var result = { data: data || [], error };
+      if (!error) this._setCache('projects', result);
+      return result;
     } catch (err) {
       return { data: [], error: { message: err.message } };
     }
@@ -677,6 +702,54 @@ const DB = {
       return { data: data || [], error };
     } catch (err) {
       return { data: [], error: { message: err.message } };
+    }
+  },
+
+  async getExpensesByMonth(month, year) {
+    try {
+      var { data, error } = await this.client
+        .from('expenses')
+        .select('*, invoices!inner(month, year, employee_id)')
+        .eq('invoices.month', month)
+        .eq('invoices.year', year);
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.error('[DB] getExpensesByMonth error:', e);
+      return [];
+    }
+  },
+
+  async getSettings(keys) {
+    try {
+      var { data, error } = await this.client
+        .from('settings')
+        .select('key, value')
+        .in('key', keys);
+      if (error) throw error;
+      var result = {};
+      for (var i = 0; i < (data || []).length; i++) {
+        result[data[i].key] = data[i].value;
+      }
+      return result;
+    } catch (e) {
+      console.error('[DB] getSettings batch error:', e);
+      return {};
+    }
+  },
+
+  async getEmployeesSafe() {
+    try {
+      var cached = this._getCached('employees_safe');
+      if (cached) return cached;
+      var { data, error } = await this.client.rpc('get_employees_safe');
+      if (error) throw error;
+      var result = data || [];
+      this._setCache('employees_safe', result);
+      return result;
+    } catch (e) {
+      console.error('[DB] getEmployeesSafe error:', e);
+      return [];
     }
   },
 

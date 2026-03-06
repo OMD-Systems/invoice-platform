@@ -533,25 +533,26 @@ const Settings = {
     try {
       // Parallel load: all settings + projects + teams + profiles + locks + team_members
       var settingKeys = ['billed_to', 'payment_terms', 'exchange_rate', 'working_hours_adjustment'];
-      var settingPromises = settingKeys.map(function (key) { return DB.getSetting(key); });
 
       var parallel = await Promise.all([
-        Promise.all(settingPromises),
+        DB.getSettings(settingKeys),
+        // TODO: move to db.js — DB.getProjects() filters is_active=true; settings needs ALL projects
         DB.client.from('projects').select('*').order('name', { ascending: true }),
         DB.getTeams(),
+        // TODO: move to db.js — add DB.getProfiles()
         DB.client.from('profiles').select('*').order('email', { ascending: true }),
+        // TODO: move to db.js — add DB.getMonthLocks()
         DB.client.from('month_locks').select('*')
           .order('year', { ascending: false })
           .order('month', { ascending: false }),
-        // Single query for ALL team_members with employee names (replaces N+1 per team)
+        // TODO: move to db.js — DB.getTeamMembers(teamId) is per-team; need bulk variant
         DB.client.from('team_members').select('*, employees(id, name, work_email)')
       ]);
 
-      // Settings
-      var settingResults = parallel[0];
+      // Settings — DB.getSettings returns { key: value } map directly
+      var settingMap = parallel[0] || {};
       for (var i = 0; i < settingKeys.length; i++) {
-        var result = settingResults[i];
-        self.settings[settingKeys[i]] = (result && result.data) ? result.data : {};
+        self.settings[settingKeys[i]] = settingMap[settingKeys[i]] || {};
       }
 
       self.projects = (parallel[1] && parallel[1].data) ? parallel[1].data : [];
@@ -1500,7 +1501,7 @@ const Settings = {
           tempPassword += chars[arr[ci] % chars.length];
         }
 
-        // Create user via admin RPC (checks admin role server-side)
+        // TODO: move to db.js — add DB.adminCreateUser(email, password, fullName, role)
         var result = await DB.client.rpc('admin_create_user', {
           p_email: email,
           p_password: tempPassword,

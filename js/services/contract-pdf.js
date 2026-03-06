@@ -20,6 +20,10 @@ var ContractPdf = {
     FAFBFC:         '#FAFBFC',
   },
 
+  CONTRACT_END_DATE:        '31.12.2026',
+  TAX_RATE:                 0.06,
+  TERMINATION_NOTICE_DAYS:  30,
+
   CLIENT_NAME:    'Woodenshark LLC',
   CLIENT_ADDRESS: '3411 Silverside Road, Suite 104\nRodney Building, Wilmington, DE, 19810',
   CLIENT_SWIFT:   'CMFGUS33',
@@ -165,7 +169,7 @@ var ContractPdf = {
     var passExpires = fmtDate(emp.passport_expires);
 
     var rate = parseFloat(emp.rate_usd) || 0;
-    var taxRate = 0.06;
+    var taxRate = self.TAX_RATE;
     var totalWithTax = Math.round(rate * (1 + taxRate));
     var rateWords = self._numberToWords(rate);
     var totalWords = self._numberToWords(totalWithTax);
@@ -297,6 +301,11 @@ var ContractPdf = {
 
       for (var p = 0; p < sec.paragraphs.length; p++) {
         var text = sec.paragraphs[p];
+        if (text !== null && sec.title === 'TERM OF AGREEMENT') {
+          text = text
+            .replace(/31\.12\.2026/g, self.CONTRACT_END_DATE)
+            .replace(/30 days/g, self.TERMINATION_NOTICE_DAYS + ' days');
+        }
 
         if (text === null) {
           var special = '';
@@ -306,7 +315,7 @@ var ContractPdf = {
             special = '<div class="notice-box"><span class="nm">' + esc(self.CLIENT_NAME) + '</span>, <span class="ct">mitgor@woodenshark.com</span></div>';
             special += '<div class="notice-box"><span class="nm">' + esc(emp.full_name_lat || '') + '</span>, <span class="ct">' + esc(emp.work_email || emp.phone || '') + '</span></div>';
           } else if (sec.title === 'COMPENSATION') {
-            special = '<div class="body-para">The Consultant will charge the Client for the Services at the rate of ' + rateFmt + ' (' + rateWords + ') USD plus 6% tax, totaling ' + totalFmt + ' (' + totalWords + ') USD per month (the \u201cCompensation\u201d) for full time employment.</div>';
+            special = '<div class="body-para">The Consultant will charge the Client for the Services at the rate of ' + rateFmt + ' (' + rateWords + ') USD plus ' + (self.TAX_RATE * 100) + '% tax, totaling ' + totalFmt + ' (' + totalWords + ') USD per month (the \u201cCompensation\u201d) for full time employment.</div>';
           }
 
           if (firstContent) {
@@ -369,6 +378,15 @@ var ContractPdf = {
   },
 
   _drawOverlay: function (pdf, page, total) {
+    if (page === 2) {
+      pdf.setProperties({
+        title:   'Consulting Agreement - Woodenshark LLC',
+        author:  'Woodenshark LLC',
+        subject: 'Consulting Services Agreement',
+        creator: 'OMD Finance Platform',
+      });
+    }
+
     // ── HEADER: white bg → navy bar → company line → cyan line ──
     pdf.setFillColor(255, 255, 255);
     pdf.rect(0, 0, 210, 15, 'F');
@@ -414,7 +432,8 @@ var ContractPdf = {
   async generate(emp) {
     var self = this;
     var html = this.renderHTML(emp);
-    var ownerPassword = 'WS-' + emp.id.slice(0, 8) + '-' + Date.now();
+    var rnd = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10);
+    var ownerPassword = 'WS-' + emp.id.slice(0, 8) + '-' + rnd + '-' + Date.now();
     return PdfUtils.renderToPdf(html, {
       ownerPassword: ownerPassword,
       watermark: 'WOODENSHARK LLC CONFIDENTIAL',

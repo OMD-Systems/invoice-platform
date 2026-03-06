@@ -61,7 +61,7 @@ const Auth = {
    * @param {string} email
    * @returns {Promise<{data: object|null, error: object|null}>}
    */
-  async signInWithOTP(email) {
+  async _signInWithOTP(email) {
     try {
       // Input validation
       if (!email || !Utils.isValidEmail(email)) {
@@ -154,7 +154,7 @@ const Auth = {
    * @param {string} token - The 6-digit code from the email
    * @returns {Promise<{data: object|null, error: object|null}>}
    */
-  async verifyOTP(email, token) {
+  async _verifyOTP(email, token) {
     try {
       if (!token || token.length < 6) {
         return { data: null, error: { message: 'Please enter the 6-digit code from your email.' } };
@@ -219,24 +219,16 @@ const Auth = {
   // SIMPLIFIED API (used by app.js — throw on error, return data directly)
   // ----------------------------------------------------------
 
-  /**
-   * Send OTP code to email. Throws on error.
-   * @param {string} email
-   */
+  /** PUBLIC: Send OTP code. Throws on error. */
   async sendOtp(email) {
-    var result = await this.signInWithOTP(email);
+    var result = await this._signInWithOTP(email);
     if (result.error) throw new Error(result.error.message || 'Failed to send code');
     return { success: true };
   },
 
-  /**
-   * Verify OTP code. Returns the session object. Throws on error.
-   * @param {string} email
-   * @param {string} code
-   * @returns {Promise<Object>} session with .user
-   */
+  /** PUBLIC: Verify OTP code. Returns session. Throws on error. */
   async verifyOtp(email, code) {
-    const { data, error } = await this.verifyOTP(email, code);
+    const { data, error } = await this._verifyOTP(email, code);
     if (error) throw new Error(error.message || 'Invalid code');
     return data?.session || data;
   }

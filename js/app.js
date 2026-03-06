@@ -12,14 +12,14 @@ if (window.location.protocol === 'http:' && window.location.hostname !== 'localh
 window.addEventListener('unhandledrejection', function (event) {
   console.error('[Unhandled Promise]', event.reason);
   if (typeof showToast === 'function') {
-    showToast('An unexpected error occurred. Check console.', 'error');
+    showToast('Something went wrong. Please refresh the page.', 'error');
   }
 });
 
 window.addEventListener('error', function (event) {
   console.error('[Global Error]', event.error);
   if (typeof showToast === 'function') {
-    showToast('A script error occurred. Check console.', 'error');
+    showToast('Something went wrong. Please refresh the page.', 'error');
   }
 });
 
@@ -36,6 +36,7 @@ const App = {
   _sessionCheckInterval: null,
   _sessionCountdownInterval: null,
   _sessionWarningShown: false,
+  _sessionCheckFailures: 0,
   SESSION_WARN_BEFORE_MS: 5 * 60 * 1000, // 5 minutes
 
   pages: {
@@ -104,6 +105,13 @@ const App = {
           }
         });
         self._authSubscription = authSub.data.subscription;
+
+        window.addEventListener('offline', function() {
+          showToast('No internet connection. Changes may not be saved.', 'error');
+        });
+        window.addEventListener('online', function() {
+          showToast('Connection restored.', 'success');
+        });
 
         this.navigate(window.location.hash || '#/team');
       } else {
@@ -364,8 +372,14 @@ const App = {
         if (remaining <= self.SESSION_WARN_BEFORE_MS && remaining > 0 && !self._sessionWarningShown) {
           self.showSessionWarning(expiresMs);
         }
+        self._sessionCheckFailures = 0;
       } catch (e) {
         console.warn('[App] Session check error:', e);
+        self._sessionCheckFailures++;
+        if (self._sessionCheckFailures >= 3) {
+          showToast('Session check failed. Your session may have expired.', 'warning');
+          self._sessionCheckFailures = 0;
+        }
       }
     }, 30000); // check every 30s
   },

@@ -175,21 +175,30 @@ const Invoices = {
       if (self.statusFilter !== 'all') invFilters.status = self.statusFilter;
       if (self.employeeFilter !== 'all') invFilters.employee_id = self.employeeFilter;
 
-      var parallel = await Promise.all([
+      var results = await Promise.allSettled([
         DB.getInvoices(invFilters),
         DB.getTimesheets(self.month, self.year),
         DB.getProjects(),
-        DB.getSetting('billed_to'),
-        DB.getSetting('invoice_terms'),
-        DB.getSetting('uah_usd_rate'),
-        DB.getSetting('working_hours_adjustment').catch(function () { return null; }),
-        DB.getWorkingHoursConfig(self.month, self.year).catch(function () { return null; })
+        DB.getSettings(['billed_to', 'invoice_terms', 'uah_usd_rate', 'working_hours_adjustment']),
+        DB.getWorkingHoursConfig(self.month, self.year)
       ]);
 
-      self.invoices = (parallel[0] && parallel[0].data) ? parallel[0].data : [];
+      for (var ri = 0; ri < results.length; ri++) {
+        if (results[ri].status === 'rejected') {
+          console.warn('[Invoices] loadData promise[' + ri + '] rejected:', results[ri].reason);
+        }
+      }
+
+      var invResult    = results[0].status === 'fulfilled' ? results[0].value : null;
+      var tsResult     = results[1].status === 'fulfilled' ? results[1].value : null;
+      var projResult   = results[2].status === 'fulfilled' ? results[2].value : null;
+      var settings     = results[3].status === 'fulfilled' ? (results[3].value || {}) : {};
+      var whResult     = results[4].status === 'fulfilled' ? results[4].value : null;
+
+      self.invoices = (invResult && invResult.data) ? invResult.data : [];
 
       // Build timesheetMap from full timesheets (replaces separate getTimesheetSummary call)
-      self.timesheets = (parallel[1] && parallel[1].data) || [];
+      self.timesheets = (tsResult && tsResult.data) || [];
       self.timesheetMap = {};
       for (var t = 0; t < self.timesheets.length; t++) {
         var ts = self.timesheets[t];
@@ -199,31 +208,30 @@ const Invoices = {
         self.timesheetMap[ts.employee_id].total_hours += parseFloat(ts.hours) || 0;
       }
 
-      self.projects = (parallel[2] && parallel[2].data) || [];
+      self.projects = (projResult && projResult.data) || [];
 
-      var btResult = parallel[3];
-      self.billedTo = (btResult && btResult.data) ? btResult.data : { name: '', address: '' };
+      var btData = settings['billed_to'];
+      self.billedTo = btData ? btData : { name: '', address: '' };
 
-      var termsResult = parallel[4];
-      self.defaultTerms = (termsResult && termsResult.data) ? termsResult.data : 'Payment is due within 15 days of invoice date.';
+      var termsData = settings['invoice_terms'];
+      self.defaultTerms = termsData ? termsData : 'Payment is due within 15 days of invoice date.';
 
-      var rateResult = parallel[5];
-      if (rateResult && rateResult.data) {
+      var rateData = settings['uah_usd_rate'];
+      if (rateData) {
         try {
-          var rateData = typeof rateResult.data === 'string' ? JSON.parse(rateResult.data) : rateResult.data;
-          if (rateData && rateData.rate) self.exchangeRate = parseFloat(rateData.rate) || 42.16;
+          var rateParsed = typeof rateData === 'string' ? JSON.parse(rateData) : rateData;
+          if (rateParsed && rateParsed.rate) self.exchangeRate = parseFloat(rateParsed.rate) || 42.16;
         } catch (e) { /* keep default exchangeRate */ }
       }
 
-      var adjResult = parallel[6];
-      if (adjResult && adjResult.data) {
+      var adjData = settings['working_hours_adjustment'];
+      if (adjData) {
         try {
-          var adjData = typeof adjResult.data === 'string' ? JSON.parse(adjResult.data) : adjResult.data;
-          if (adjData.subtract_hours) self.hoursAdjustment = parseInt(adjData.subtract_hours) || 0;
+          var adjParsed = typeof adjData === 'string' ? JSON.parse(adjData) : adjData;
+          if (adjParsed.subtract_hours) self.hoursAdjustment = parseInt(adjParsed.subtract_hours) || 0;
         } catch (e) { /* default 0 */ }
       }
 
-      var whResult = parallel[7];
       if (whResult && whResult.data) {
         self.workingDays = whResult.data.working_days || 21;
         self.hoursPerDay = whResult.data.hours_per_day || 8;

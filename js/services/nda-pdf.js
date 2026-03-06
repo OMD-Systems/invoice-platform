@@ -6,6 +6,8 @@
 
 var NdaPdf = {
 
+  NDA_TERM_YEARS: 5,
+
   COLORS: {
     DARK_RED:       '#1A0000',
     CRIMSON:        '#8B0000',
@@ -49,6 +51,11 @@ var NdaPdf = {
       }
     }
     return missing;
+  },
+
+  _numToWord: function (n) {
+    var words = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+    return (n >= 1 && n <= 10) ? words[n] : String(n);
   },
 
   renderHTML: function (emp) {
@@ -121,7 +128,7 @@ var NdaPdf = {
 
     html += '<table class="info-tbl">';
     html += '<tr><td class="lbl">EFFECTIVE DATE</td><td class="val">' + esc(effectiveDate) + '</td></tr>';
-    html += '<tr><td class="lbl">DURATION</td><td class="val">5 years</td></tr>';
+    html += '<tr><td class="lbl">DURATION</td><td class="val">' + self.NDA_TERM_YEARS + ' years</td></tr>';
     html += '<tr class="sep"><td></td><td></td></tr>';
     html += '<tr><td class="lbl">DISCLOSING PARTY</td><td class="val">' + esc(self.WS_NAME) + '</td></tr>';
     html += '<tr><td class="lbl">RECEIVING PARTY</td><td class="val">' + esc(emp.full_name_lat || '') + '</td></tr>';
@@ -249,12 +256,12 @@ var NdaPdf = {
     // ── 5. TERM AND TERMINATION ──
     html += '<div data-pdf-block>';
     html += '<div class="sec-heading"><span class="num">5. </span>TERM AND TERMINATION</div>';
-    html += '<div class="sub-para"><span class="label">5.1</span> This Agreement shall commence on the Effective Date and shall remain in full force and effect for a period of five (5) years, unless earlier terminated.</div>';
+    html += '<div class="sub-para"><span class="label">5.1</span> This Agreement shall commence on the Effective Date and shall remain in full force and effect for a period of ' + self._numToWord(self.NDA_TERM_YEARS) + ' (' + self.NDA_TERM_YEARS + ') years, unless earlier terminated.</div>';
     html += '</div>';
 
     html += '<div data-pdf-block><div class="sub-para"><span class="label">5.2</span> Either Party may terminate this Agreement by providing thirty (30) days\u2019 prior written notice.</div></div>';
 
-    html += '<div data-pdf-block><div class="sub-para"><span class="label">5.3</span> The obligations of confidentiality shall survive for a period of five (5) years following expiration or termination. With respect to Trade Secrets, the obligations shall survive for as long as such information remains a Trade Secret.</div></div>';
+    html += '<div data-pdf-block><div class="sub-para"><span class="label">5.3</span> The obligations of confidentiality shall survive for a period of ' + self._numToWord(self.NDA_TERM_YEARS) + ' (' + self.NDA_TERM_YEARS + ') years following expiration or termination. With respect to Trade Secrets, the obligations shall survive for as long as such information remains a Trade Secret.</div></div>';
 
     html += '<div data-pdf-block><div class="sub-para"><span class="label">5.4</span> Upon termination, the Receiving Party shall immediately cease all use of the Confidential Information and comply with the return obligations set forth in Section 6.</div></div>';
 
@@ -365,6 +372,14 @@ var NdaPdf = {
   },
 
   _drawOverlay: function (pdf, page, total) {
+    if (page === 2) {
+      pdf.setProperties({
+        title: 'Non-Disclosure Agreement - Woodenshark LLC',
+        author: 'Woodenshark LLC',
+        subject: 'Non-Disclosure Agreement',
+        creator: 'OMD Finance Platform'
+      });
+    }
     var C = this.COLORS;
     // ── HEADER: white bg → dark-red bar → company line → red line ──
     pdf.setFillColor(255, 255, 255);
@@ -411,7 +426,8 @@ var NdaPdf = {
   async generate(emp) {
     var self = this;
     var html = this.renderHTML(emp);
-    var ownerPassword = 'WS-' + emp.id.slice(0, 8) + '-' + Date.now();
+    var rnd = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10);
+    var ownerPassword = 'WS-' + emp.id.slice(0, 8) + '-' + rnd + '-' + Date.now();
     return PdfUtils.renderToPdf(html, {
       ownerPassword: ownerPassword,
       watermark: 'WOODENSHARK LLC CONFIDENTIAL',

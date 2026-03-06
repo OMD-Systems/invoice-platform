@@ -164,26 +164,37 @@ const Team = {
       self.applySearch();
 
       // Parallel load: projects, timesheets, invoices, teams, hoursConfig, settings
-      var parallel = await Promise.all([
+      var parallel = await Promise.allSettled([
         DB.getProjects(),
         DB.getTimesheets(self.month, self.year),
         DB.getInvoices({ month: self.month, year: self.year }),
         DB.getTeams(),
-        DB.getWorkingHoursConfig(self.month, self.year).catch(function (whErr) {
-          console.warn('[Team] working_hours_config not available:', whErr.message);
-          return null;
-        }),
+        DB.getWorkingHoursConfig(self.month, self.year),
         DB.getSetting('billed_to'),
         DB.getSetting('payment_terms')
       ]);
 
-      self.projects = (parallel[0] && parallel[0].data) || [];
-      self.allTimesheets = (parallel[1] && parallel[1].data) || [];
-      self.invoices = (parallel[2] && parallel[2].data) || [];
-      self.teams = (parallel[3] && parallel[3].data) || [];
-      self.hoursConfig = (parallel[4] && parallel[4].data) || null;
+      if (parallel[0].status === 'rejected') console.error('[Team] Failed to load projects:', parallel[0].reason);
+      if (parallel[1].status === 'rejected') console.error('[Team] Failed to load timesheets:', parallel[1].reason);
+      if (parallel[2].status === 'rejected') console.error('[Team] Failed to load invoices:', parallel[2].reason);
+      if (parallel[3].status === 'rejected') console.error('[Team] Failed to load teams:', parallel[3].reason);
+      if (parallel[4].status === 'rejected') console.warn('[Team] working_hours_config not available:', parallel[4].reason);
+      if (parallel[5].status === 'rejected') console.error('[Team] Failed to load billed_to:', parallel[5].reason);
+      if (parallel[6].status === 'rejected') console.error('[Team] Failed to load payment_terms:', parallel[6].reason);
 
-      var btResult = parallel[5];
+      var p0 = parallel[0].status === 'fulfilled' ? parallel[0].value : null;
+      var p1 = parallel[1].status === 'fulfilled' ? parallel[1].value : null;
+      var p2 = parallel[2].status === 'fulfilled' ? parallel[2].value : null;
+      var p3 = parallel[3].status === 'fulfilled' ? parallel[3].value : null;
+      var p4 = parallel[4].status === 'fulfilled' ? parallel[4].value : null;
+
+      self.projects = (p0 && p0.data) || [];
+      self.allTimesheets = (p1 && p1.data) || [];
+      self.invoices = (p2 && p2.data) || [];
+      self.teams = (p3 && p3.data) || [];
+      self.hoursConfig = (p4 && p4.data) || null;
+
+      var btResult = parallel[5].status === 'fulfilled' ? parallel[5].value : null;
       if (btResult && btResult.data) {
         try {
           self.billedTo = typeof btResult.data === 'string' ? JSON.parse(btResult.data) : btResult.data;
@@ -192,7 +203,7 @@ const Team = {
         }
       }
 
-      var ptResult = parallel[6];
+      var ptResult = parallel[6].status === 'fulfilled' ? parallel[6].value : null;
       if (ptResult && ptResult.data) {
         try {
           var ptData = typeof ptResult.data === 'string' ? JSON.parse(ptResult.data) : ptResult.data;
@@ -285,8 +296,9 @@ const Team = {
 
       var isSelected = emp.id === self.selectedId;
 
-      var avatarHtml = emp.avatar_url
-        ? '<img class="td-avatar-sm" src="' + self.escapeHtml(emp.avatar_url) + '" alt="" loading="lazy">'
+      var safeAvatarUrl = self._safeAvatarUrl(emp.avatar_url);
+      var avatarHtml = safeAvatarUrl
+        ? '<img class="td-avatar-sm" src="' + self.escapeHtml(safeAvatarUrl) + '" alt="" loading="lazy">'
         : '<div class="td-avatar-placeholder-sm">' + (emp.full_name_lat || emp.name || '?').charAt(0).toUpperCase() + '</div>';
 
       html +=
@@ -389,8 +401,9 @@ const Team = {
       ? (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase()
       : (nameParts[0] || 'U').charAt(0).toUpperCase();
 
-    var detailAvatarHtml = emp.avatar_url
-      ? '<img class="td-avatar" src="' + self.escapeHtml(emp.avatar_url) + '" alt="">'
+    var safeDetailAvatarUrl = self._safeAvatarUrl(emp.avatar_url);
+    var detailAvatarHtml = safeDetailAvatarUrl
+      ? '<img class="td-avatar" src="' + self.escapeHtml(safeDetailAvatarUrl) + '" alt="">'
       : '<div class="td-avatar">' + initials + '</div>';
 
     // ── Build HTML ──
@@ -800,20 +813,30 @@ const Team = {
     var contractFile = container.querySelector('#team-file-contract');
     if (contractFile) {
       contractFile.addEventListener('change', async function () {
-        if (this.files && this.files[0]) {
-          var result = await DB.uploadContract(emp.id, this.files[0]);
-          if (result && !result.error) {
-            showToast('Contract uploaded', 'success');
-            // Refresh employee data
-            var empResult = await DB.getEmployee(emp.id);
-            if (empResult && empResult.data) {
-              self.updateEmployeeInCache(empResult.data);
-            }
-            self.renderDetail(container);
-          } else {
-            console.error('[Team] contract upload error:', result && result.error);
-            showToast('Contract upload failed. Please try again.', 'error');
+        var file = this.files && this.files[0];
+        if (!file) return;
+        if (file.type !== 'application/pdf') {
+          showToast('Please select a PDF file.', 'error');
+          this.value = '';
+          return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          showToast('File too large. Maximum size is 10MB.', 'error');
+          this.value = '';
+          return;
+        }
+        var result = await DB.uploadContract(emp.id, file);
+        if (result && !result.error) {
+          showToast('Contract uploaded', 'success');
+          // Refresh employee data
+          var empResult = await DB.getEmployee(emp.id);
+          if (empResult && empResult.data) {
+            self.updateEmployeeInCache(empResult.data);
           }
+          self.renderDetail(container);
+        } else {
+          console.error('[Team] contract upload error:', result && result.error);
+          showToast('Contract upload failed. Please try again.', 'error');
         }
       });
     }
@@ -841,19 +864,29 @@ const Team = {
     var ndaFile = container.querySelector('#team-file-nda');
     if (ndaFile) {
       ndaFile.addEventListener('change', async function () {
-        if (this.files && this.files[0]) {
-          var result = await DB.uploadNda(emp.id, this.files[0]);
-          if (result && !result.error) {
-            showToast('NDA uploaded', 'success');
-            var empResult = await DB.getEmployee(emp.id);
-            if (empResult && empResult.data) {
-              self.updateEmployeeInCache(empResult.data);
-            }
-            self.renderDetail(container);
-          } else {
-            console.error('[Team] NDA upload error:', result && result.error);
-            showToast('NDA upload failed. Please try again.', 'error');
+        var file = this.files && this.files[0];
+        if (!file) return;
+        if (file.type !== 'application/pdf') {
+          showToast('Please select a PDF file.', 'error');
+          this.value = '';
+          return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          showToast('File too large. Maximum size is 10MB.', 'error');
+          this.value = '';
+          return;
+        }
+        var result = await DB.uploadNda(emp.id, file);
+        if (result && !result.error) {
+          showToast('NDA uploaded', 'success');
+          var empResult = await DB.getEmployee(emp.id);
+          if (empResult && empResult.data) {
+            self.updateEmployeeInCache(empResult.data);
           }
+          self.renderDetail(container);
+        } else {
+          console.error('[Team] NDA upload error:', result && result.error);
+          showToast('NDA upload failed. Please try again.', 'error');
         }
       });
     }
@@ -2207,5 +2240,11 @@ const Team = {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  },
+
+  _safeAvatarUrl: function(url) {
+    if (!url) return '';
+    if (url.startsWith('https://')) return url;
+    return '';
   }
 };
