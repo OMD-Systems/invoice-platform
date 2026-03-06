@@ -666,8 +666,8 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    margin-bottom: 20pt;
-    padding-bottom: 12pt;
+    margin-bottom: 14pt;
+    padding-bottom: 8pt;
     border-bottom: 2pt solid #205968;
   }
 
@@ -696,7 +696,7 @@
   .invoice-parties {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 20pt;
+    margin-bottom: 14pt;
     gap: 20pt;
   }
 
@@ -759,7 +759,7 @@
   .invoice-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 20pt;
+    margin-bottom: 14pt;
     font-size: 9pt;
   }
 
@@ -813,7 +813,7 @@
   .invoice-totals {
     display: flex;
     justify-content: flex-end;
-    margin-bottom: 20pt;
+    margin-bottom: 14pt;
   }
 
   .invoice-totals-table {
@@ -822,7 +822,7 @@
   }
 
   .invoice-totals-table tr td {
-    padding: 5pt 10pt;
+    padding: 4pt 10pt;
     font-size: 9pt;
     color: #333;
   }
@@ -944,7 +944,7 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 24pt;
-    margin-top: 16pt;
+    margin-top: 10pt;
   }
 
   .invoice-footer-columns > .invoice-payment {
@@ -1032,8 +1032,8 @@
   .invoice-page-frame {
     position: relative;
     border: 1.5pt solid #00D4FF;
-    padding: 28px 32px 20px;
-    min-height: 297mm;
+    padding: 20px 28px 14px;
+    min-height: auto;
     overflow: hidden;
   }
 
@@ -1056,8 +1056,8 @@
   /* ── OMD Brand Header ── */
   .invoice-brand-header {
     text-align: center;
-    margin-bottom: 16pt;
-    padding-bottom: 10pt;
+    margin-bottom: 10pt;
+    padding-bottom: 6pt;
     border-bottom: 1px solid #e0e0e0;
     position: relative;
     z-index: 1;
@@ -1079,14 +1079,14 @@
 
   /* ── Document Footer ── */
   .invoice-doc-footer {
-    margin-top: 24pt;
+    margin-top: 12pt;
     position: relative;
     z-index: 1;
   }
 
   .invoice-doc-footer-line {
     border-top: 1px solid #00D4FF;
-    margin-bottom: 8pt;
+    margin-bottom: 4pt;
   }
 
   .invoice-doc-footer-content {

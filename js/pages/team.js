@@ -782,7 +782,7 @@ const Team = {
     if (contractBtn) {
       contractBtn.addEventListener('click', async function () {
         try {
-          var fileName = ContractDocx.getFileName(emp);
+          var fileName = ContractPdf.getFileName(emp);
           var result = await DB.getContractUrl(emp.id, fileName);
           if (result && result.data) {
             await self._downloadFromUrl(result.data, fileName);
@@ -823,7 +823,7 @@ const Team = {
     if (ndaBtn) {
       ndaBtn.addEventListener('click', async function () {
         try {
-          var fileName = NdaDocx.getFileName(emp);
+          var fileName = NdaPdf.getFileName(emp);
           var result = await DB.getNdaUrl(emp.id, fileName);
           if (result && result.data) {
             await self._downloadFromUrl(result.data, fileName);
@@ -2093,7 +2093,7 @@ const Team = {
     var emp = self.findEmployee(self.selectedId);
     if (!emp) { showToast('No employee selected', 'error'); self._generatingDoc = false; return; }
 
-    var generator = docType === 'contract' ? ContractDocx : NdaDocx;
+    var generator = docType === 'contract' ? ContractPdf : NdaPdf;
     var label = docType === 'contract' ? 'Contract' : 'NDA';
 
     // Validate required fields
@@ -2110,7 +2110,7 @@ const Team = {
     try {
       showToast((isRegenerate ? 'Re-generating' : 'Generating') + ' ' + label + '...', 'info');
 
-      // Generate DOCX blob
+      // Generate PDF blob
       var blob = await generator.generate(emp);
       console.log('[Team] Generated blob:', blob, 'size:', blob && blob.size, 'type:', blob && blob.type);
 
@@ -2120,7 +2120,7 @@ const Team = {
       }
 
       // Upload to Supabase
-      var uploadFn = docType === 'contract' ? DB.uploadContractDocx.bind(DB) : DB.uploadNdaDocx.bind(DB);
+      var uploadFn = docType === 'contract' ? DB.uploadContractPdf.bind(DB) : DB.uploadNdaPdf.bind(DB);
       var result = await uploadFn(emp.id, blob);
       if (result.error) {
         showToast(label + ' upload failed: ' + result.error.message, 'error');
@@ -2161,7 +2161,7 @@ const Team = {
     // Try native File System Access API first (Chrome 86+)
     if (window.showSaveFilePicker) {
       try {
-        var ext = fileName.split('.').pop() || 'docx';
+        var ext = fileName.split('.').pop() || 'pdf';
         var mimeMap = { docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', pdf: 'application/pdf' };
         var accept = {};
         accept[mimeMap[ext] || 'application/octet-stream'] = ['.' + ext];

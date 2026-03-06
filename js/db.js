@@ -1109,28 +1109,54 @@ const DB = {
   },
 
   /**
-   * Get a signed URL for an employee's contract. Tries DOCX first, falls back to PDF.
+   * Upload a generated contract PDF for an employee.
+   * @param {string} employeeId
+   * @param {Blob} blob - PDF blob
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async uploadContractPdf(employeeId, blob) {
+    try {
+      var path = employeeId + '/contract.pdf';
+      var { data, error } = await this.client.storage
+        .from('contracts')
+        .upload(path, blob, { upsert: true, contentType: 'application/pdf' });
+
+      if (error) return { data: null, error };
+
+      await this.client
+        .from('employees')
+        .update({ contract_uploaded_at: new Date().toISOString() })
+        .eq('id', employeeId);
+
+      return { data, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get a signed URL for an employee's contract. Tries PDF first, falls back to DOCX.
    * @param {string} employeeId
    * @returns {Promise<{data: string|null, error: object|null}>}
    */
   async getContractUrl(employeeId, downloadName) {
     try {
       var opts = downloadName ? { download: downloadName } : {};
-      // Try DOCX first
-      var docxPath = employeeId + '/contract.docx';
-      var { data: docxData, error: docxError } = await this.client.storage
-        .from('contracts')
-        .createSignedUrl(docxPath, 3600, opts);
-
-      if (!docxError && docxData && docxData.signedUrl) {
-        return { data: docxData.signedUrl, error: null };
-      }
-
-      // Fallback to PDF
+      // Try PDF first
       var pdfPath = employeeId + '/contract.pdf';
-      var { data, error } = await this.client.storage
+      var { data: pdfData, error: pdfError } = await this.client.storage
         .from('contracts')
         .createSignedUrl(pdfPath, 3600, opts);
+
+      if (!pdfError && pdfData && pdfData.signedUrl) {
+        return { data: pdfData.signedUrl, error: null };
+      }
+
+      // Fallback to DOCX
+      var docxPath = employeeId + '/contract.docx';
+      var { data, error } = await this.client.storage
+        .from('contracts')
+        .createSignedUrl(docxPath, 3600, opts);
 
       if (error) return { data: null, error };
       if (!data || !data.signedUrl) return { data: null, error: { message: 'Contract file not found' } };
@@ -1200,28 +1226,54 @@ const DB = {
   },
 
   /**
-   * Get a signed URL for an employee's NDA. Tries DOCX first, falls back to PDF.
+   * Upload a generated NDA PDF for an employee.
+   * @param {string} employeeId
+   * @param {Blob} blob - PDF blob
+   * @returns {Promise<{data: object|null, error: object|null}>}
+   */
+  async uploadNdaPdf(employeeId, blob) {
+    try {
+      var path = employeeId + '/nda.pdf';
+      var { data, error } = await this.client.storage
+        .from('documents')
+        .upload(path, blob, { upsert: true, contentType: 'application/pdf' });
+
+      if (error) return { data: null, error };
+
+      await this.client
+        .from('employees')
+        .update({ nda_uploaded_at: new Date().toISOString() })
+        .eq('id', employeeId);
+
+      return { data, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  /**
+   * Get a signed URL for an employee's NDA. Tries PDF first, falls back to DOCX.
    * @param {string} employeeId
    * @returns {Promise<{data: string|null, error: object|null}>}
    */
   async getNdaUrl(employeeId, downloadName) {
     try {
       var opts = downloadName ? { download: downloadName } : {};
-      // Try DOCX first
-      var docxPath = employeeId + '/nda.docx';
-      var { data: docxData, error: docxError } = await this.client.storage
-        .from('documents')
-        .createSignedUrl(docxPath, 3600, opts);
-
-      if (!docxError && docxData && docxData.signedUrl) {
-        return { data: docxData.signedUrl, error: null };
-      }
-
-      // Fallback to PDF
+      // Try PDF first
       var pdfPath = employeeId + '/nda.pdf';
-      var { data, error } = await this.client.storage
+      var { data: pdfData, error: pdfError } = await this.client.storage
         .from('documents')
         .createSignedUrl(pdfPath, 3600, opts);
+
+      if (!pdfError && pdfData && pdfData.signedUrl) {
+        return { data: pdfData.signedUrl, error: null };
+      }
+
+      // Fallback to DOCX
+      var docxPath = employeeId + '/nda.docx';
+      var { data, error } = await this.client.storage
+        .from('documents')
+        .createSignedUrl(docxPath, 3600, opts);
 
       if (error) return { data: null, error };
       if (!data || !data.signedUrl) return { data: null, error: { message: 'NDA file not found' } };

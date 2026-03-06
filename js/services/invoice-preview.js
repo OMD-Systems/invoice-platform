@@ -171,7 +171,7 @@ var InvoicePreview = {
       preview.className = 'invoice-preview';
       preview.style.cssText =
         'background: #fff; color: #000; font-family: Calibri, Segoe UI, Arial, sans-serif; ' +
-        'font-size: 10pt; line-height: 1.4; padding: 40px; margin: 0; ' +
+        'font-size: 10pt; line-height: 1.4; padding: 14px 40px; margin: 0; ' +
         'width: 794px; min-height: auto; box-shadow: none; border-radius: 0;';
       preview.innerHTML = self.renderInvoiceHTML(data, hash);
       container.appendChild(preview);
