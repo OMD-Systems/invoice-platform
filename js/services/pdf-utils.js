@@ -10,7 +10,7 @@ var PdfUtils = {
   PAGE_HEIGHT_PX: Math.ceil(297 * 794 / 210), // 1123
   WRAPPER_PAD: 40,
   HEADER_ZONE: 55,  // px reserved at top of each page for header (~14.5mm)
-  FOOTER_ZONE: 55,  // px reserved at bottom for footer (~14.5mm)
+  FOOTER_ZONE: 80,  // px reserved at bottom for footer (~21mm, covers white rect at y=277mm)
 
   renderToPdf: function (html, opts) {
     opts = opts || {};
