@@ -11,6 +11,12 @@
 
 BEGIN;
 
+-- Drop old function signatures (different param types cause overload conflicts)
+DROP FUNCTION IF EXISTS public.create_invoice_for_self(TEXT, DATE, INTEGER, INTEGER, TEXT, NUMERIC, NUMERIC, TEXT, JSONB, NUMERIC, NUMERIC);
+DROP FUNCTION IF EXISTS public.update_my_profile(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.get_employee_safe(UUID);
+DROP FUNCTION IF EXISTS public.get_employees_safe();
+
 -- ============================================================
 -- 1. Fix create_invoice_for_self: invoice_number type TEXT → INTEGER
 -- ============================================================
