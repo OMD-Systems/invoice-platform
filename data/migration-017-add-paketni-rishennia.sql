@@ -1,0 +1,48 @@
+-- Migration 017: Add Paketni Rishennia LLC (Maksym Shahun) as contractor
+-- Source: Consulting Agreement dated February 1, 2026 + requisites.pdf + passport
+
+INSERT INTO employees (
+  name,
+  full_name_lat,
+  work_email,
+  address,
+  date_of_birth,
+  passport_number,
+  passport_issued,
+  iban,
+  swift,
+  bank_name,
+  receiver_name,
+  service_description,
+  rate_usd,
+  employee_type,
+  contract_type,
+  invoice_format,
+  invoice_prefix,
+  next_invoice_number,
+  agreement_date,
+  effective_date,
+  is_active
+) VALUES (
+  'Shahun, Maksym',
+  'Maksym Dmytrovych Shahun',
+  'paketnirisenna@gmail.com',
+  '54055, Mykolaiv, Ukraine, Tsentralnyi Ave., 107, office 425',
+  '1988-08-25',
+  'МР 114016',
+  '2004-10-10',
+  'UA053052990000026007021106688',
+  'PBANUA2X',
+  'AT KB PrivatBank, Mykolaiv, Ukraine',
+  '"Paketni Rishennia" LLC',
+  'Software Development, Programming, and Consulting Services',
+  16000.00,
+  'FTE',
+  'Contractor',
+  'CUSTOM',
+  'PR-Invoice',
+  1,
+  '2026-02-01',
+  '2026-02-01',
+  true
+);

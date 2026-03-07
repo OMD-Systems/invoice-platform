@@ -364,7 +364,7 @@ textarea:focus-visible {
 }
 
 .fury-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.6;
   cursor: not-allowed;
   pointer-events: none;
 }
@@ -589,8 +589,9 @@ textarea:focus-visible {
 }
 
 .fury-input:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
+  color: var(--fury-text-muted);
 }
 
 .fury-input-error {
@@ -660,8 +661,9 @@ textarea.fury-input {
 }
 
 .fury-textarea:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
+  color: var(--fury-text-muted);
 }
 
 /* Select */
@@ -2757,8 +2759,9 @@ textarea.fury-input {
 }
 
 .td-hours-input:disabled {
-  opacity: 0.4;
+  opacity: 0.6;
   cursor: not-allowed;
+  color: var(--fury-text-muted);
 }
 
 .td-hours-input::placeholder {
@@ -3773,7 +3776,22 @@ img.td-avatar-sm,
 
   /* Page title compact */
   #page-title {
-    font-size: 14px;
+    font-size: 16px;
+  }
+
+  /* Tables: remove min-width, allow natural flow */
+  .fury-table {
+    min-width: 0;
+    font-size: 12px;
+  }
+
+  .fury-table thead th {
+    padding: 8px 6px;
+    font-size: 9px;
+  }
+
+  .fury-table tbody td {
+    padding: 8px 6px;
   }
 
   /* Bottom nav compact */
@@ -3783,7 +3801,7 @@ img.td-avatar-sm,
   }
 
   .nav-item .nav-label {
-    font-size: 8px;
+    font-size: 10px;
   }
 
   .nav-item .nav-icon svg {

@@ -616,6 +616,40 @@ const DB = {
    * @param {string} status - 'draft' | 'generated' | 'sent' | 'paid'
    * @returns {Promise<{data: object|null, error: object|null}>}
    */
+  async updateInvoice(invoiceId, invoiceData, items = []) {
+    try {
+      const { data, error: rpcError } = await this.client.rpc('update_invoice_atomic', {
+        p_invoice_id: invoiceId,
+        p_invoice_date: invoiceData.invoice_date,
+        p_subtotal_usd: invoiceData.subtotal_usd,
+        p_total_usd: invoiceData.total_usd,
+        p_discount_usd: invoiceData.discount_usd || 0,
+        p_tax_usd: invoiceData.tax_usd || 0,
+        p_items: items.map((item, index) => ({
+          item_order: item.item_order || index + 1,
+          description: item.description,
+          price_usd: item.price_usd,
+          qty: item.qty || 1,
+          total_usd: item.total_usd
+        }))
+      });
+
+      if (rpcError) return { data: null, error: rpcError };
+
+      // Fetch updated invoice with items
+      const { data: updated, error: fetchErr } = await this.client
+        .from('invoices')
+        .select('*, invoice_items(*), employees(*)')
+        .eq('id', invoiceId)
+        .single();
+
+      this.clearCache();
+      return { data: updated, error: fetchErr };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
   async updateInvoiceStatus(id, status) {
     try {
       const { data, error } = await this.client

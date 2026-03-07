@@ -217,8 +217,12 @@ const Settings = {
 
     if (self.projects.length === 0) {
       rows =
-        '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--fury-neutral);">' +
-        'No projects found.' +
+        '<tr><td colspan="5">' +
+        '<div class="fury-empty">' +
+        '<svg class="fury-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' +
+        '<div class="fury-empty-title">No projects</div>' +
+        '<div class="fury-empty-text">Create your first project to organize work.</div>' +
+        '</div>' +
         '</td></tr>';
     } else {
       for (var i = 0; i < self.projects.length; i++) {
@@ -275,8 +279,12 @@ const Settings = {
 
     if (self.teams.length === 0) {
       rows =
-        '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--fury-neutral);">' +
-        'No teams found.' +
+        '<tr><td colspan="4">' +
+        '<div class="fury-empty">' +
+        '<svg class="fury-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
+        '<div class="fury-empty-title">No teams</div>' +
+        '<div class="fury-empty-text">Create teams to group employees.</div>' +
+        '</div>' +
         '</td></tr>';
     } else {
       for (var i = 0; i < self.teams.length; i++) {
@@ -355,8 +363,12 @@ const Settings = {
 
     if (self.profiles.length === 0) {
       rows =
-        '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--fury-neutral);">' +
-        'No user profiles found.' +
+        '<tr><td colspan="4">' +
+        '<div class="fury-empty">' +
+        '<svg class="fury-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+        '<div class="fury-empty-title">No users</div>' +
+        '<div class="fury-empty-text">User profiles will appear here.</div>' +
+        '</div>' +
         '</td></tr>';
     } else {
       for (var i = 0; i < self.profiles.length; i++) {
@@ -1732,7 +1744,7 @@ const Settings = {
       '</tr></thead><tbody id="set-email-tbody">';
 
     if (requests.length === 0) {
-      html += '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--fury-text-muted)">No email requests found.</td></tr>';
+      html += '<tr><td colspan="5"><div class="fury-empty"><svg class="fury-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg><div class="fury-empty-title">No email requests</div><div class="fury-empty-text">Email provisioning requests will appear here.</div></div></td></tr>';
     } else {
       for (var i = 0; i < requests.length; i++) {
         var req = requests[i];

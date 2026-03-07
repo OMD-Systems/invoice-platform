@@ -111,8 +111,8 @@ const Invoices = {
       '<th scope="col" style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all" title="Select all" aria-label="Select all invoices"></th>' +
       '<th scope="col">Employee</th>' +
       '<th scope="col">Invoice #</th>' +
-      '<th scope="col">Date</th>' +
-      '<th scope="col" style="text-align: center;">Items</th>' +
+      '<th scope="col" class="fury-hide-mobile">Date</th>' +
+      '<th scope="col" class="fury-hide-mobile" style="text-align: center;">Items</th>' +
       '<th scope="col" style="text-align: right;">Total</th>' +
       '<th scope="col" style="text-align: center;">Status</th>' +
       '<th scope="col" style="text-align: center;">Actions</th>' +
@@ -330,7 +330,7 @@ const Invoices = {
       '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-export-summary">Export .xlsx</button>' +
       '</div>' +
       '<div style="overflow-x:auto"><table class="fury-table"><thead><tr>' +
-      '<th scope="col" style="width:40px">#</th><th scope="col">Employee</th><th scope="col">Invoice #</th><th scope="col">Date</th>' +
+      '<th scope="col" style="width:40px">#</th><th scope="col">Employee</th><th scope="col">Invoice #</th><th scope="col" class="fury-hide-mobile">Date</th>' +
       '<th scope="col" style="text-align:right">Subtotal ($)</th><th scope="col" style="text-align:right">Discount ($)</th>' +
       '<th scope="col" style="text-align:right">Total ($)</th><th scope="col" style="text-align:center">Status</th>' +
       '</tr></thead><tbody>';
@@ -353,7 +353,7 @@ const Invoices = {
           '<tr><td style="color:var(--fury-text-muted)">' + (r + 1) + '</td>' +
           '<td style="font-weight:500">' + self._escapeHtml(empName) + '</td>' +
           '<td><span class="fury-badge fury-badge-info">' + self._escapeHtml(invNum) + '</span></td>' +
-          '<td style="color:var(--fury-text-secondary)">' + self._escapeHtml(inv.invoice_date ? self._formatDate(inv.invoice_date) : '') + '</td>' +
+          '<td class="fury-hide-mobile" style="color:var(--fury-text-secondary)">' + self._escapeHtml(inv.invoice_date ? self._formatDate(inv.invoice_date) : '') + '</td>' +
           '<td style="text-align:right;font-variant-numeric:tabular-nums">' + self._formatCurrency(subtotal) + '</td>' +
           '<td style="text-align:right;color:var(--fury-text-secondary)">' + (discount > 0 ? '-' + self._formatCurrency(discount) : '$0.00') + '</td>' +
           '<td style="text-align:right;font-weight:600">' + self._formatCurrency(invTotal) + '</td>' +
@@ -603,8 +603,12 @@ const Invoices = {
 
     if (this.invoices.length === 0) {
       tbody.innerHTML =
-        '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--fury-text-muted);">' +
-        'No invoices for this period.' +
+        '<tr><td colspan="8">' +
+        '<div class="fury-empty">' +
+        '<svg class="fury-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>' +
+        '<div class="fury-empty-title">No invoices</div>' +
+        '<div class="fury-empty-text">No invoices found for the selected period.</div>' +
+        '</div>' +
         '</td></tr>';
       return;
     }
@@ -628,14 +632,18 @@ const Invoices = {
         '</td>' +
         '<td>' + this._escapeHtml(empName) + '</td>' +
         '<td style="font-variant-numeric: tabular-nums;">' + this._escapeHtml(invNumber) + '</td>' +
-        '<td>' + invDate + '</td>' +
-        '<td style="text-align: center;">' + itemCount + '</td>' +
+        '<td class="fury-hide-mobile">' + invDate + '</td>' +
+        '<td class="fury-hide-mobile" style="text-align: center;">' + itemCount + '</td>' +
         '<td style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">' +
         this._formatCurrency(total) +
         '</td>' +
         '<td style="text-align: center;">' + this._statusBadge(status) + '</td>' +
         '<td style="text-align: center; white-space: nowrap;">' +
         '<div style="display: inline-flex; gap: 4px;">' +
+        '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-edit" ' +
+        'data-invoice-id="' + inv.id + '" title="Edit" aria-label="Edit invoice">' +
+        '&#x270F;' +
+        '</button>' +
         '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-preview" ' +
         'data-invoice-id="' + inv.id + '" title="Preview" aria-label="Preview invoice">' +
         '&#x1F441;' +
@@ -869,6 +877,21 @@ const Invoices = {
     if (tbody) {
       tbody.addEventListener('click', async function (e) {
         try {
+
+          // Edit
+          var btnEdit = e.target.closest('.inv-act-edit');
+          if (btnEdit) {
+            var editId = btnEdit.getAttribute('data-invoice-id');
+            var editInv = self._findInvoice(editId);
+            if (!editInv) { showToast('Invoice not found', 'error'); return; }
+            var editEmp = self._findEmployee(editInv.employee_id);
+            if (!editEmp && editInv.employees) {
+              editEmp = editInv.employees;
+            }
+            if (!editEmp) { showToast('Employee not found', 'error'); return; }
+            self.showGenerateModal(editEmp, container, ctx, null, editInv);
+            return;
+          }
 
           // Preview
           var btnPreview = e.target.closest('.inv-act-preview');
@@ -1232,8 +1255,9 @@ const Invoices = {
   /* ═══════════════════════════════════════════════════════
      GENERATE MODAL
      ═══════════════════════════════════════════════════════ */
-  showGenerateModal: function (employee, container, ctx, onCloseCallback) {
+  showGenerateModal: function (employee, container, ctx, onCloseCallback, editInvoice) {
     var self = this;
+    var isEdit = !!editInvoice;
     var empName = employee.full_name_lat || employee.name || 'Unknown';
     var rate = employee.rate_usd || employee.hourly_rate || 0;
     var ts = this.timesheetMap[employee.id];
@@ -1256,11 +1280,17 @@ const Invoices = {
 
     var prefix = employee.invoice_prefix || '';
     var nextNum = employee.next_invoice_number || 1;
-    var invoiceNumber = Numbering.formatNumber(prefix, nextNum);
+    var invoiceNumber = isEdit ? (editInvoice.invoice_number || '') : Numbering.formatNumber(prefix, nextNum);
 
     // Last day of selected month
     var lastDay = new Date(this.year, this.month, 0);
-    var invDateStr = this._toISODate(lastDay);
+    var invDateStr = isEdit ? (editInvoice.invoice_date || this._toISODate(lastDay)) : this._toISODate(lastDay);
+
+    // In edit mode, load existing data
+    if (isEdit) {
+      var existingItems = (editInvoice.invoice_items || []).slice().sort(function(a,b) { return (a.item_order||0)-(b.item_order||0); });
+      estimatedAmount = parseFloat(editInvoice.subtotal_usd) || 0;
+    }
 
     // Remove existing modal
     var existing = document.querySelector('.invoice-generate-overlay');
@@ -1273,7 +1303,7 @@ const Invoices = {
     overlay.innerHTML =
       '<div class="fury-modal" style="max-width: 680px; max-height: 92vh;">' +
       '<div class="fury-modal-header">' +
-      '<span class="fury-modal-title">Generate Invoice</span>' +
+      '<span class="fury-modal-title">' + (isEdit ? 'Edit Invoice' : 'Generate Invoice') + '</span>' +
       '<button class="fury-modal-close" id="gen-close" title="Close">&times;</button>' +
       '</div>' +
       '<div class="fury-modal-body" style="overflow-y: auto;">' +
@@ -1288,7 +1318,7 @@ const Invoices = {
       '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">' +
       '<div class="fury-form-group">' +
       '<label class="fury-label">Invoice Number</label>' +
-      '<input class="fury-input" type="text" id="gen-inv-number" value="' + this._escapeAttr(invoiceNumber) + '">' +
+      '<input class="fury-input" type="text" id="gen-inv-number" value="' + this._escapeAttr(String(invoiceNumber)) + '"' + (isEdit ? ' readonly style="opacity: 0.7;"' : '') + '>' +
       '</div>' +
       '<div class="fury-form-group">' +
       '<label class="fury-label">Invoice Date</label>' +
@@ -1300,13 +1330,14 @@ const Invoices = {
       '<div class="fury-form-group">' +
       '<label class="fury-label">Line Items</label>' +
       '<div id="gen-line-items">' +
+      (isEdit ? self._buildEditLineItemsHtml(existingItems) :
       '<div class="gen-line-item" style="display: grid; grid-template-columns: 1fr 100px 60px 100px 32px; gap: 8px; align-items: center; margin-bottom: 8px;">' +
       '<input class="fury-input gen-li-desc" type="text" placeholder="Description" value="' + this._escapeAttr(serviceDesc) + '">' +
       '<input class="fury-input gen-li-price" type="number" step="0.01" placeholder="Price" value="' + estimatedAmount.toFixed(2) + '">' +
       '<input class="fury-input gen-li-qty" type="number" step="1" min="1" placeholder="QTY" value="1">' +
       '<input class="fury-input gen-li-total" type="text" readonly value="' + estimatedAmount.toFixed(2) + '" style="text-align: right; opacity: 0.7;">' +
       '<span></span>' +
-      '</div>' +
+      '</div>') +
       '</div>' +
       '<button class="fury-btn fury-btn-ghost fury-btn-sm" id="gen-add-item" style="margin-top: 4px;">+ Add Line Item</button>' +
       '</div>' +
@@ -1319,33 +1350,43 @@ const Invoices = {
       '</div>' +
 
       /* Totals */
-      '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 8px;">' +
-      '<div class="fury-form-group">' +
-      '<label class="fury-label">Subtotal</label>' +
-      '<input class="fury-input" type="text" id="gen-subtotal" readonly value="' + estimatedAmount.toFixed(2) + '" style="text-align: right; opacity: 0.7;">' +
-      '</div>' +
-      '<div class="fury-form-group">' +
-      '<label class="fury-label">Discount</label>' +
-      '<input class="fury-input" type="number" step="0.01" id="gen-discount" value="0">' +
-      '</div>' +
-      '<div class="fury-form-group">' +
-      '<label class="fury-label">Tax</label>' +
-      '<input class="fury-input" type="number" step="0.01" id="gen-tax" value="0">' +
-      '</div>' +
-      '</div>' +
-      '<div class="fury-form-group">' +
-      '<label class="fury-label" style="font-size: 14px; color: var(--fury-text);">Total</label>' +
-      '<input class="fury-input" type="text" id="gen-total" readonly ' +
-      'value="$' + estimatedAmount.toFixed(2) + '" ' +
-      'style="text-align: right; font-size: 18px; font-weight: 700; color: var(--fury-accent); opacity: 1;">' +
-      '</div>' +
+      (function() {
+        var disc = isEdit ? (parseFloat(editInvoice.discount_usd) || 0) : 0;
+        var tx = isEdit ? (parseFloat(editInvoice.tax_usd) || 0) : 0;
+        var tot = isEdit ? (parseFloat(editInvoice.total_usd) || 0) : estimatedAmount;
+        return '<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 8px;">' +
+        '<div class="fury-form-group">' +
+        '<label class="fury-label">Subtotal</label>' +
+        '<input class="fury-input" type="text" id="gen-subtotal" readonly value="' + estimatedAmount.toFixed(2) + '" style="text-align: right; opacity: 0.7;">' +
+        '</div>' +
+        '<div class="fury-form-group">' +
+        '<label class="fury-label">Discount</label>' +
+        '<input class="fury-input" type="number" step="0.01" id="gen-discount" value="' + disc.toFixed(2) + '">' +
+        '</div>' +
+        '<div class="fury-form-group">' +
+        '<label class="fury-label">Tax</label>' +
+        '<input class="fury-input" type="number" step="0.01" id="gen-tax" value="' + tx.toFixed(2) + '">' +
+        '</div>' +
+        '</div>' +
+        '<div class="fury-form-group">' +
+        '<label class="fury-label" style="font-size: 14px; color: var(--fury-text);">Total</label>' +
+        '<input class="fury-input" type="text" id="gen-total" readonly ' +
+        'value="$' + tot.toFixed(2) + '" ' +
+        'style="text-align: right; font-size: 18px; font-weight: 700; color: var(--fury-accent); opacity: 1;">' +
+        '</div>';
+      })() +
 
       '</div>' + // end modal body
       '<div class="fury-modal-footer">' +
       '<button class="fury-btn fury-btn-ghost" id="gen-cancel">Cancel</button>' +
       '<button class="fury-btn fury-btn-secondary" id="gen-preview">Preview</button>' +
-      '<button class="fury-btn fury-btn-secondary" id="gen-save-draft">Save Draft</button>' +
-      '<button class="fury-btn fury-btn-primary" id="gen-download">Generate &amp; Save PDF</button>' +
+      (isEdit ?
+        '<button class="fury-btn fury-btn-primary" id="gen-save-edit">Save Changes</button>' +
+        '<button class="fury-btn fury-btn-secondary" id="gen-save-edit-pdf">Save &amp; Download PDF</button>'
+        :
+        '<button class="fury-btn fury-btn-secondary" id="gen-save-draft">Save Draft</button>' +
+        '<button class="fury-btn fury-btn-primary" id="gen-download">Generate &amp; Save PDF</button>'
+      ) +
       '</div>' +
       '</div>';
 
@@ -1474,15 +1515,206 @@ const Invoices = {
       InvoicePreview.show(modalData);
     });
 
-    // Save Draft
-    overlay.querySelector('#gen-save-draft').addEventListener('click', function () {
-      self._saveInvoice(overlay, employee, 'draft', container, ctx, closeModal);
-    });
+    // Save Draft (create mode only)
+    var saveDraftBtn = overlay.querySelector('#gen-save-draft');
+    if (saveDraftBtn) {
+      saveDraftBtn.addEventListener('click', function () {
+        self._saveInvoice(overlay, employee, 'draft', container, ctx, closeModal);
+      });
+    }
 
-    // Generate & Save PDF
-    overlay.querySelector('#gen-download').addEventListener('click', function () {
-      self._saveAndDownload(overlay, employee, container, ctx, closeModal);
-    });
+    // Generate & Save PDF (create mode only)
+    var genDownloadBtn = overlay.querySelector('#gen-download');
+    if (genDownloadBtn) {
+      genDownloadBtn.addEventListener('click', function () {
+        self._saveAndDownload(overlay, employee, container, ctx, closeModal);
+      });
+    }
+
+    // Save Changes (edit mode)
+    var saveEditBtn = overlay.querySelector('#gen-save-edit');
+    if (saveEditBtn) {
+      saveEditBtn.addEventListener('click', function () {
+        self._updateInvoice(overlay, employee, editInvoice, container, ctx, closeModal);
+      });
+    }
+
+    // Save & Download PDF (edit mode)
+    var saveEditPdfBtn = overlay.querySelector('#gen-save-edit-pdf');
+    if (saveEditPdfBtn) {
+      saveEditPdfBtn.addEventListener('click', function () {
+        self._updateAndDownload(overlay, employee, editInvoice, container, ctx, closeModal);
+      });
+    }
+  },
+
+  /* ── Build line items HTML for edit mode ── */
+  _buildEditLineItemsHtml: function (items) {
+    var html = '';
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      var desc = it.description || '';
+      var price = parseFloat(it.price_usd) || 0;
+      var qty = parseFloat(it.qty) || 1;
+      var total = parseFloat(it.total_usd) || (price * qty);
+      var canRemove = items.length > 1;
+      html +=
+        '<div class="gen-line-item" style="display: grid; grid-template-columns: 1fr 100px 60px 100px 32px; gap: 8px; align-items: center; margin-bottom: 8px;">' +
+        '<input class="fury-input gen-li-desc" type="text" placeholder="Description" value="' + this._escapeAttr(desc) + '">' +
+        '<input class="fury-input gen-li-price" type="number" step="0.01" placeholder="Price" value="' + price.toFixed(2) + '">' +
+        '<input class="fury-input gen-li-qty" type="number" step="1" min="1" placeholder="QTY" value="' + qty + '">' +
+        '<input class="fury-input gen-li-total" type="text" readonly value="' + total.toFixed(2) + '" style="text-align: right; opacity: 0.7;">' +
+        (canRemove ?
+          '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon gen-remove-item" style="color: var(--fury-danger); font-size: 16px;" title="Remove">&times;</button>'
+          : '<span></span>') +
+        '</div>';
+    }
+    return html;
+  },
+
+  /* ── Update existing invoice ── */
+  async _updateInvoice(overlay, employee, editInvoice, container, ctx, closeCallback) {
+    var data = this.collectModalData(overlay, employee);
+    if (!data) return null;
+
+    if (!data.items || data.items.length === 0) {
+      showToast('At least one line item is required', 'error');
+      return null;
+    }
+
+    var saveBtn = overlay.querySelector('#gen-save-edit');
+    var pdfBtn = overlay.querySelector('#gen-save-edit-pdf');
+    var prevBtn = overlay.querySelector('#gen-preview');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+    if (pdfBtn) pdfBtn.disabled = true;
+    if (prevBtn) prevBtn.disabled = true;
+
+    try {
+      var invoicePayload = {
+        invoice_date: data.invoiceDateISO,
+        subtotal_usd: data.subtotal,
+        total_usd: data.total,
+        discount_usd: data.discount,
+        tax_usd: data.tax
+      };
+
+      var itemsPayload = data.items.map(function (item, idx) {
+        return {
+          item_order: idx + 1,
+          description: item.description,
+          price_usd: item.price,
+          qty: item.qty,
+          total_usd: item.total
+        };
+      });
+
+      var result = await DB.updateInvoice(editInvoice.id, invoicePayload, itemsPayload);
+      if (!result || result.error) {
+        console.error('[Invoices] Update error:', result && result.error);
+        showToast('Failed to update invoice. ' + ((result && result.error && result.error.message) || ''), 'error');
+        return null;
+      }
+
+      if (closeCallback) closeCallback();
+      showToast('Invoice updated', 'success');
+      await this._reload(container, ctx);
+      return result.data;
+    } catch (err) {
+      console.error('[Invoices] Update error:', err);
+      showToast('Failed to update invoice. Please try again.', 'error');
+      return null;
+    } finally {
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Changes'; }
+      if (pdfBtn) pdfBtn.disabled = false;
+      if (prevBtn) prevBtn.disabled = false;
+    }
+  },
+
+  /* ── Update and Download PDF ── */
+  async _updateAndDownload(overlay, employee, editInvoice, container, ctx, closeCallback) {
+    var data = this.collectModalData(overlay, employee);
+    if (!data) return;
+
+    if (!data.items || data.items.length === 0) {
+      showToast('At least one line item is required', 'error');
+      return;
+    }
+
+    var pdfBtn = overlay.querySelector('#gen-save-edit-pdf');
+    var saveBtn = overlay.querySelector('#gen-save-edit');
+    var prevBtn = overlay.querySelector('#gen-preview');
+    if (pdfBtn) { pdfBtn.disabled = true; pdfBtn.textContent = 'Saving...'; }
+    if (saveBtn) saveBtn.disabled = true;
+    if (prevBtn) prevBtn.disabled = true;
+
+    try {
+      // Fetch full employee data for PDF
+      var fullEmp = employee;
+      try {
+        var empResult = await DB.getEmployee(employee.id);
+        if (empResult && empResult.data) fullEmp = empResult.data;
+      } catch (e) { /* fallback */ }
+
+      data.employee = {
+        full_name_lat: fullEmp.full_name_lat || fullEmp.name || '',
+        address: fullEmp.address || '',
+        phone: fullEmp.phone || '',
+        iban: fullEmp.iban || '',
+        swift: fullEmp.swift || '',
+        receiver_name: fullEmp.receiver_name || fullEmp.full_name_lat || '',
+        bank_name: fullEmp.bank_name || '',
+        invoice_format: fullEmp.invoice_format || 'WS',
+        invoice_prefix: fullEmp.invoice_prefix || ''
+      };
+
+      var invoicePayload = {
+        invoice_date: data.invoiceDateISO,
+        subtotal_usd: data.subtotal,
+        total_usd: data.total,
+        discount_usd: data.discount,
+        tax_usd: data.tax
+      };
+
+      var itemsPayload = data.items.map(function (item, idx) {
+        return {
+          item_order: idx + 1,
+          description: item.description,
+          price_usd: item.price,
+          qty: item.qty,
+          total_usd: item.total
+        };
+      });
+
+      var result = await DB.updateInvoice(editInvoice.id, invoicePayload, itemsPayload);
+      if (!result || result.error) {
+        console.error('[Invoices] Update & download error:', result && result.error);
+        showToast('Failed to update invoice. ' + ((result && result.error && result.error.message) || ''), 'error');
+        return;
+      }
+
+      if (closeCallback) closeCallback();
+
+      showToast('Generating PDF...', 'info');
+      InvoicePreview._currentInvoiceData = data;
+      InvoicePreview._generatePdf(data, function (blobUrl) {
+        if (blobUrl) {
+          InvoicePreview._downloadPdf(blobUrl);
+          setTimeout(function () { URL.revokeObjectURL(blobUrl); }, 1000);
+          showToast('PDF downloaded', 'success');
+        } else {
+          showToast('Failed to generate PDF', 'error');
+        }
+      });
+
+      await this._reload(container, ctx);
+    } catch (err) {
+      console.error('[Invoices] Update & download error:', err);
+      showToast('Failed to update invoice. Please try again.', 'error');
+    } finally {
+      if (pdfBtn) { pdfBtn.disabled = false; pdfBtn.textContent = 'Save & Download PDF'; }
+      if (saveBtn) saveBtn.disabled = false;
+      if (prevBtn) prevBtn.disabled = false;
+    }
   },
 
   /* ── Recalculate Totals ── */

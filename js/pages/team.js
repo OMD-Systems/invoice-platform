@@ -243,8 +243,12 @@ const Team = {
 
     if (self.employees.length === 0) {
       body.innerHTML =
-        '<div style="padding:40px;text-align:center;color:var(--fury-text-muted)">' +
-        (self.searchQuery ? 'No employees match your search.' : 'No employees found.') +
+        '<div class="fury-empty">' +
+        '<svg class="fury-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
+        '<div class="fury-empty-title">' + (self.searchQuery ? 'No matches' : 'No employees yet') + '</div>' +
+        '<div class="fury-empty-text">' +
+        (self.searchQuery ? 'No employees match your search.' : 'Add your first team member to get started.') +
+        '</div>' +
         '</div>';
       return;
     }
@@ -1930,7 +1934,7 @@ const Team = {
 
       if (invoices.length === 0) {
         listEl.innerHTML =
-          '<div style="color:var(--fury-text-muted);font-size:13px;padding:12px 0;text-align:center;">No invoices yet</div>';
+          '<div class="fury-empty" style="padding:24px 12px"><svg class="fury-empty-icon" style="width:32px;height:32px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><div class="fury-empty-text">No invoices yet</div></div>';
         return;
       }
 

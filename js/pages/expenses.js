@@ -120,9 +120,9 @@ const Expenses = {
                 '<th scope="col">Category</th>' +
                 '<th scope="col">Description</th>' +
                 '<th scope="col" style="text-align:right">Amount (UAH)</th>' +
-                '<th scope="col" style="text-align:right">Rate</th>' +
+                '<th scope="col" class="fury-hide-mobile" style="text-align:right">Rate</th>' +
                 '<th scope="col" style="text-align:right">Amount (USD)</th>' +
-                '<th scope="col">Linked Invoice</th>' +
+                '<th scope="col" class="fury-hide-mobile">Linked Invoice</th>' +
                 '<th scope="col" style="text-align:center">Actions</th>' +
               '</tr>' +
             '</thead>' +
@@ -263,11 +263,18 @@ const Expenses = {
 
     if (filtered.length === 0) {
       tbody.innerHTML =
-        '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--fury-text-muted)">' +
+        '<tr><td colspan="7">' +
+        '<div class="fury-empty">' +
+        '<svg class="fury-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15.5V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><circle cx="18" cy="18" r="3"/><path d="M18 16.5v1.5l1 1"/></svg>' +
+        '<div class="fury-empty-title">' +
+        (self.activeCategory === 'all' ? 'No expenses yet' : 'No expenses in this category') +
+        '</div>' +
+        '<div class="fury-empty-text">' +
         (self.activeCategory === 'all'
-          ? 'No expenses recorded for this period. Click "+ Add Expense" to add one.'
-          : 'No expenses in category "' + self.escapeHtml(self.getCategoryLabel(self.activeCategory)) + '".'
-        ) +
+          ? 'Click "+ Add Expense" to record your first expense.'
+          : 'No expenses in "' + self.escapeHtml(self.getCategoryLabel(self.activeCategory)) + '".') +
+        '</div>' +
+        '</div>' +
         '</td></tr>';
       return;
     }
@@ -321,13 +328,13 @@ const Expenses = {
         '<td style="text-align:right;font-variant-numeric:tabular-nums">' +
           amountUah.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) +
         '</td>' +
-        '<td style="text-align:right;font-variant-numeric:tabular-nums;color:var(--fury-text-secondary)">' +
+        '<td class="fury-hide-mobile" style="text-align:right;font-variant-numeric:tabular-nums;color:var(--fury-text-secondary)">' +
           rate.toFixed(2) +
         '</td>' +
         '<td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">' +
           self.formatCurrency(amountUsd) +
         '</td>' +
-        '<td>' + invoiceDisplay + '</td>' +
+        '<td class="fury-hide-mobile">' + invoiceDisplay + '</td>' +
         '<td style="text-align:center;white-space:nowrap">' +
           '<button class="fury-btn fury-btn-ghost fury-btn-sm exp-edit-btn" ' +
             'data-expense-id="' + expense.id + '" title="Edit" aria-label="Edit expense">' +
