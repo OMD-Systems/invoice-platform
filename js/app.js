@@ -40,6 +40,7 @@ const App = {
   SESSION_WARN_BEFORE_MS: 5 * 60 * 1000, // 5 minutes
 
   pages: {
+    '/dashboard': Dashboard,
     '/team': Team,
     '/invoices': Invoices,
     '/expenses': Expenses,
@@ -48,7 +49,6 @@ const App = {
 
   /* ── Legacy route redirects ── */
   REDIRECTS: {
-    '/dashboard': '/team',
     '/timesheet': '/team',
     '/employees': '/team',
     '/reports': '/invoices',
@@ -113,7 +113,7 @@ const App = {
           showToast('Connection restored.', 'success');
         });
 
-        var defaultPage = this.role === 'viewer' ? '#/invoices' : '#/team';
+        var defaultPage = this.role === 'viewer' ? '#/dashboard' : '#/team';
         this.navigate(window.location.hash || defaultPage);
       } else {
         this.showLogin();
@@ -157,13 +157,27 @@ const App = {
       .map(function (w) { return w.charAt(0).toUpperCase(); })
       .join('');
 
-    document.getElementById('sidebar-avatar').textContent = initials;
+    var avatarEl = document.getElementById('sidebar-avatar');
+    avatarEl.textContent = initials;
     document.getElementById('sidebar-user-name').textContent = name;
     document.getElementById('top-bar-user-name').textContent = name;
 
     var badge = document.getElementById('top-bar-role-badge');
     badge.textContent = this.role || 'viewer';
     badge.className = 'role-badge ' + (this.role || 'viewer');
+
+    // Load avatar from employee record
+    var self = this;
+    DB.getEmployeesSafe().then(function(result) {
+      var employees = Array.isArray(result) ? result : (result && result.data || []);
+      var emp = employees.find(function(e) {
+        return e.work_email && e.work_email.toLowerCase() === email.toLowerCase();
+      });
+      if (emp && emp.avatar_url) {
+        self._currentAvatarUrl = emp.avatar_url;
+        avatarEl.innerHTML = '<img src="' + emp.avatar_url.replace(/&/g,'&amp;').replace(/"/g,'&quot;') + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" alt="" />';
+      }
+    }).catch(function() {});
   },
 
   /* ── Clear all app state on logout/session expiry ── */
@@ -193,6 +207,13 @@ const App = {
       Expenses.invoices = [];
       Expenses.expenses = [];
     }
+    if (typeof Dashboard !== 'undefined') {
+      Dashboard.employee = null;
+      Dashboard.invoices = [];
+      Dashboard.projects = [];
+      Dashboard.timesheets = [];
+      Dashboard.suggestions = [];
+    }
     if (typeof Settings !== 'undefined') {
       Settings.settings = {};
       Settings.projects = [];
@@ -208,22 +229,25 @@ const App = {
 
   /* ── Adjust nav labels based on role ── */
   applyRoleVisibility() {
+    var isViewer = this.role === 'viewer';
+
+    // Dashboard: only visible for viewers
+    var dashNav = document.getElementById('nav-dashboard');
+    if (dashNav) dashNav.style.display = isViewer ? '' : 'none';
+
     // Hide Team and Expenses tabs for viewers
     var teamNav = document.getElementById('nav-team');
-    if (teamNav) {
-      teamNav.style.display = this.role === 'viewer' ? 'none' : '';
-    }
+    if (teamNav) teamNav.style.display = isViewer ? 'none' : '';
+
     var expensesNav = document.getElementById('nav-expenses');
-    if (expensesNav) {
-      expensesNav.style.display = this.role === 'viewer' ? 'none' : '';
-    }
+    if (expensesNav) expensesNav.style.display = isViewer ? 'none' : '';
 
     var settingsNav = document.getElementById('nav-settings');
     if (settingsNav) {
       settingsNav.style.display = '';
       var label = settingsNav.querySelector('.nav-label');
       if (label) {
-        if (this.role === 'viewer') {
+        if (isViewer) {
           label.textContent = 'My Profile';
         } else if (this.role === 'admin') {
           label.textContent = 'Settings';
@@ -554,15 +578,15 @@ const App = {
   async navigate(hash) {
     var navId = ++this._navId;
     // Normalize: strip hash, query params, trailing slashes
-    var defaultRoute = this.role === 'viewer' ? '/invoices' : '/team';
+    var defaultRoute = this.role === 'viewer' ? '/dashboard' : '/team';
     var raw = (hash || '').replace(/^#/, '').split('?')[0].split('&')[0];
     var path = raw.replace(/\/+$/, '') || defaultRoute;
     // Ensure path starts with /
     if (path.charAt(0) !== '/') path = '/' + path;
 
-    // Block viewer from accessing /team
+    // Block viewer from accessing /team and /expenses
     if ((path === '/team' || path === '/expenses') && this.role === 'viewer') {
-      window.location.hash = '#/invoices';
+      window.location.hash = '#/dashboard';
       return;
     }
 

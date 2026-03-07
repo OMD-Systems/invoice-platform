@@ -2103,12 +2103,19 @@ const Settings = {
           '</div></div>';
       };
 
+      var avatarInitials = this._escapeHtml((emp.name || '').split(',').reverse().map(function(w){return w.trim().charAt(0)}).join('').toUpperCase() || '?');
+      var avatarInner = emp.avatar_url
+        ? '<img src="' + this._escapeAttr(emp.avatar_url) + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" alt="Avatar" />'
+        : avatarInitials;
+
       profileHtml =
         /* Header */
         '<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">' +
-        '<div style="width:48px;height:48px;border-radius:50%;background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.3);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#00D4FF;">' +
-        this._escapeHtml((emp.name || '').split(',').reverse().map(function(w){return w.trim().charAt(0)}).join('').toUpperCase() || '?') +
+        '<div id="prof-avatar-wrap" style="position:relative;width:48px;height:48px;border-radius:50%;background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.3);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#00D4FF;cursor:pointer;overflow:hidden;" title="Change avatar">' +
+        avatarInner +
+        '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s;font-size:10px;font-weight:600;color:#fff;pointer-events:none;" class="prof-avatar-overlay">Change</div>' +
         '</div>' +
+        '<input type="file" id="prof-avatar-input" accept="image/jpeg,image/png,image/webp" style="display:none" />' +
         '<div>' +
         '<div style="font-size:16px;font-weight:600;color:var(--fury-text);">' + this._escapeHtml(emp.name || '') + '</div>' +
         '<div style="font-size:12px;color:var(--fury-text-secondary);">' +
@@ -2402,6 +2409,50 @@ const Settings = {
   /* ── Viewer profile save handler ── */
   _bindProfileEvents(container) {
     var self = this;
+
+    // Avatar upload
+    var avatarWrap = container.querySelector('#prof-avatar-wrap');
+    var avatarInput = container.querySelector('#prof-avatar-input');
+    if (avatarWrap && avatarInput) {
+      avatarWrap.addEventListener('mouseenter', function() {
+        var overlay = avatarWrap.querySelector('.prof-avatar-overlay');
+        if (overlay) overlay.style.opacity = '1';
+      });
+      avatarWrap.addEventListener('mouseleave', function() {
+        var overlay = avatarWrap.querySelector('.prof-avatar-overlay');
+        if (overlay) overlay.style.opacity = '0';
+      });
+      avatarWrap.addEventListener('click', function() { avatarInput.click(); });
+      avatarInput.addEventListener('change', async function() {
+        var file = avatarInput.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+          showToast('Max file size is 2MB', 'error');
+          return;
+        }
+        var overlay = avatarWrap.querySelector('.prof-avatar-overlay');
+        if (overlay) { overlay.textContent = '...'; overlay.style.opacity = '1'; }
+        try {
+          var result = await DB.uploadAvatar(file);
+          if (result.error) throw new Error(result.error.message);
+          showToast('Avatar updated', 'success');
+          avatarWrap.innerHTML = '<img src="' + result.data.url + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" alt="Avatar" />' +
+            '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s;font-size:10px;font-weight:600;color:#fff;pointer-events:none;" class="prof-avatar-overlay">Change</div>';
+          // Re-bind hover
+          avatarWrap.addEventListener('mouseenter', function() { var o = avatarWrap.querySelector('.prof-avatar-overlay'); if(o) o.style.opacity='1'; });
+          avatarWrap.addEventListener('mouseleave', function() { var o = avatarWrap.querySelector('.prof-avatar-overlay'); if(o) o.style.opacity='0'; });
+          // Update sidebar avatar
+          DB.clearCache();
+          App.renderUserInfo();
+        } catch (err) {
+          console.error('[Settings] avatar upload error:', err);
+          showToast('Failed to upload avatar', 'error');
+        }
+        if (overlay) { overlay.textContent = 'Change'; overlay.style.opacity = '0'; }
+        avatarInput.value = '';
+      });
+    }
+
     var saveBtn = container.querySelector('#prof-save-btn');
     if (!saveBtn) return;
 

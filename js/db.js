@@ -1687,6 +1687,45 @@ const DB = {
     } catch (err) {
       return { data: null, error: { message: err.message } };
     }
+  },
+
+  // -- Avatar --
+
+  async uploadAvatar(file) {
+    try {
+      var session = (await this.client.auth.getSession()).data.session;
+      if (!session) return { data: null, error: { message: 'Not authenticated' } };
+      var uid = session.user.id;
+      var ext = file.name.split('.').pop().toLowerCase();
+      if (['jpg','jpeg','png','webp'].indexOf(ext) === -1) {
+        return { data: null, error: { message: 'Only JPG, PNG, WEBP allowed' } };
+      }
+      var path = uid + '/avatar.' + ext;
+      var { error: uploadError } = await this.client.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadError) return { data: null, error: uploadError };
+
+      var { data: urlData } = this.client.storage.from('avatars').getPublicUrl(path);
+      var publicUrl = urlData.publicUrl + '?t=' + Date.now();
+
+      var rpcResult = await this.updateMyAvatar(publicUrl);
+      if (rpcResult.error) return rpcResult;
+
+      this.clearCache();
+      return { data: { url: publicUrl }, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  async updateMyAvatar(url) {
+    try {
+      var { error } = await this.client.rpc('update_my_avatar', { p_avatar_url: url });
+      return { data: null, error: error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
   }
 };
 
