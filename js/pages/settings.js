@@ -2094,50 +2094,126 @@ const Settings = {
 
     if (isViewer) {
       var emp = this._viewerEmployee || {};
+      var fmtDate = function(d) { return d ? d.substring(0, 10) : ''; };
+      var readonlyField = function(label, value) {
+        return '<div class="settings-field">' +
+          '<label>' + label + '</label>' +
+          '<div style="padding:8px 12px;font-size:13px;color:var(--fury-text);background:rgba(255,255,255,0.03);border:1px solid #1F1F23;border-radius:6px;min-height:36px;">' +
+          (value || '<span style="color:var(--fury-text-muted)">Not set</span>') +
+          '</div></div>';
+      };
+
       profileHtml =
-        '<div class="settings-section">' +
-        '<div class="settings-section-title">My Profile</div>' +
-        '<div style="font-size:13px;color:var(--fury-text-secondary);margin-bottom:16px;">' +
-        '<strong style="color:var(--fury-text)">' + this._escapeHtml(emp.name || '') + '</strong>' +
-        ' &middot; ' + this._escapeHtml(emp.employee_type || '') +
+        /* Header */
+        '<div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;">' +
+        '<div style="width:48px;height:48px;border-radius:50%;background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.3);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#00D4FF;">' +
+        this._escapeHtml((emp.name || '').split(',').reverse().map(function(w){return w.trim().charAt(0)}).join('').toUpperCase() || '?') +
+        '</div>' +
+        '<div>' +
+        '<div style="font-size:16px;font-weight:600;color:var(--fury-text);">' + this._escapeHtml(emp.name || '') + '</div>' +
+        '<div style="font-size:12px;color:var(--fury-text-secondary);">' +
+        this._escapeHtml(emp.employee_type || '') +
+        ' &middot; ' + this._escapeHtml(emp.contract_type || '') +
         (emp.rate_usd ? ' &middot; $' + Number(emp.rate_usd).toFixed(2) + '/mo' : '') +
         '</div>' +
-
-        '<div class="fury-form-group">' +
-        '<label class="fury-label" for="prof-address">Address</label>' +
-        '<textarea class="fury-textarea" id="prof-address" rows="2">' + this._escapeHtml(emp.address || '') + '</textarea>' +
         '</div>' +
-        '<div class="fury-form-group fury-mt-2">' +
-        '<label class="fury-label" for="prof-phone">Phone</label>' +
-        '<input type="text" class="fury-input" id="prof-phone" value="' + this._escapeHtml(emp.phone || '') + '" />' +
-        '</div>' +
-        '<div class="fury-form-group fury-mt-2">' +
-        '<label class="fury-label" for="prof-iban">IBAN</label>' +
-        '<input type="text" class="fury-input" id="prof-iban" value="' + this._escapeHtml(emp.iban || '') + '" />' +
-        '</div>' +
-        '<div style="display:flex;gap:12px" class="fury-mt-2">' +
-        '<div class="fury-form-group" style="flex:1">' +
-        '<label class="fury-label" for="prof-swift">SWIFT</label>' +
-        '<input type="text" class="fury-input" id="prof-swift" value="' + this._escapeHtml(emp.swift || '') + '" />' +
-        '</div>' +
-        '<div class="fury-form-group" style="flex:1">' +
-        '<label class="fury-label" for="prof-bank">Bank Name</label>' +
-        '<input type="text" class="fury-input" id="prof-bank" value="' + this._escapeHtml(emp.bank_name || '') + '" />' +
-        '</div>' +
-        '</div>' +
-        '<div class="fury-form-group fury-mt-2">' +
-        '<label class="fury-label" for="prof-receiver">Receiver Name</label>' +
-        '<input type="text" class="fury-input" id="prof-receiver" value="' + this._escapeHtml(emp.receiver_name || '') + '" />' +
         '</div>' +
 
-        '<div class="settings-actions" style="border-top:none;padding-top:12px;">' +
+        /* Section: Personal Info */
+        '<div class="settings-section">' +
+        '<div class="settings-section-title">Personal Information</div>' +
+        '<div class="settings-row">' +
+        '<div class="settings-field">' +
+        '<label for="prof-fullname-lat">Full Name (Latin)</label>' +
+        '<input type="text" class="fury-input" id="prof-fullname-lat" value="' + this._escapeAttr(emp.full_name_lat || '') + '" placeholder="e.g. Andrii Galinsky" />' +
+        '</div>' +
+        '<div class="settings-field">' +
+        '<label for="prof-dob">Date of Birth</label>' +
+        '<input type="date" class="fury-input" id="prof-dob" value="' + fmtDate(emp.date_of_birth) + '" />' +
+        '</div>' +
+        '</div>' +
+        '<div class="settings-row">' +
+        '<div class="settings-field">' +
+        '<label for="prof-address">Address</label>' +
+        '<textarea class="fury-input" id="prof-address" rows="2" placeholder="Full postal address">' + this._escapeHtml(emp.address || '') + '</textarea>' +
+        '</div>' +
+        '</div>' +
+        '<div class="settings-row">' +
+        '<div class="settings-field" style="max-width:280px;">' +
+        '<label for="prof-phone">Phone</label>' +
+        '<input type="tel" class="fury-input" id="prof-phone" value="' + this._escapeAttr(emp.phone || '') + '" placeholder="+380..." />' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+
+        /* Section: Passport / ID */
+        '<div class="settings-section">' +
+        '<div class="settings-section-title">Passport / ID</div>' +
+        '<div class="settings-row">' +
+        '<div class="settings-field">' +
+        '<label for="prof-passport">Passport Number</label>' +
+        '<input type="text" class="fury-input" id="prof-passport" value="' + this._escapeAttr(emp.passport_number || '') + '" placeholder="XX000000" />' +
+        '</div>' +
+        '<div class="settings-field">' +
+        '<label for="prof-passport-issued">Issued Date</label>' +
+        '<input type="date" class="fury-input" id="prof-passport-issued" value="' + fmtDate(emp.passport_issued) + '" />' +
+        '</div>' +
+        '<div class="settings-field">' +
+        '<label for="prof-passport-expires">Expires Date</label>' +
+        '<input type="date" class="fury-input" id="prof-passport-expires" value="' + fmtDate(emp.passport_expires) + '" />' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+
+        /* Section: Banking */
+        '<div class="settings-section">' +
+        '<div class="settings-section-title">Banking Details</div>' +
+        '<div class="settings-row">' +
+        '<div class="settings-field">' +
+        '<label for="prof-receiver">Receiver Name</label>' +
+        '<input type="text" class="fury-input" id="prof-receiver" value="' + this._escapeAttr(emp.receiver_name || '') + '" placeholder="Name as on bank account" />' +
+        '</div>' +
+        '</div>' +
+        '<div class="settings-row">' +
+        '<div class="settings-field">' +
+        '<label for="prof-iban">IBAN</label>' +
+        '<input type="text" class="fury-input" id="prof-iban" value="' + this._escapeAttr(emp.iban || '') + '" placeholder="UA..." />' +
+        '</div>' +
+        '</div>' +
+        '<div class="settings-row">' +
+        '<div class="settings-field">' +
+        '<label for="prof-swift">SWIFT / BIC</label>' +
+        '<input type="text" class="fury-input" id="prof-swift" value="' + this._escapeAttr(emp.swift || '') + '" />' +
+        '</div>' +
+        '<div class="settings-field">' +
+        '<label for="prof-bank">Bank Name</label>' +
+        '<input type="text" class="fury-input" id="prof-bank" value="' + this._escapeAttr(emp.bank_name || '') + '" />' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+
+        /* Section: Contract Info (read-only) */
+        '<div class="settings-section">' +
+        '<div class="settings-section-title">Contract Information</div>' +
+        '<div class="settings-row">' +
+        readonlyField('Contract Type', this._escapeHtml(emp.contract_type || '')) +
+        readonlyField('Agreement Date', emp.agreement_date ? fmtDate(emp.agreement_date) : null) +
+        readonlyField('Effective Date', emp.effective_date ? fmtDate(emp.effective_date) : null) +
+        '</div>' +
+        '<div class="settings-row">' +
+        readonlyField('Contract', emp.contract_uploaded_at ? 'Uploaded ' + new Date(emp.contract_uploaded_at).toLocaleDateString() : null) +
+        readonlyField('NDA', emp.nda_uploaded_at ? 'Uploaded ' + new Date(emp.nda_uploaded_at).toLocaleDateString() : null) +
+        '</div>' +
+        '</div>' +
+
+        /* Save button */
+        '<div class="settings-actions">' +
         '<button class="fury-btn fury-btn-primary" id="prof-save-btn">Save Profile</button>' +
-        '</div>' +
         '</div>';
     }
 
     return (
-      '<div class="fury-card" style="max-width:480px;">' +
+      '<div class="fury-card" style="max-width:' + (isViewer ? '640' : '480') + 'px;">' +
 
       profileHtml +
 
@@ -2334,13 +2410,19 @@ const Settings = {
       saveBtn.disabled = true;
       saveBtn.textContent = 'Saving...';
 
+      var val = function(sel) { var el = container.querySelector(sel); return el ? (el.value || '').trim() : ''; };
       var data = {
-        address: (container.querySelector('#prof-address').value || '').trim(),
-        phone: (container.querySelector('#prof-phone').value || '').trim(),
-        iban: (container.querySelector('#prof-iban').value || '').trim(),
-        swift: (container.querySelector('#prof-swift').value || '').trim(),
-        bank_name: (container.querySelector('#prof-bank').value || '').trim(),
-        receiver_name: (container.querySelector('#prof-receiver').value || '').trim()
+        full_name_lat: val('#prof-fullname-lat'),
+        date_of_birth: val('#prof-dob') || null,
+        address: val('#prof-address'),
+        phone: val('#prof-phone'),
+        passport_number: val('#prof-passport'),
+        passport_issued: val('#prof-passport-issued') || null,
+        passport_expires: val('#prof-passport-expires') || null,
+        iban: val('#prof-iban'),
+        swift: val('#prof-swift'),
+        bank_name: val('#prof-bank'),
+        receiver_name: val('#prof-receiver')
       };
 
       if (data.iban && typeof Validation !== 'undefined' && !Validation.isValidIBAN(data.iban)) {

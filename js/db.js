@@ -1524,7 +1524,12 @@ const DB = {
         p_iban: profileData.iban || null,
         p_swift: profileData.swift || null,
         p_bank_name: profileData.bank_name || null,
-        p_receiver_name: profileData.receiver_name || null
+        p_receiver_name: profileData.receiver_name || null,
+        p_full_name_lat: profileData.full_name_lat || null,
+        p_date_of_birth: profileData.date_of_birth || null,
+        p_passport_number: profileData.passport_number || null,
+        p_passport_issued: profileData.passport_issued || null,
+        p_passport_expires: profileData.passport_expires || null
       });
       if (error) return { data: null, error: error };
       this.clearCache();
@@ -1536,8 +1541,8 @@ const DB = {
 
   async createInvoiceForSelf(invoiceData, items) {
     try {
-      var invNum = invoiceData.invoice_number;
-      if (typeof invNum === 'number') invNum = String(invNum);
+      var invNum = parseInt(invoiceData.invoice_number, 10);
+      if (isNaN(invNum)) invNum = 1;
 
       var { data: invoiceId, error: rpcError } = await this.client.rpc('create_invoice_for_self', {
         p_invoice_number: invNum,

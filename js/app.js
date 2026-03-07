@@ -208,10 +208,14 @@ const App = {
 
   /* ── Adjust nav labels based on role ── */
   applyRoleVisibility() {
-    // Hide Team tab for viewers
+    // Hide Team and Expenses tabs for viewers
     var teamNav = document.getElementById('nav-team');
     if (teamNav) {
       teamNav.style.display = this.role === 'viewer' ? 'none' : '';
+    }
+    var expensesNav = document.getElementById('nav-expenses');
+    if (expensesNav) {
+      expensesNav.style.display = this.role === 'viewer' ? 'none' : '';
     }
 
     var settingsNav = document.getElementById('nav-settings');
@@ -557,7 +561,7 @@ const App = {
     if (path.charAt(0) !== '/') path = '/' + path;
 
     // Block viewer from accessing /team
-    if (path === '/team' && this.role === 'viewer') {
+    if ((path === '/team' || path === '/expenses') && this.role === 'viewer') {
       window.location.hash = '#/invoices';
       return;
     }

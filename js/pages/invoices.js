@@ -92,19 +92,21 @@ const Invoices = {
           '</select>'
         : '') +
       '</div>' +
-      '<div style="display: flex; align-items: center; gap: 8px;">' +
-      (App.role === 'admin' ?
-        '<button class="fury-btn fury-btn-sm" id="btn-delete-selected" disabled style="background-color: var(--fury-danger); border-color: var(--fury-danger); color: white;">' +
-        'Delete Selected' +
-        '</button>'
+      (App.role !== 'viewer' ?
+        '<div style="display: flex; align-items: center; gap: 8px;">' +
+        (App.role === 'admin' ?
+          '<button class="fury-btn fury-btn-sm" id="btn-delete-selected" disabled style="background-color: var(--fury-danger); border-color: var(--fury-danger); color: white;">' +
+          'Delete Selected' +
+          '</button>'
+          : '') +
+        '<button class="fury-btn fury-btn-primary fury-btn-sm" id="btn-generate-selected" disabled>' +
+        'Generate Selected' +
+        '</button>' +
+        '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-batch-download" disabled>' +
+        'Download All PDF' +
+        '</button>' +
+        '</div>'
         : '') +
-      '<button class="fury-btn fury-btn-primary fury-btn-sm" id="btn-generate-selected" disabled>' +
-      'Generate Selected' +
-      '</button>' +
-      '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="btn-batch-download" disabled>' +
-      'Download All PDF' +
-      '</button>' +
-      '</div>' +
       '</div>' +
 
       /* ── Invoice Table ── */
@@ -112,8 +114,8 @@ const Invoices = {
       '<table class="fury-table" id="inv-table">' +
       '<thead>' +
       '<tr>' +
-      '<th scope="col" style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all" title="Select all" aria-label="Select all invoices"></th>' +
-      '<th scope="col">Employee</th>' +
+      (App.role !== 'viewer' ? '<th scope="col" style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all" title="Select all" aria-label="Select all invoices"></th>' : '') +
+      (App.role !== 'viewer' ? '<th scope="col">Employee</th>' : '') +
       '<th scope="col">Invoice #</th>' +
       '<th scope="col" class="fury-hide-mobile">Date</th>' +
       '<th scope="col" class="fury-hide-mobile" style="text-align: center;">Items</th>' +
@@ -123,7 +125,7 @@ const Invoices = {
       '</tr>' +
       '</thead>' +
       '<tbody id="inv-tbody">' +
-      Skeleton.render('table-row', 5, { cols: 8 }) +
+      Skeleton.render('table-row', 5, { cols: App.role === 'viewer' ? 6 : 8 }) +
       '</tbody>' +
       '</table>' +
       '</div>' +
@@ -137,8 +139,8 @@ const Invoices = {
       '<table class="fury-table">' +
       '<thead>' +
       '<tr>' +
-      '<th scope="col" style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all-pending" title="Select all pending" aria-label="Select all pending employees"></th>' +
-      '<th scope="col">Employee</th>' +
+      (App.role !== 'viewer' ? '<th scope="col" style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all-pending" title="Select all pending" aria-label="Select all pending employees"></th>' : '') +
+      (App.role !== 'viewer' ? '<th scope="col">Employee</th>' : '') +
       '<th scope="col" style="text-align: right;">Hours</th>' +
       '<th scope="col" style="text-align: right;">Rate (USD)</th>' +
       '<th scope="col" style="text-align: right;">Est. Amount</th>' +
@@ -616,8 +618,9 @@ const Invoices = {
     if (!tbody) return;
 
     if (this.invoices.length === 0) {
+      var colSpan = App.role === 'viewer' ? 6 : 8;
       tbody.innerHTML =
-        '<tr><td colspan="8">' +
+        '<tr><td colspan="' + colSpan + '">' +
         '<div class="fury-empty">' +
         '<svg class="fury-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>' +
         '<div class="fury-empty-title">No invoices</div>' +
@@ -639,12 +642,14 @@ const Invoices = {
       var invDate = inv.invoice_date ? this._formatDate(inv.invoice_date) : '—';
       var status = inv.status || 'draft';
 
+      var isViewerLocked = App.role === 'viewer' && (status === 'sent' || status === 'paid');
       html +=
         '<tr data-invoice-id="' + inv.id + '">' +
-        '<td style="text-align: center;">' +
-        '<input type="checkbox" class="inv-row-check" data-invoice-id="' + inv.id + '">' +
-        '</td>' +
-        '<td>' + this._escapeHtml(empName) + '</td>' +
+        (App.role !== 'viewer' ?
+          '<td style="text-align: center;">' +
+          '<input type="checkbox" class="inv-row-check" data-invoice-id="' + inv.id + '">' +
+          '</td>' : '') +
+        (App.role !== 'viewer' ? '<td>' + this._escapeHtml(empName) + '</td>' : '') +
         '<td style="font-variant-numeric: tabular-nums;">' + this._escapeHtml(invNumber) + '</td>' +
         '<td class="fury-hide-mobile">' + invDate + '</td>' +
         '<td class="fury-hide-mobile" style="text-align: center;">' + itemCount + '</td>' +
@@ -654,10 +659,11 @@ const Invoices = {
         '<td style="text-align: center;">' + this._statusBadge(status) + '</td>' +
         '<td style="text-align: center; white-space: nowrap;">' +
         '<div style="display: inline-flex; gap: 4px;">' +
+        (isViewerLocked ? '' :
         '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-edit" ' +
         'data-invoice-id="' + inv.id + '" title="Edit" aria-label="Edit invoice">' +
         '&#x270F;' +
-        '</button>' +
+        '</button>') +
         '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-preview" ' +
         'data-invoice-id="' + inv.id + '" title="Preview" aria-label="Preview invoice">' +
         '&#x1F441;' +
@@ -668,6 +674,7 @@ const Invoices = {
         '</button>' +
         '<select class="fury-select inv-act-status" ' +
         'data-invoice-id="' + inv.id + '" ' +
+        (isViewerLocked ? 'disabled ' : '') +
         'style="width: 110px; height: 31px; font-size: 12px;">' +
         '<option value="draft"' + (status === 'draft' ? ' selected' : '') + '>Draft</option>' +
         '<option value="generated"' + (status === 'generated' ? ' selected' : '') + '>Generated</option>' +
@@ -737,10 +744,11 @@ const Invoices = {
 
       html +=
         '<tr data-employee-id="' + pe.id + '">' +
-        '<td style="text-align: center;">' +
-        '<input type="checkbox" class="inv-pending-check" data-employee-id="' + pe.id + '">' +
-        '</td>' +
-        '<td>' + this._escapeHtml(name) + '</td>' +
+        (App.role !== 'viewer' ?
+          '<td style="text-align: center;">' +
+          '<input type="checkbox" class="inv-pending-check" data-employee-id="' + pe.id + '">' +
+          '</td>' : '') +
+        (App.role !== 'viewer' ? '<td>' + this._escapeHtml(name) + '</td>' : '') +
         '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + hours.toFixed(1) + '</td>' +
         '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + this._formatCurrency(rate) + '</td>' +
         '<td style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">' +
