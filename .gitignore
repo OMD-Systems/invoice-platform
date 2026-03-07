@@ -13,4 +13,4 @@ js/config.js
 js/config.local.js
 
 # Supabase local
-supabase/.temp/
+supabase/

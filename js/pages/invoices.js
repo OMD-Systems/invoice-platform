@@ -2126,16 +2126,23 @@ const Invoices = {
       total_usd: amount
     }];
 
-    var result = await DB.createInvoice(invoicePayload, itemsPayload);
+    var result;
+    if (App.role === 'viewer') {
+      result = await DB.createInvoiceForSelf(invoicePayload, itemsPayload);
+    } else {
+      result = await DB.createInvoice(invoicePayload, itemsPayload);
+    }
     if (!result || result.error) {
       throw new Error(result && result.error ? result.error.message : 'DB error');
     }
 
     // Advance next_invoice_number so subsequent invoices get a fresh number
-    try {
-      await Numbering.incrementNumberAtomic(employee.id);
-    } catch (e) {
-      console.warn('[Invoices] Failed to increment invoice number:', e);
+    if (App.role !== 'viewer') {
+      try {
+        await Numbering.incrementNumberAtomic(employee.id);
+      } catch (e) {
+        console.warn('[Invoices] Failed to increment invoice number:', e);
+      }
     }
 
     return result.data;

@@ -1649,6 +1649,7 @@ const DB = {
         .upsert(suggestionData, { onConflict: 'employee_id,project_id,month,year' })
         .select()
         .single();
+      this.clearCache();
       return { data: data, error: error };
     } catch (err) {
       return { data: null, error: { message: err.message } };
@@ -1661,6 +1662,7 @@ const DB = {
         .from('timesheet_suggestions')
         .delete()
         .eq('id', id);
+      this.clearCache();
       return { data: data, error: error };
     } catch (err) {
       return { data: null, error: { message: err.message } };
@@ -1675,6 +1677,7 @@ const DB = {
         .eq('id', id)
         .select()
         .single();
+      this.clearCache();
       return { data: data, error: error };
     } catch (err) {
       return { data: null, error: { message: err.message } };

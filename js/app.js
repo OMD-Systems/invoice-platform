@@ -178,6 +178,7 @@ const App = {
       Team.allEmployees = [];
       Team.projects = [];
       Team.allTimesheets = [];
+      Team.suggestions = [];
       Team.invoices = [];
     }
     if (typeof Invoices !== 'undefined') {
