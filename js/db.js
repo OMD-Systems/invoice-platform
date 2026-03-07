@@ -1500,6 +1500,185 @@ const DB = {
     } catch (err) {
       return { data: null, error: { message: err.message } };
     }
+  },
+
+  // ----------------------------------------------------------
+  // VIEWER SELF-SERVICE
+  // ----------------------------------------------------------
+
+  async getMyEmployeeId() {
+    try {
+      var { data, error } = await this.client.rpc('get_my_employee_id');
+      if (error) return { data: null, error: error };
+      return { data: data, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  async updateMyProfile(profileData) {
+    try {
+      var { data, error } = await this.client.rpc('update_my_profile', {
+        p_address: profileData.address || null,
+        p_phone: profileData.phone || null,
+        p_iban: profileData.iban || null,
+        p_swift: profileData.swift || null,
+        p_bank_name: profileData.bank_name || null,
+        p_receiver_name: profileData.receiver_name || null
+      });
+      if (error) return { data: null, error: error };
+      this.clearCache();
+      return { data: data, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  async createInvoiceForSelf(invoiceData, items) {
+    try {
+      var invNum = invoiceData.invoice_number;
+      if (typeof invNum === 'number') invNum = String(invNum);
+
+      var { data: invoiceId, error: rpcError } = await this.client.rpc('create_invoice_for_self', {
+        p_invoice_number: invNum,
+        p_invoice_date: invoiceData.invoice_date,
+        p_month: invoiceData.month,
+        p_year: invoiceData.year,
+        p_format_type: invoiceData.format_type || 'WS',
+        p_subtotal_usd: invoiceData.subtotal_usd,
+        p_total_usd: invoiceData.total_usd,
+        p_status: invoiceData.status || 'draft',
+        p_discount_usd: invoiceData.discount_usd || 0,
+        p_tax_usd: invoiceData.tax_usd || 0,
+        p_items: (items || []).map(function(item, idx) {
+          return {
+            item_order: item.item_order || idx + 1,
+            description: item.description,
+            price_usd: item.price_usd,
+            qty: item.qty || 1,
+            total_usd: item.total_usd
+          };
+        })
+      });
+
+      if (rpcError) return { data: null, error: rpcError };
+
+      var { data: fullInvoice, error: fetchError } = await this.client
+        .from('invoices')
+        .select('*, employees ( id, name, full_name_lat, invoice_prefix, invoice_format, address, phone, iban, swift, bank_name, receiver_name ), invoice_items ( id, item_order, description, price_usd, qty, total_usd )')
+        .eq('id', invoiceId)
+        .single();
+
+      if (fetchError) return { data: null, error: fetchError };
+      this.clearCache();
+      return { data: fullInvoice, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  async updateInvoiceForSelf(invoiceId, invoiceData, items) {
+    try {
+      var { data, error: rpcError } = await this.client.rpc('update_invoice_for_self', {
+        p_invoice_id: invoiceId,
+        p_invoice_date: invoiceData.invoice_date,
+        p_subtotal_usd: invoiceData.subtotal_usd,
+        p_total_usd: invoiceData.total_usd,
+        p_discount_usd: invoiceData.discount_usd || 0,
+        p_tax_usd: invoiceData.tax_usd || 0,
+        p_items: (items || []).map(function(item, idx) {
+          return {
+            item_order: item.item_order || idx + 1,
+            description: item.description,
+            price_usd: item.price_usd,
+            qty: item.qty || 1,
+            total_usd: item.total_usd
+          };
+        })
+      });
+
+      if (rpcError) return { data: null, error: rpcError };
+
+      var { data: updated, error: fetchErr } = await this.client
+        .from('invoices')
+        .select('*, invoice_items(*), employees(*)')
+        .eq('id', invoiceId)
+        .single();
+
+      this.clearCache();
+      return { data: updated, error: fetchErr };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  async deleteInvoiceForSelf(invoiceId) {
+    try {
+      var { data, error } = await this.client.rpc('delete_invoice_for_self', {
+        p_invoice_id: invoiceId
+      });
+      if (error) return { data: null, error: error };
+      this.clearCache();
+      return { data: { id: invoiceId }, error: null };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  // -- Timesheet Suggestions --
+
+  async getTimesheetSuggestions(month, year, employeeId) {
+    try {
+      var query = this.client
+        .from('timesheet_suggestions')
+        .select('*, projects ( id, name, code )')
+        .eq('month', month)
+        .eq('year', year);
+      if (employeeId) query = query.eq('employee_id', employeeId);
+      var { data, error } = await query.order('created_at', { ascending: true });
+      return { data: data || [], error: error };
+    } catch (err) {
+      return { data: [], error: { message: err.message } };
+    }
+  },
+
+  async upsertTimesheetSuggestion(suggestionData) {
+    try {
+      var { data, error } = await this.client
+        .from('timesheet_suggestions')
+        .upsert(suggestionData, { onConflict: 'employee_id,project_id,month,year' })
+        .select()
+        .single();
+      return { data: data, error: error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  async deleteTimesheetSuggestion(id) {
+    try {
+      var { data, error } = await this.client
+        .from('timesheet_suggestions')
+        .delete()
+        .eq('id', id);
+      return { data: data, error: error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
+  },
+
+  async updateSuggestionStatus(id, status, adminNote) {
+    try {
+      var { data, error } = await this.client
+        .from('timesheet_suggestions')
+        .update({ status: status, admin_note: adminNote || null, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single();
+      return { data: data, error: error };
+    } catch (err) {
+      return { data: null, error: { message: err.message } };
+    }
   }
 };
 

@@ -77,9 +77,9 @@ const Expenses = {
           '<div class="fury-flex fury-gap-3">' +
             '<div class="fury-form-group" style="flex:1;margin-bottom:0">' +
               '<label class="fury-label" for="exchange-rate">UAH per 1 USD</label>' +
-              '<input type="number" class="fury-input" id="exchange-rate" step="0.01" min="0" value="' + self.exchangeRate + '">' +
+              '<input type="number" class="fury-input" id="exchange-rate" step="0.01" min="0" value="' + self.exchangeRate + '"' + (App.role === 'viewer' ? ' disabled' : '') + '>' +
             '</div>' +
-            '<button class="fury-btn fury-btn-secondary" id="btn-update-rate" style="align-self:flex-end;height:36px">Update</button>' +
+            (App.role !== 'viewer' ? '<button class="fury-btn fury-btn-secondary" id="btn-update-rate" style="align-self:flex-end;height:36px">Update</button>' : '') +
           '</div>' +
           '<div style="margin-top:8px;font-size:11px;color:var(--fury-text-muted)" id="rate-updated-info"></div>' +
         '</div>' +

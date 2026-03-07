@@ -63,9 +63,11 @@ const Invoices = {
 
       /* ── Tabs ── */
       '<div class="fury-tabs fury-mb-3" role="tablist" aria-label="Invoice views">' +
-      '<button class="fury-tab' + (this.activeTab === 'invoices' ? ' active' : '') + '" data-inv-tab="invoices">All Invoices</button>' +
-      '<button class="fury-tab' + (this.activeTab === 'summary' ? ' active' : '') + '" data-inv-tab="summary">Monthly Summary</button>' +
-      '<button class="fury-tab' + (this.activeTab === 'settlements' ? ' active' : '') + '" data-inv-tab="settlements">Settlements</button>' +
+      '<button class="fury-tab' + (this.activeTab === 'invoices' ? ' active' : '') + '" data-inv-tab="invoices">' + (App.role === 'viewer' ? 'My Invoices' : 'All Invoices') + '</button>' +
+      (App.role !== 'viewer'
+        ? '<button class="fury-tab' + (this.activeTab === 'summary' ? ' active' : '') + '" data-inv-tab="summary">Monthly Summary</button>' +
+          '<button class="fury-tab' + (this.activeTab === 'settlements' ? ' active' : '') + '" data-inv-tab="settlements">Settlements</button>'
+        : '') +
       '</div>' +
 
       /* ── Tab Content Container ── */
@@ -84,9 +86,11 @@ const Invoices = {
       '<option value="sent"' + (this.statusFilter === 'sent' ? ' selected' : '') + '>Sent</option>' +
       '<option value="paid"' + (this.statusFilter === 'paid' ? ' selected' : '') + '>Paid</option>' +
       '</select>' +
-      '<select class="fury-select" id="inv-employee" aria-label="Filter by employee" style="width: 170px;">' +
-      '<option value="all">All Employees</option>' +
-      '</select>' +
+      (App.role !== 'viewer'
+        ? '<select class="fury-select" id="inv-employee" aria-label="Filter by employee" style="width: 170px;">' +
+          '<option value="all">All Employees</option>' +
+          '</select>'
+        : '') +
       '</div>' +
       '<div style="display: flex; align-items: center; gap: 8px;">' +
       (App.role === 'admin' ?
@@ -161,14 +165,20 @@ const Invoices = {
       var role = ctx.role || App.role;
       var user = ctx.user || App.user;
 
-      // Load employees (filtered for leads) — must complete first
+      // Load employees (filtered by role)
       var empResult;
       if (role === 'admin') {
         empResult = await DB.getEmployees();
+        self.employees = (empResult && empResult.data) ? empResult.data : [];
+      } else if (role === 'viewer') {
+        var viewerSafe = await DB.getEmployeesSafe();
+        var viewerArr = Array.isArray(viewerSafe) ? viewerSafe : ((viewerSafe && viewerSafe.data) || []);
+        var viewerEmail = user ? user.email : null;
+        self.employees = viewerArr.filter(function (e) { return e.work_email && e.work_email === viewerEmail; });
       } else {
         empResult = await DB.getTeamEmployees(user.email);
+        self.employees = (empResult && empResult.data) ? empResult.data : [];
       }
-      self.employees = (empResult && empResult.data) ? empResult.data : [];
 
       // Parallel load: invoices, timesheets, projects, settings, config
       var invFilters = { month: self.month, year: self.year };
@@ -658,9 +668,9 @@ const Invoices = {
         '<option value="draft"' + (status === 'draft' ? ' selected' : '') + '>Draft</option>' +
         '<option value="generated"' + (status === 'generated' ? ' selected' : '') + '>Generated</option>' +
         '<option value="sent"' + (status === 'sent' ? ' selected' : '') + '>Sent</option>' +
-        '<option value="paid"' + (status === 'paid' ? ' selected' : '') + '>Paid</option>' +
+        (App.role !== 'viewer' ? '<option value="paid"' + (status === 'paid' ? ' selected' : '') + '>Paid</option>' : '') +
         '</select>' +
-        (App.role === 'admin' ?
+        (App.role === 'admin' || (App.role === 'viewer' && (status === 'draft' || status === 'generated')) ?
           '<button class="fury-btn fury-btn-ghost fury-btn-sm fury-btn-icon inv-act-delete" ' +
           'data-invoice-id="' + inv.id + '" title="Delete Invoice" aria-label="Delete invoice" style="color:var(--fury-danger)">' +
           '&#x1F5D1;' +
@@ -929,11 +939,13 @@ const Invoices = {
               return;
             }
 
-            // Second click — delete
+            // Second click — delete (viewer uses self-service RPC)
             delete btnDel.dataset.confirmPending;
             btnDel.innerHTML = '...';
             btnDel.disabled = true;
-            var result = await DB.deleteInvoice(delId);
+            var result = App.role === 'viewer'
+              ? await DB.deleteInvoiceForSelf(delId)
+              : await DB.deleteInvoice(delId);
             if (result && result.error) throw new Error(result.error.message);
             showToast('Invoice deleted', 'success');
             await self._reload(container, ctx);
@@ -1064,6 +1076,8 @@ const Invoices = {
     var allowed = (validForward[prevStatus] || []).slice();
     if (App.role === 'admin') {
       allowed = ['draft', 'generated', 'sent', 'paid'];
+    } else if (App.role === 'viewer') {
+      allowed = allowed.filter(function (s) { return s !== 'paid'; });
     }
     if (allowed.indexOf(newStatus) === -1) {
       showToast('Invalid transition: ' + prevStatus + ' -> ' + newStatus, 'error');
@@ -1608,7 +1622,12 @@ const Invoices = {
         };
       });
 
-      var result = await DB.updateInvoice(editInvoice.id, invoicePayload, itemsPayload);
+      var result;
+      if (App.role === 'viewer') {
+        result = await DB.updateInvoiceForSelf(editInvoice.id, invoicePayload, itemsPayload);
+      } else {
+        result = await DB.updateInvoice(editInvoice.id, invoicePayload, itemsPayload);
+      }
       if (!result || result.error) {
         console.error('[Invoices] Update error:', result && result.error);
         showToast('Failed to update invoice. ' + ((result && result.error && result.error.message) || ''), 'error');
@@ -1685,7 +1704,12 @@ const Invoices = {
         };
       });
 
-      var result = await DB.updateInvoice(editInvoice.id, invoicePayload, itemsPayload);
+      var result;
+      if (App.role === 'viewer') {
+        result = await DB.updateInvoiceForSelf(editInvoice.id, invoicePayload, itemsPayload);
+      } else {
+        result = await DB.updateInvoice(editInvoice.id, invoicePayload, itemsPayload);
+      }
       if (!result || result.error) {
         console.error('[Invoices] Update & download error:', result && result.error);
         showToast('Failed to update invoice. ' + ((result && result.error && result.error.message) || ''), 'error');
@@ -1905,18 +1929,25 @@ const Invoices = {
         };
       });
 
-      var result = await DB.createInvoice(invoicePayload, itemsPayload);
+      var result;
+      if (App.role === 'viewer') {
+        result = await DB.createInvoiceForSelf(invoicePayload, itemsPayload);
+      } else {
+        result = await DB.createInvoice(invoicePayload, itemsPayload);
+      }
       if (!result || result.error) {
         console.error('[Invoices] Save error:', result && result.error);
-        showToast('Failed to save invoice. Please try again.', 'error');
+        showToast('Failed to save invoice. ' + ((result && result.error && result.error.message) || ''), 'error');
         return null;
       }
 
-      // Advance next_invoice_number for this employee
-      try {
-        await Numbering.incrementNumberAtomic(employee.id);
-      } catch (e) {
-        console.warn('[Invoices] Failed to increment invoice number:', e);
+      // Advance next_invoice_number for this employee (admin/lead only — viewer RPC does it)
+      if (App.role !== 'viewer') {
+        try {
+          await Numbering.incrementNumberAtomic(employee.id);
+        } catch (e) {
+          console.warn('[Invoices] Failed to increment invoice number:', e);
+        }
       }
 
       if (closeCallback) closeCallback();
@@ -1997,18 +2028,25 @@ const Invoices = {
         };
       });
 
-      var result = await DB.createInvoice(invoicePayload, itemsPayload);
+      var result;
+      if (App.role === 'viewer') {
+        result = await DB.createInvoiceForSelf(invoicePayload, itemsPayload);
+      } else {
+        result = await DB.createInvoice(invoicePayload, itemsPayload);
+      }
       if (!result || result.error) {
         console.error('[Invoices] Generate & download save error:', result && result.error);
-        showToast('Failed to save invoice. Please try again.', 'error');
+        showToast('Failed to save invoice. ' + ((result && result.error && result.error.message) || ''), 'error');
         return;
       }
 
-      // Advance next_invoice_number for this employee
-      try {
-        await Numbering.incrementNumberAtomic(employee.id);
-      } catch (e) {
-        console.warn('[Invoices] Failed to increment invoice number:', e);
+      // Advance next_invoice_number (admin/lead only — viewer RPC does it)
+      if (App.role !== 'viewer') {
+        try {
+          await Numbering.incrementNumberAtomic(employee.id);
+        } catch (e) {
+          console.warn('[Invoices] Failed to increment invoice number:', e);
+        }
       }
 
       // Close the generate modal

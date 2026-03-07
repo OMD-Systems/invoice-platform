@@ -19,6 +19,7 @@ const Team = {
   projects: [],
   timesheets: [],     // for selected employee
   allTimesheets: [],   // for all employees (summary)
+  suggestions: [],    // timesheet suggestions for selected employee
   invoices: [],
   teams: [],
   teamMembers: {},
@@ -89,8 +90,10 @@ const Team = {
       /* ── LEFT: Employee List ── */
       '<div class="team-list">' +
       '<div class="team-list-header">' +
-      '<input type="text" class="fury-input team-search" id="team-search" aria-label="Search employees" ' +
-      'placeholder="Search employees..." />' +
+      (App.role !== 'viewer'
+        ? '<input type="text" class="fury-input team-search" id="team-search" aria-label="Search employees" ' +
+          'placeholder="Search employees..." />'
+        : '') +
       (App.role === 'admin' ? '<button id="team-btn-add" class="fury-btn fury-btn-primary fury-btn-sm" style="margin-left: 8px;">+ Add Employee</button>' : '') +
       '<div class="team-period" style="margin-top: 8px;">' +
       '<select class="fury-select fury-select-sm" id="team-month" aria-label="Month">' + monthOptions + '</select>' +
@@ -98,15 +101,17 @@ const Team = {
       '</div>' +
       '</div>' +
       '<div class="team-list-body" id="team-list-body">' +
-      Skeleton.render('list-item', 6) +
+      Skeleton.render('list-item', App.role === 'viewer' ? 1 : 6) +
       '</div>' +
-      '<div class="team-list-footer">' +
-      '<label class="fury-btn fury-btn-secondary fury-btn-sm team-upload-btn" id="team-upload-label" tabindex="0" role="button">' +
-      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' +
-      ' Upload Timesheet' +
-      '<input type="file" accept=".xlsx,.xls" id="team-upload-file" style="display:none" />' +
-      '</label>' +
-      '</div>' +
+      (App.role !== 'viewer'
+        ? '<div class="team-list-footer">' +
+          '<label class="fury-btn fury-btn-secondary fury-btn-sm team-upload-btn" id="team-upload-label" tabindex="0" role="button">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' +
+          ' Upload Timesheet' +
+          '<input type="file" accept=".xlsx,.xls" id="team-upload-file" style="display:none" />' +
+          '</label>' +
+          '</div>'
+        : '') +
       '</div>' +
 
       /* ── RIGHT: Detail Panel ── */
@@ -151,8 +156,13 @@ const Team = {
           self.allEmployees = [];
         }
       } else {
-        var viewerResult = await DB.getEmployees();
-        self.allEmployees = (viewerResult && viewerResult.data) || [];
+        // Viewer: use employees_safe, filter to own profile only
+        var viewerResult = await DB.getEmployeesSafe();
+        var viewerAll = Array.isArray(viewerResult) ? viewerResult : ((viewerResult && viewerResult.data) || []);
+        var viewerEmail = ctx.user ? ctx.user.email : null;
+        self.allEmployees = viewerAll.filter(function (e) {
+          return e.work_email && e.work_email === viewerEmail;
+        });
       }
 
       // Sort: active first, then by name
@@ -343,6 +353,13 @@ const Team = {
     self.timesheets = self.allTimesheets.filter(function (ts) {
       return ts.employee_id === employeeId;
     });
+    // Load timesheet suggestions for this employee
+    try {
+      var sugResult = await DB.getTimesheetSuggestions(self.month, self.year, employeeId);
+      self.suggestions = (sugResult && sugResult.data) || [];
+    } catch (e) {
+      self.suggestions = [];
+    }
   },
 
   renderDetail(container) {
@@ -398,6 +415,8 @@ const Team = {
     var invoice = self.getEmployeeInvoice(emp.id);
     var isAdmin = App.role === 'admin';
     var isAdminOrLead = App.role === 'admin' || App.role === 'lead';
+    var isViewer = App.role === 'viewer';
+    var isOwnProfile = isViewer && emp.work_email && App.user && emp.work_email === App.user.email;
 
     // Avatar initials
     var nameParts = (emp.name || '').split(/[\s,]+/).filter(Boolean);
@@ -431,7 +450,12 @@ const Team = {
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
         ' Edit' +
         '</button>'
-        : '') +
+        : isOwnProfile
+          ? '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-edit-profile">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' +
+          ' Edit Profile' +
+          '</button>'
+          : '') +
       '</div>';
 
     // ═══ CONTACT & DOCUMENTS ═══
@@ -493,7 +517,7 @@ const Team = {
         ' No projects configured' +
         '</div>';
     } else {
-      if (!isAdminOrLead) {
+      if (!isAdminOrLead && !isOwnProfile) {
         html +=
           '<div class="td-readonly-hint">' +
           '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
@@ -501,10 +525,19 @@ const Team = {
           '</div>';
       }
 
+      // Build suggestion lookup
+      var sugMap = {};
+      var suggestions = self.suggestions || [];
+      for (var s = 0; s < suggestions.length; s++) {
+        sugMap[suggestions[s].project_id] = suggestions[s];
+      }
+
       html += '<div class="td-hours-grid">';
       for (var p = 0; p < self.projects.length; p++) {
         var proj = self.projects[p];
         var projHours = projectHoursMap[proj.id] || 0;
+        var sug = sugMap[proj.id];
+        var sugVal = sug ? parseFloat(sug.suggested_hours) || 0 : 0;
         html +=
           '<div class="td-hours-row">' +
           '<span class="td-hours-project">' + self.escapeHtml(proj.code) + '</span>' +
@@ -513,9 +546,28 @@ const Team = {
           'value="' + (projHours > 0 ? projHours : '') + '" ' +
           'min="0" max="999" step="0.5" placeholder="0" ' +
           (isAdminOrLead ? '' : 'disabled') + ' />' +
+          (isOwnProfile
+            ? '<input type="number" class="td-hours-input team-suggest-input" ' +
+              'data-project-id="' + proj.id + '" ' +
+              'value="' + (sugVal > 0 ? sugVal : '') + '" ' +
+              'min="0" max="999" step="0.5" placeholder="Suggest" ' +
+              'style="width:80px;margin-left:4px;font-size:12px" />'
+            : '') +
+          (isAdminOrLead && sug && sug.status === 'pending' && sugVal > 0
+            ? '<span class="td-suggest-badge" data-suggest-id="' + sug.id + '" data-suggest-hours="' + sugVal + '" ' +
+              'style="margin-left:6px;font-size:11px;color:var(--fury-warning);cursor:pointer" ' +
+              'title="Click to apply suggested hours">' +
+              '\uD83D\uDCA1 ' + sugVal + 'h' +
+              '</span>'
+            : '') +
           '</div>';
       }
       html += '</div>';
+
+      if (isOwnProfile) {
+        html += '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-submit-suggestions" style="margin-top:8px">Submit Suggestions</button>';
+        html += '<div class="td-autosave-indicator" id="team-suggest-indicator" style="display:none;"></div>';
+      }
 
       if (isAdminOrLead) {
         html += '<div class="td-autosave-indicator" id="team-save-indicator" style="display:none;"></div>';
@@ -567,13 +619,13 @@ const Team = {
           ' Mark Sent' +
           '</button>'
           : '') +
-        (invStatus === 'sent'
+        (invStatus === 'sent' && !isViewer
           ? '<button class="fury-btn fury-btn-success fury-btn-sm" id="team-btn-mark-paid">' +
           '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
           ' Mark Paid' +
           '</button>'
           : '') +
-        (isAdminOrLead && (invStatus === 'draft' || invStatus === 'generated')
+        ((isAdminOrLead || isOwnProfile) && (invStatus === 'draft' || invStatus === 'generated')
           ? '<button class="fury-btn fury-btn-danger fury-btn-sm" id="team-btn-delete-invoice" data-fury-tooltip="Delete this invoice">' +
           '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>' +
           ' Delete' +
@@ -588,7 +640,7 @@ const Team = {
         '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' +
         '</div>' +
         '<div class="td-invoice-empty-text">No invoice for this period</div>' +
-        (isAdminOrLead
+        (isAdminOrLead || isOwnProfile
           ? '<button class="fury-btn fury-btn-primary td-generate-btn" id="team-btn-generate">' +
           '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
           ' Generate Invoice' +
@@ -794,6 +846,22 @@ const Team = {
       });
     }
 
+    // Edit Profile button (viewer own profile)
+    var editProfileBtn = container.querySelector('#team-btn-edit-profile');
+    if (editProfileBtn) {
+      editProfileBtn.addEventListener('click', function () {
+        self.showProfileModal(emp, container);
+      });
+    }
+
+    // Submit Suggestions button (viewer)
+    var submitSuggestBtn = container.querySelector('#team-btn-submit-suggestions');
+    if (submitSuggestBtn) {
+      submitSuggestBtn.addEventListener('click', function () {
+        self.handleSubmitSuggestions(container);
+      });
+    }
+
     // Contract download
     var contractBtn = container.querySelector('#team-btn-contract');
     if (contractBtn) {
@@ -931,6 +999,22 @@ const Team = {
           self._autoSaveTimer = null;
           self.handleSaveHours(container);
         }, 1500);
+      });
+    }
+
+    // Suggestion badges (admin: click to apply suggested hours)
+    var sugBadges = container.querySelectorAll('.td-suggest-badge');
+    for (var sb = 0; sb < sugBadges.length; sb++) {
+      sugBadges[sb].addEventListener('click', function () {
+        var hours = this.getAttribute('data-suggest-hours');
+        var row = this.closest('.td-hours-row');
+        if (row) {
+          var input = row.querySelector('.team-hours-input');
+          if (input) {
+            input.value = hours;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
       });
     }
 
@@ -1155,7 +1239,63 @@ const Team = {
     self._generating = true;
 
     try {
-      var result = await DB.generateInvoice(emp.id, self.month, self.year);
+      var result;
+      var isViewer = App.role === 'viewer';
+
+      if (isViewer) {
+        // Viewer: build invoice data locally, then call createInvoiceForSelf
+        var isHourly = emp.employee_type === 'Hourly Contractor';
+        var config = self.hoursConfig;
+        var expectedHours = config ? (config.working_days || 21) * (config.hours_per_day || 8) : 21 * 8;
+        var items = [];
+        var order = 1;
+        var projectHoursMap = {};
+        for (var t = 0; t < self.timesheets.length; t++) {
+          var ts = self.timesheets[t];
+          var h = parseFloat(ts.hours) || 0;
+          if (h <= 0) continue;
+          if (!projectHoursMap[ts.project_id]) {
+            projectHoursMap[ts.project_id] = { hours: 0, name: '' };
+          }
+          projectHoursMap[ts.project_id].hours += h;
+          if (!projectHoursMap[ts.project_id].name) {
+            var proj = self.projects.find(function (p) { return p.id === ts.project_id; });
+            projectHoursMap[ts.project_id].name = proj ? proj.name : 'Project';
+          }
+        }
+        var subtotal = 0;
+        for (var pid in projectHoursMap) {
+          var ph = projectHoursMap[pid];
+          var itemTotal = isHourly ? ph.hours * rate : (expectedHours > 0 ? rate * (ph.hours / expectedHours) : rate);
+          itemTotal = Math.round(itemTotal * 100) / 100;
+          subtotal += itemTotal;
+          items.push({
+            item_order: order++,
+            description: ph.name + ' \u2014 ' + ph.hours + ' hours',
+            price_usd: rate,
+            qty: isHourly ? ph.hours : (expectedHours > 0 ? (ph.hours / expectedHours) : 1),
+            total_usd: itemTotal
+          });
+        }
+        subtotal = Math.round(subtotal * 100) / 100;
+        var prefix = emp.invoice_prefix || 'WS-Invoice';
+        var nextNum = emp.next_invoice_number || 1;
+        var invNumber = prefix + '-' + String(nextNum).padStart(3, '0');
+        var today = new Date().toISOString().split('T')[0];
+
+        result = await DB.createInvoiceForSelf({
+          invoice_number: invNumber,
+          invoice_date: today,
+          month: self.month,
+          year: self.year,
+          format_type: emp.invoice_format || 'WS',
+          subtotal_usd: subtotal,
+          total_usd: subtotal,
+          status: 'draft'
+        }, items);
+      } else {
+        result = await DB.generateInvoice(emp.id, self.month, self.year);
+      }
       if (result && result.error) throw new Error(result.error.message || 'Failed to generate');
 
       showToast('Invoice generated', 'success');
@@ -1163,6 +1303,18 @@ const Team = {
       // Refresh invoices
       var invResult = await DB.getInvoices({ month: self.month, year: self.year });
       self.invoices = (invResult && invResult.data) || [];
+
+      // Refresh employee data (next_invoice_number incremented)
+      if (isViewer) {
+        var refreshEmp = await DB.getEmployeesSafe();
+        var empArr = Array.isArray(refreshEmp) ? refreshEmp : ((refreshEmp && refreshEmp.data) || []);
+        for (var re = 0; re < empArr.length; re++) {
+          if (empArr[re].id === emp.id) {
+            self.updateEmployeeInCache(empArr[re]);
+            break;
+          }
+        }
+      }
 
       // Re-render detail and list
       self.renderDetail(container);
@@ -1208,7 +1360,10 @@ const Team = {
     self._deletingInvoice = true;
 
     try {
-      var result = await DB.deleteInvoice(invoice.id);
+      var isViewer = App.role === 'viewer';
+      var result = isViewer
+        ? await DB.deleteInvoiceForSelf(invoice.id)
+        : await DB.deleteInvoice(invoice.id);
       if (result && result.error) throw new Error(result.error.message);
 
       showToast('Invoice deleted', 'success');
@@ -1384,6 +1539,9 @@ const Team = {
     var allowed = (validForward[prevStatus] || []).slice();
     if (App.role === 'admin') {
       allowed = ['draft', 'generated', 'sent', 'paid'];
+    } else if (App.role === 'viewer') {
+      // Viewer cannot mark as paid
+      allowed = allowed.filter(function (s) { return s !== 'paid'; });
     }
     if (newStatus === prevStatus) { return; }
     if (allowed.indexOf(newStatus) === -1) {
@@ -1505,6 +1663,7 @@ const Team = {
     this.projects = [];
     this.timesheets = [];
     this.allTimesheets = [];
+    this.suggestions = [];
     this.invoices = [];
     this.selectedId = null;
   },
@@ -1532,6 +1691,182 @@ const Team = {
     } catch (err) {
       console.error('[Team] onPeriodChange error:', err);
       showToast('Failed to load data for selected period.', 'error');
+    }
+  },
+
+  /* ═══════════════════════════════════════════════════════
+     PROFILE MODAL (viewer self-service — 6 fields only)
+     ═══════════════════════════════════════════════════════ */
+  showProfileModal(employee, container) {
+    var self = this;
+    var overlay = container.querySelector('#team-modal-overlay');
+    var modal = container.querySelector('#team-modal');
+    if (!overlay || !modal || !employee) return;
+
+    var emp = employee;
+
+    modal.innerHTML = '' +
+      '<div class="fury-modal-header">' +
+      '<span class="fury-modal-title">Edit Profile</span>' +
+      '<button class="fury-modal-close" id="team-modal-close" aria-label="Close">&times;</button>' +
+      '</div>' +
+      '<div class="fury-modal-body" style="padding: 24px; max-height: 70vh; overflow-y: auto;">' +
+
+      '<div class="fury-form-group">' +
+      '<label class="fury-label" for="team-pf-address">Address</label>' +
+      '<textarea class="fury-textarea" id="team-pf-address">' + self.escapeHtml(emp.address || '') + '</textarea>' +
+      '</div>' +
+      '<div class="fury-form-group fury-mt-2">' +
+      '<label class="fury-label" for="team-pf-phone">Phone</label>' +
+      '<input type="text" class="fury-input" id="team-pf-phone" value="' + self.escapeHtml(emp.phone || '') + '" />' +
+      '</div>' +
+      '<div class="fury-form-group fury-mt-2">' +
+      '<label class="fury-label" for="team-pf-iban">IBAN</label>' +
+      '<input type="text" class="fury-input" id="team-pf-iban" value="' + self.escapeHtml(emp.iban || '') + '" />' +
+      '</div>' +
+      '<div class="fury-form-row fury-mt-2">' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label" for="team-pf-swift">SWIFT</label>' +
+      '<input type="text" class="fury-input" id="team-pf-swift" value="' + self.escapeHtml(emp.swift || '') + '" />' +
+      '</div>' +
+      '<div class="fury-form-group">' +
+      '<label class="fury-label" for="team-pf-bank">Bank Name</label>' +
+      '<input type="text" class="fury-input" id="team-pf-bank" value="' + self.escapeHtml(emp.bank_name || '') + '" />' +
+      '</div>' +
+      '</div>' +
+      '<div class="fury-form-group fury-mt-2">' +
+      '<label class="fury-label" for="team-pf-receiver">Receiver Name</label>' +
+      '<input type="text" class="fury-input" id="team-pf-receiver" value="' + self.escapeHtml(emp.receiver_name || '') + '" />' +
+      '</div>' +
+
+      '</div>' +
+      '<div class="fury-modal-footer">' +
+      '<button class="fury-btn fury-btn-secondary" id="team-modal-cancel">Cancel</button>' +
+      '<button class="fury-btn fury-btn-primary" id="team-modal-save">Save</button>' +
+      '</div>';
+
+    overlay.classList.add('active');
+    document.body.classList.add('fury-modal-open');
+
+    setTimeout(function () {
+      var firstInput = modal.querySelector('textarea, input');
+      if (firstInput) firstInput.focus();
+    }, 100);
+
+    var closeModal = function () {
+      overlay.classList.remove('active');
+      document.body.classList.remove('fury-modal-open');
+    };
+    modal.querySelector('#team-modal-close').addEventListener('click', closeModal);
+    modal.querySelector('#team-modal-cancel').addEventListener('click', closeModal);
+
+    var saveBtn = modal.querySelector('#team-modal-save');
+    saveBtn.addEventListener('click', async function () {
+      if (saveBtn.disabled) return;
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
+      var profileData = {
+        address: (modal.querySelector('#team-pf-address').value || '').trim(),
+        phone: (modal.querySelector('#team-pf-phone').value || '').trim(),
+        iban: (modal.querySelector('#team-pf-iban').value || '').trim(),
+        swift: (modal.querySelector('#team-pf-swift').value || '').trim(),
+        bank_name: (modal.querySelector('#team-pf-bank').value || '').trim(),
+        receiver_name: (modal.querySelector('#team-pf-receiver').value || '').trim()
+      };
+
+      if (profileData.iban && typeof Validation !== 'undefined' && !Validation.isValidIBAN(profileData.iban)) {
+        showToast('Invalid IBAN format', 'error');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+        return;
+      }
+      if (profileData.swift && typeof Validation !== 'undefined' && !Validation.isValidSWIFT(profileData.swift)) {
+        showToast('Invalid SWIFT/BIC format', 'error');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+        return;
+      }
+
+      try {
+        var result = await DB.updateMyProfile(profileData);
+        if (result && result.error) throw new Error(result.error.message);
+        showToast('Profile updated', 'success');
+        closeModal();
+
+        // Refresh employee data from view
+        var refreshResult = await DB.getEmployeesSafe();
+        var empArr = Array.isArray(refreshResult) ? refreshResult : ((refreshResult && refreshResult.data) || []);
+        for (var i = 0; i < empArr.length; i++) {
+          if (empArr[i].id === emp.id) {
+            self.updateEmployeeInCache(empArr[i]);
+            break;
+          }
+        }
+        self.renderDetail(container);
+      } catch (err) {
+        console.error('[Team] update profile error:', err);
+        showToast('Failed to update profile', 'error');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+      }
+    });
+  },
+
+  /* ── Submit hour suggestions (viewer) ── */
+  async handleSubmitSuggestions(container) {
+    var self = this;
+    var emp = self.findEmployee(self.selectedId);
+    if (!emp) return;
+
+    var inputs = container.querySelectorAll('.team-suggest-input');
+    var indicator = container.querySelector('#team-suggest-indicator');
+    var promises = [];
+
+    for (var i = 0; i < inputs.length; i++) {
+      var val = parseFloat(inputs[i].value) || 0;
+      if (val <= 0) continue;
+      var projectId = inputs[i].getAttribute('data-project-id');
+      promises.push(DB.upsertTimesheetSuggestion({
+        employee_id: emp.id,
+        project_id: projectId,
+        month: self.month,
+        year: self.year,
+        suggested_hours: val
+      }));
+    }
+
+    if (promises.length === 0) {
+      showToast('Enter suggested hours first', 'error');
+      return;
+    }
+
+    if (indicator) {
+      indicator.textContent = 'submitting...';
+      indicator.style.display = '';
+      indicator.className = 'td-autosave-indicator td-autosave-pending';
+    }
+
+    try {
+      var results = await Promise.all(promises);
+      for (var r = 0; r < results.length; r++) {
+        if (results[r] && results[r].error) throw new Error(results[r].error.message);
+      }
+      showToast('Suggestions submitted', 'success');
+      if (indicator) {
+        indicator.textContent = 'submitted';
+        indicator.className = 'td-autosave-indicator td-autosave-done';
+        setTimeout(function () { indicator.style.display = 'none'; }, 1200);
+      }
+    } catch (err) {
+      console.error('[Team] submit suggestions error:', err);
+      showToast('Failed to submit suggestions', 'error');
+      if (indicator) {
+        indicator.textContent = 'error';
+        indicator.className = 'td-autosave-indicator td-autosave-error';
+        setTimeout(function () { indicator.style.display = 'none'; }, 2000);
+      }
     }
   },
 
@@ -2054,7 +2389,10 @@ const Team = {
       }
       if (delBtn) delete delBtn.dataset.confirmPending;
       try {
-        var result = await DB.deleteInvoice(invoiceId);
+        var isViewer = App.role === 'viewer';
+        var result = isViewer
+          ? await DB.deleteInvoiceForSelf(invoiceId)
+          : await DB.deleteInvoice(invoiceId);
         if (result && result.error) throw new Error(result.error.message);
         showToast('Invoice deleted', 'success');
         // Refresh period invoices too
