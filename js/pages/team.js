@@ -550,12 +550,10 @@ const Team = {
             ? '<input type="number" class="td-hours-input team-suggest-input" ' +
               'data-project-id="' + proj.id + '" ' +
               'value="' + (sugVal > 0 ? sugVal : '') + '" ' +
-              'min="0" max="999" step="0.5" placeholder="Suggest" ' +
-              'style="width:80px;margin-left:4px;font-size:12px" />'
+              'min="0" max="999" step="0.5" placeholder="Suggest" />'
             : '') +
           (isAdminOrLead && sug && sug.status === 'pending' && sugVal > 0
             ? '<span class="td-suggest-badge" data-suggest-id="' + sug.id + '" data-suggest-hours="' + sugVal + '" ' +
-              'style="margin-left:6px;font-size:11px;color:var(--fury-warning);cursor:pointer" ' +
               'title="Click to apply suggested hours">' +
               '\uD83D\uDCA1 ' + sugVal + 'h' +
               '</span>'
@@ -1216,19 +1214,19 @@ const Team = {
     var emp = self.findEmployee(self.selectedId);
     if (!emp) return;
 
-    // Check for zero hours
+    // Check for zero hours (skip for viewer — they generate from suggestions/manual input)
     var totalHours = 0;
     for (var t = 0; t < self.timesheets.length; t++) {
       totalHours += parseFloat(self.timesheets[t].hours) || 0;
     }
-    if (totalHours <= 0) {
+    if (totalHours <= 0 && App.role !== 'viewer') {
       showToast('Cannot generate invoice: no hours logged', 'error');
       return;
     }
 
     // Check for missing rate
     var rate = parseFloat(emp.rate_usd) || 0;
-    if (rate <= 0) {
+    if (rate <= 0 && App.role !== 'viewer') {
       showToast('Cannot generate invoice: rate is not set', 'error');
       return;
     }

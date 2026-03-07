@@ -38,6 +38,11 @@ const Settings = {
       await this.loadData();
     }
 
+    // Load viewer profile data
+    if (ctx.role === 'viewer') {
+      await this._loadViewerProfile();
+    }
+
     this.renderActiveTab(container);
   },
 
@@ -60,7 +65,7 @@ const Settings = {
       /* ── Tabs ── */
       '<div class="fury-tabs fury-mb-3" role="tablist" aria-label="Settings tabs">' +
       adminTabs +
-      '<button class="fury-tab' + (this.activeTab === 'account' ? ' active' : '') + '" data-tab="account">Account</button>' +
+      '<button class="fury-tab' + (this.activeTab === 'account' ? ' active' : '') + '" data-tab="account">' + (ctx && ctx.role === 'viewer' ? 'My Profile' : 'Account') + '</button>' +
       '</div>' +
 
       /* ── Tab Content ── */
@@ -2084,8 +2089,57 @@ const Settings = {
      ═══════════════════════════════════════════════════ */
   renderAccount() {
     var email = (this._ctx && this._ctx.user) ? this._ctx.user.email : '';
+    var isViewer = this._ctx && this._ctx.role === 'viewer';
+    var profileHtml = '';
+
+    if (isViewer) {
+      var emp = this._viewerEmployee || {};
+      profileHtml =
+        '<div class="settings-section">' +
+        '<div class="settings-section-title">My Profile</div>' +
+        '<div style="font-size:13px;color:var(--fury-text-secondary);margin-bottom:16px;">' +
+        '<strong style="color:var(--fury-text)">' + this._escapeHtml(emp.name || '') + '</strong>' +
+        ' &middot; ' + this._escapeHtml(emp.employee_type || '') +
+        (emp.rate_usd ? ' &middot; $' + Number(emp.rate_usd).toFixed(2) + '/mo' : '') +
+        '</div>' +
+
+        '<div class="fury-form-group">' +
+        '<label class="fury-label" for="prof-address">Address</label>' +
+        '<textarea class="fury-textarea" id="prof-address" rows="2">' + this._escapeHtml(emp.address || '') + '</textarea>' +
+        '</div>' +
+        '<div class="fury-form-group fury-mt-2">' +
+        '<label class="fury-label" for="prof-phone">Phone</label>' +
+        '<input type="text" class="fury-input" id="prof-phone" value="' + this._escapeHtml(emp.phone || '') + '" />' +
+        '</div>' +
+        '<div class="fury-form-group fury-mt-2">' +
+        '<label class="fury-label" for="prof-iban">IBAN</label>' +
+        '<input type="text" class="fury-input" id="prof-iban" value="' + this._escapeHtml(emp.iban || '') + '" />' +
+        '</div>' +
+        '<div style="display:flex;gap:12px" class="fury-mt-2">' +
+        '<div class="fury-form-group" style="flex:1">' +
+        '<label class="fury-label" for="prof-swift">SWIFT</label>' +
+        '<input type="text" class="fury-input" id="prof-swift" value="' + this._escapeHtml(emp.swift || '') + '" />' +
+        '</div>' +
+        '<div class="fury-form-group" style="flex:1">' +
+        '<label class="fury-label" for="prof-bank">Bank Name</label>' +
+        '<input type="text" class="fury-input" id="prof-bank" value="' + this._escapeHtml(emp.bank_name || '') + '" />' +
+        '</div>' +
+        '</div>' +
+        '<div class="fury-form-group fury-mt-2">' +
+        '<label class="fury-label" for="prof-receiver">Receiver Name</label>' +
+        '<input type="text" class="fury-input" id="prof-receiver" value="' + this._escapeHtml(emp.receiver_name || '') + '" />' +
+        '</div>' +
+
+        '<div class="settings-actions" style="border-top:none;padding-top:12px;">' +
+        '<button class="fury-btn fury-btn-primary" id="prof-save-btn">Save Profile</button>' +
+        '</div>' +
+        '</div>';
+    }
+
     return (
       '<div class="fury-card" style="max-width:480px;">' +
+
+      profileHtml +
 
       '<div class="settings-section">' +
       '<div class="settings-section-title">Account</div>' +
@@ -2127,6 +2181,10 @@ const Settings = {
 
   _bindAccountEvents(container) {
     var self = this;
+
+    // Bind profile save for viewer
+    this._bindProfileEvents(container);
+
     var newPwInput = container.querySelector('#cp-new-password');
     var confirmPwInput = container.querySelector('#cp-confirm-password');
     var strengthBar = container.querySelector('#cp-strength-bar');
@@ -2248,5 +2306,69 @@ const Settings = {
     for (var i = 0; i < modals.length; i++) {
       modals[i].remove();
     }
+  },
+
+  /* ── Viewer profile data loading ── */
+  async _loadViewerProfile() {
+    try {
+      var result = await DB.getEmployeesSafe();
+      var arr = Array.isArray(result) ? result : ((result && result.data) || []);
+      var userEmail = (this._ctx && this._ctx.user) ? this._ctx.user.email.toLowerCase() : '';
+      this._viewerEmployee = arr.find(function (e) {
+        return e.work_email && e.work_email.toLowerCase() === userEmail;
+      }) || null;
+    } catch (e) {
+      console.error('[Settings] load viewer profile:', e);
+      this._viewerEmployee = null;
+    }
+  },
+
+  /* ── Viewer profile save handler ── */
+  _bindProfileEvents(container) {
+    var self = this;
+    var saveBtn = container.querySelector('#prof-save-btn');
+    if (!saveBtn) return;
+
+    saveBtn.addEventListener('click', async function () {
+      if (saveBtn.disabled) return;
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+
+      var data = {
+        address: (container.querySelector('#prof-address').value || '').trim(),
+        phone: (container.querySelector('#prof-phone').value || '').trim(),
+        iban: (container.querySelector('#prof-iban').value || '').trim(),
+        swift: (container.querySelector('#prof-swift').value || '').trim(),
+        bank_name: (container.querySelector('#prof-bank').value || '').trim(),
+        receiver_name: (container.querySelector('#prof-receiver').value || '').trim()
+      };
+
+      if (data.iban && typeof Validation !== 'undefined' && !Validation.isValidIBAN(data.iban)) {
+        showToast('Invalid IBAN format', 'error');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Profile';
+        return;
+      }
+      if (data.swift && typeof Validation !== 'undefined' && !Validation.isValidSWIFT(data.swift)) {
+        showToast('Invalid SWIFT/BIC format', 'error');
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Profile';
+        return;
+      }
+
+      try {
+        var result = await DB.updateMyProfile(data);
+        if (result && result.error) throw new Error(result.error.message);
+        showToast('Profile updated', 'success');
+        DB.clearCache();
+        await self._loadViewerProfile();
+      } catch (err) {
+        console.error('[Settings] save profile error:', err);
+        showToast('Failed to save profile', 'error');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save Profile';
+      }
+    });
   }
 };

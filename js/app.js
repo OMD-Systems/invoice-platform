@@ -113,7 +113,8 @@ const App = {
           showToast('Connection restored.', 'success');
         });
 
-        this.navigate(window.location.hash || '#/team');
+        var defaultPage = this.role === 'viewer' ? '#/invoices' : '#/team';
+        this.navigate(window.location.hash || defaultPage);
       } else {
         this.showLogin();
       }
@@ -207,13 +208,24 @@ const App = {
 
   /* ── Adjust nav labels based on role ── */
   applyRoleVisibility() {
+    // Hide Team tab for viewers
+    var teamNav = document.getElementById('nav-team');
+    if (teamNav) {
+      teamNav.style.display = this.role === 'viewer' ? 'none' : '';
+    }
+
     var settingsNav = document.getElementById('nav-settings');
     if (settingsNav) {
-      // Show to all users; non-admins see "Account" label
       settingsNav.style.display = '';
       var label = settingsNav.querySelector('.nav-label');
       if (label) {
-        label.textContent = this.role === 'admin' ? 'Settings' : 'Account';
+        if (this.role === 'viewer') {
+          label.textContent = 'My Profile';
+        } else if (this.role === 'admin') {
+          label.textContent = 'Settings';
+        } else {
+          label.textContent = 'Account';
+        }
       }
     }
   },
@@ -331,7 +343,8 @@ const App = {
         self.showApp();
         self.setupRouter();
         self.startSessionMonitor();
-        self.navigate(window.location.hash || '#/team');
+        var defaultPage = self.role === 'viewer' ? '#/invoices' : '#/team';
+        self.navigate(window.location.hash || defaultPage);
       } catch (err) {
         self._showLoginMsg(errorEl, err.message || 'Invalid or expired code. Please try again.', 'error');
       } finally {
@@ -537,10 +550,17 @@ const App = {
   async navigate(hash) {
     var navId = ++this._navId;
     // Normalize: strip hash, query params, trailing slashes
+    var defaultRoute = this.role === 'viewer' ? '/invoices' : '/team';
     var raw = (hash || '').replace(/^#/, '').split('?')[0].split('&')[0];
-    var path = raw.replace(/\/+$/, '') || '/team';
+    var path = raw.replace(/\/+$/, '') || defaultRoute;
     // Ensure path starts with /
     if (path.charAt(0) !== '/') path = '/' + path;
+
+    // Block viewer from accessing /team
+    if (path === '/team' && this.role === 'viewer') {
+      window.location.hash = '#/invoices';
+      return;
+    }
 
     // Handle legacy route redirects (prevent infinite loops)
     if (this.REDIRECTS && this.REDIRECTS[path]) {
@@ -548,14 +568,14 @@ const App = {
       if (this.pages[target]) {
         window.location.hash = '#' + target;
       } else {
-        window.location.hash = '#/team';
+        window.location.hash = '#' + defaultRoute;
       }
       return;
     }
 
     // Redirect unknown routes
     if (!this.pages[path]) {
-      window.location.hash = '#/team';
+      window.location.hash = '#' + defaultRoute;
       return;
     }
 

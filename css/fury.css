@@ -2713,11 +2713,12 @@ textarea.fury-input {
 .td-hours-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 8px;
   padding: 6px 12px;
   background: rgba(255, 255, 255, 0.02);
   border-radius: 6px;
   transition: background var(--fury-transition);
+  flex-wrap: wrap;
 }
 
 .td-hours-row:hover {
@@ -2725,10 +2726,22 @@ textarea.fury-input {
 }
 
 .td-hours-project {
+  flex: 1;
+  min-width: 0;
   font-size: 13px;
   font-weight: 500;
   color: var(--fury-text);
   letter-spacing: 0.3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.td-suggest-badge {
+  font-size: 11px;
+  color: var(--fury-warning);
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .td-hours-input {

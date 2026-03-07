@@ -184,6 +184,10 @@ const Invoices = {
       var invFilters = { month: self.month, year: self.year };
       if (self.statusFilter !== 'all') invFilters.status = self.statusFilter;
       if (self.employeeFilter !== 'all') invFilters.employee_id = self.employeeFilter;
+      // Defense-in-depth: viewer always filters by own employee
+      if (role === 'viewer' && self.employees.length > 0) {
+        invFilters.employee_id = self.employees[0].id;
+      }
 
       var results = await Promise.allSettled([
         DB.getInvoices(invFilters),
