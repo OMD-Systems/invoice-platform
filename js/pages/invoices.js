@@ -177,6 +177,21 @@ const Invoices = {
         var viewerArr = Array.isArray(viewerSafe) ? viewerSafe : ((viewerSafe && viewerSafe.data) || []);
         var viewerEmail = user ? user.email : null;
         self.employees = viewerArr.filter(function (e) { return e.work_email && e.work_email === viewerEmail; });
+      } else if (role === 'lead') {
+        // Lead: use employees_safe to prevent rate_usd leak
+        var tmResult = await DB.getTeamMembersByLead(user.email);
+        var teamMemberData = (tmResult && tmResult.data) || [];
+        if (teamMemberData.length > 0) {
+          var memberIds = {};
+          for (var tm = 0; tm < teamMemberData.length; tm++) {
+            memberIds[teamMemberData[tm].employee_id] = true;
+          }
+          var safeResult = await DB.getEmployeesSafe();
+          var safeAll = Array.isArray(safeResult) ? safeResult : ((safeResult && safeResult.data) || []);
+          self.employees = safeAll.filter(function (emp) { return memberIds[emp.id]; });
+        } else {
+          self.employees = [];
+        }
       } else {
         empResult = await DB.getTeamEmployees(user.email);
         self.employees = (empResult && empResult.data) ? empResult.data : [];

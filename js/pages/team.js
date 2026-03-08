@@ -831,7 +831,7 @@ const Team = {
         '</div>' +
         '<div class="td-doc-info">' +
         '<span class="td-doc-label">' + label + '</span>' +
-        '<span class="td-doc-status">' + (isLead ? 'Available' : 'Available') + '</span>' +
+        '<span class="td-doc-status">Available</span>' +
         '</div>' +
         (isLead ? '' :
           '<div class="td-doc-actions">' +
@@ -863,20 +863,7 @@ const Team = {
         '</div>'
       );
     }
-    // Lead: show status only without actions
-    if (isLead) {
-      return (
-        '<div class="td-doc-card td-doc-missing">' +
-        '<div class="td-doc-icon">' +
-        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' +
-        '</div>' +
-        '<div class="td-doc-info">' +
-        '<span class="td-doc-label">' + label + '</span>' +
-        '<span class="td-doc-status td-doc-status-missing">Not uploaded</span>' +
-        '</div>' +
-        '</div>'
-      );
-    }
+    // Lead or viewer: show status only without actions
     return (
       '<div class="td-doc-card td-doc-missing">' +
       '<div class="td-doc-icon">' +
