@@ -119,7 +119,7 @@ const Invoices = {
       '<th scope="col">Invoice #</th>' +
       '<th scope="col" class="fury-hide-mobile">Date</th>' +
       '<th scope="col" class="fury-hide-mobile" style="text-align: center;">Items</th>' +
-      '<th scope="col" style="text-align: right;">Total</th>' +
+      (App.role !== 'lead' ? '<th scope="col" style="text-align: right;">Total</th>' : '') +
       '<th scope="col" style="text-align: center;">Status</th>' +
       '<th scope="col" style="text-align: center;">Actions</th>' +
       '</tr>' +
@@ -142,8 +142,8 @@ const Invoices = {
       (App.role !== 'viewer' ? '<th scope="col" style="width: 36px; text-align: center;"><input type="checkbox" id="inv-select-all-pending" title="Select all pending" aria-label="Select all pending employees"></th>' : '') +
       (App.role !== 'viewer' ? '<th scope="col">Employee</th>' : '') +
       '<th scope="col" style="text-align: right;">Hours</th>' +
-      '<th scope="col" style="text-align: right;">Rate (USD)</th>' +
-      '<th scope="col" style="text-align: right;">Est. Amount</th>' +
+      (App.role !== 'lead' ? '<th scope="col" style="text-align: right;">Rate (USD)</th>' : '') +
+      (App.role !== 'lead' ? '<th scope="col" style="text-align: right;">Est. Amount</th>' : '') +
       '<th scope="col" style="text-align: center;">Action</th>' +
       '</tr>' +
       '</thead>' +
@@ -618,7 +618,7 @@ const Invoices = {
     if (!tbody) return;
 
     if (this.invoices.length === 0) {
-      var colSpan = App.role === 'viewer' ? 6 : 8;
+      var colSpan = App.role === 'viewer' ? 6 : (App.role === 'lead' ? 7 : 8);
       tbody.innerHTML =
         '<tr><td colspan="' + colSpan + '">' +
         '<div class="fury-empty">' +
@@ -653,9 +653,10 @@ const Invoices = {
         '<td style="font-variant-numeric: tabular-nums;">' + this._escapeHtml(invNumber) + '</td>' +
         '<td class="fury-hide-mobile">' + invDate + '</td>' +
         '<td class="fury-hide-mobile" style="text-align: center;">' + itemCount + '</td>' +
-        '<td style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">' +
-        this._formatCurrency(total) +
-        '</td>' +
+        (App.role !== 'lead'
+          ? '<td style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">' +
+            this._formatCurrency(total) + '</td>'
+          : '') +
         '<td style="text-align: center;">' + this._statusBadge(status) + '</td>' +
         '<td style="text-align: center; white-space: nowrap;">' +
         '<div style="display: inline-flex; gap: 4px;">' +
@@ -750,10 +751,11 @@ const Invoices = {
           '</td>' : '') +
         (App.role !== 'viewer' ? '<td>' + this._escapeHtml(name) + '</td>' : '') +
         '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + hours.toFixed(1) + '</td>' +
-        '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + this._formatCurrency(rate) + '</td>' +
-        '<td style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">' +
-        this._formatCurrency(estAmount) +
-        '</td>' +
+        (App.role !== 'lead' ? '<td style="text-align: right; font-variant-numeric: tabular-nums;">' + this._formatCurrency(rate) + '</td>' : '') +
+        (App.role !== 'lead'
+          ? '<td style="text-align: right; font-weight: 600; font-variant-numeric: tabular-nums;">' +
+            this._formatCurrency(estAmount) + '</td>'
+          : '') +
         '<td style="text-align: center;">' +
         '<button class="fury-btn fury-btn-primary fury-btn-sm inv-act-generate" ' +
         'data-employee-id="' + pe.id + '" ' +

@@ -194,6 +194,7 @@ const App = {
       Team.projects = [];
       Team.allTimesheets = [];
       Team.suggestions = [];
+      Team.allSuggestions = [];
       Team.invoices = [];
     }
     if (typeof Invoices !== 'undefined') {
@@ -240,7 +241,7 @@ const App = {
     if (teamNav) teamNav.style.display = isViewer ? 'none' : '';
 
     var expensesNav = document.getElementById('nav-expenses');
-    if (expensesNav) expensesNav.style.display = isViewer ? 'none' : '';
+    if (expensesNav) expensesNav.style.display = (isViewer || this.role === 'lead') ? 'none' : '';
 
     var settingsNav = document.getElementById('nav-settings');
     if (settingsNav) {
@@ -587,6 +588,12 @@ const App = {
     // Block viewer from accessing /team and /expenses
     if ((path === '/team' || path === '/expenses') && this.role === 'viewer') {
       window.location.hash = '#/dashboard';
+      return;
+    }
+
+    // Block lead from accessing /expenses
+    if (path === '/expenses' && this.role === 'lead') {
+      window.location.hash = '#/team';
       return;
     }
 

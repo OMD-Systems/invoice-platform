@@ -20,6 +20,7 @@ const Team = {
   timesheets: [],     // for selected employee
   allTimesheets: [],   // for all employees (summary)
   suggestions: [],    // timesheet suggestions for selected employee
+  allSuggestions: [],  // all team suggestions for overview
   invoices: [],
   teams: [],
   teamMembers: {},
@@ -53,13 +54,15 @@ const Team = {
     this.bindEvents(container, ctx);
     await this.loadData(ctx);
     this.renderEmployeeList(container);
-    // Auto-select first employee
-    if (this.employees.length > 0 && !this.selectedId) {
+    // Auto-select first employee (not for lead — show overview instead)
+    if (this.employees.length > 0 && !this.selectedId && ctx.role !== 'lead') {
       this.selectedId = this.employees[0].id;
     }
     if (this.selectedId) {
       await this.loadEmployeeDetails(this.selectedId);
       this.renderDetail(container);
+    } else if (ctx.role === 'lead') {
+      this.renderTeamOverview(container);
     }
     this.highlightSelected(container);
   },
@@ -148,8 +151,9 @@ const Team = {
           for (var tm = 0; tm < teamMemberData.length; tm++) {
             memberIds[teamMemberData[tm].employee_id] = true;
           }
-          var allResult = await DB.getEmployees();
-          self.allEmployees = ((allResult && allResult.data) || []).filter(function (emp) {
+          var safeResult = await DB.getEmployeesSafe();
+          var safeAll = Array.isArray(safeResult) ? safeResult : ((safeResult && safeResult.data) || []);
+          self.allEmployees = safeAll.filter(function (emp) {
             return memberIds[emp.id];
           });
         } else {
@@ -220,6 +224,19 @@ const Team = {
           self.defaultTerms = ptData.text || '';
         } catch (e) {
           console.error('[Team] Failed to parse payment_terms:', e);
+        }
+      }
+
+      // Load all team suggestions for overview (lead/admin)
+      if (ctx.role === 'lead' || ctx.role === 'admin') {
+        try {
+          var sugResult = await DB.getTimesheetSuggestions(self.month, self.year);
+          var allSugs = (sugResult && sugResult.data) || [];
+          var empIds = {};
+          for (var ei = 0; ei < self.allEmployees.length; ei++) empIds[self.allEmployees[ei].id] = true;
+          self.allSuggestions = allSugs.filter(function (s) { return empIds[s.employee_id]; });
+        } catch (e) {
+          self.allSuggestions = [];
         }
       }
 
@@ -295,9 +312,9 @@ const Team = {
       // Status dot
       var statusClass = emp.is_active ? 'team-status-active' : 'team-status-inactive';
 
-      // Rate display
+      // Rate display (admin only)
       var rate = parseFloat(emp.rate_usd) || 0;
-      var rateStr = rate > 0 ? '$' + rate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
+      var rateStr = (App.role === 'admin' && rate > 0) ? '$' + rate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '';
 
       // Invoice status indicator
       var invIndicator = '';
@@ -345,6 +362,121 @@ const Team = {
   },
 
   /* ═══════════════════════════════════════════════════════
+     TEAM OVERVIEW (Lead — no employee selected)
+     ═══════════════════════════════════════════════════════ */
+  renderTeamOverview(container) {
+    var self = this;
+    var panel = container.querySelector('#team-detail');
+    if (!panel) return;
+
+    var teamSize = self.allEmployees.length;
+    var regularHours = self.calculateRegularHours();
+
+    // Build hours map
+    var hoursMap = {};
+    for (var t = 0; t < self.allTimesheets.length; t++) {
+      var ts = self.allTimesheets[t];
+      hoursMap[ts.employee_id] = (hoursMap[ts.employee_id] || 0) + (parseFloat(ts.hours) || 0);
+    }
+
+    // Count filled
+    var filledCount = 0;
+    for (var i = 0; i < self.allEmployees.length; i++) {
+      if ((hoursMap[self.allEmployees[i].id] || 0) >= regularHours && regularHours > 0) filledCount++;
+    }
+
+    // Pending suggestions
+    var pendingSugs = (self.allSuggestions || []).filter(function (s) { return s.status === 'pending'; });
+
+    // Invoice map
+    var invoiceMap = {};
+    for (var inv = 0; inv < self.invoices.length; inv++) {
+      if (!invoiceMap[self.invoices[inv].employee_id]) {
+        invoiceMap[self.invoices[inv].employee_id] = self.invoices[inv];
+      }
+    }
+    var invoiceCount = 0;
+    for (var j = 0; j < self.allEmployees.length; j++) {
+      if (invoiceMap[self.allEmployees[j].id]) invoiceCount++;
+    }
+
+    var html = '<div style="padding:8px 0">';
+
+    // KPI cards
+    html +=
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px">' +
+      self._kpiCard('Team Size', teamSize + ' members', '#00D4FF') +
+      self._kpiCard('Hours Filled', filledCount + '/' + teamSize + ' done', filledCount === teamSize ? '#10B981' : '#F59E0B') +
+      self._kpiCard('Suggestions', pendingSugs.length + ' pending', pendingSugs.length > 0 ? '#F59E0B' : '#10B981') +
+      self._kpiCard('Invoices', invoiceCount + '/' + teamSize + ' generated', invoiceCount === teamSize ? '#10B981' : '#6B7280') +
+      '</div>';
+
+    // Quick status list
+    html += '<h3 style="font-size:13px;color:var(--fury-text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px">Team Status &mdash; ' + self.MONTH_NAMES[self.month - 1] + ' ' + self.year + '</h3>';
+    html += '<div style="display:flex;flex-direction:column;gap:6px">';
+
+    for (var k = 0; k < self.allEmployees.length; k++) {
+      var emp = self.allEmployees[k];
+      var empHours = hoursMap[emp.id] || 0;
+      var empHoursStr = empHours % 1 === 0 ? empHours.toFixed(0) : empHours.toFixed(1);
+
+      // Determine status
+      var hasPendingSug = false;
+      for (var ps = 0; ps < pendingSugs.length; ps++) {
+        if (pendingSugs[ps].employee_id === emp.id) { hasPendingSug = true; break; }
+      }
+
+      var statusIcon, statusText, statusColor;
+      if (empHours >= regularHours && regularHours > 0) {
+        statusIcon = '\u2705'; statusText = 'complete'; statusColor = '#10B981';
+      } else if (hasPendingSug) {
+        statusIcon = '\uD83D\uDCA1'; statusText = 'suggested'; statusColor = '#F59E0B';
+      } else if (empHours > 0) {
+        var shortfall = regularHours - empHours;
+        var shortStr = shortfall % 1 === 0 ? shortfall.toFixed(0) : shortfall.toFixed(1);
+        statusIcon = '\u26A0\uFE0F'; statusText = 'under (-' + shortStr + 'h)'; statusColor = '#F59E0B';
+      } else {
+        statusIcon = '\u274C'; statusText = 'not filled'; statusColor = '#EF4444';
+      }
+
+      html +=
+        '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--fury-bg-secondary,#111114);border-radius:8px;border:1px solid var(--fury-border,#1F1F23);cursor:pointer" class="team-overview-item" data-id="' + emp.id + '">' +
+        '<span style="font-size:14px">' + statusIcon + '</span>' +
+        '<span style="flex:1;font-size:13px;font-weight:500;color:var(--fury-text-primary,#E5E7EB)">' + self.escapeHtml(emp.name) + '</span>' +
+        '<span style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--fury-text-primary,#E5E7EB)">' + empHoursStr + 'h</span>' +
+        '<span style="font-size:12px;color:' + statusColor + '">' + statusText + '</span>' +
+        '</div>';
+    }
+
+    html += '</div></div>';
+    panel.innerHTML = html;
+
+    // Click handler for overview items
+    var overviewItems = panel.querySelectorAll('.team-overview-item');
+    for (var oi = 0; oi < overviewItems.length; oi++) {
+      overviewItems[oi].addEventListener('click', function () {
+        var empId = this.getAttribute('data-id');
+        if (empId) {
+          self.selectedId = empId;
+          self.highlightSelected(container);
+          self.loadEmployeeDetails(empId).then(function () {
+            self.renderDetail(container);
+          });
+        }
+      });
+    }
+  },
+
+  _kpiCard(title, value, color) {
+    return (
+      '<div style="background:var(--fury-bg-secondary,#111114);border:1px solid var(--fury-border,#1F1F23);border-radius:10px;padding:16px;text-align:center">' +
+      '<div style="font-size:11px;color:var(--fury-text-muted,#6B7280);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">' + title + '</div>' +
+      '<div style="font-size:16px;font-weight:700;color:' + color + '">' + value + '</div>' +
+      '</div>'
+    );
+  },
+
+  /* ═══════════════════════════════════════════════════════
      EMPLOYEE DETAIL (Right Panel)
      ═══════════════════════════════════════════════════════ */
   async loadEmployeeDetails(employeeId) {
@@ -369,15 +501,19 @@ const Team = {
 
     var emp = self.findEmployee(self.selectedId);
     if (!emp) {
-      panel.innerHTML =
-        '<div class="team-detail-empty">' +
-        '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="opacity:0.15;margin-bottom:16px">' +
-        '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>' +
-        '<path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' +
-        '</svg>' +
-        '<div style="color:var(--fury-text-secondary);font-size:14px;font-weight:500">Select an employee</div>' +
-        '<div style="color:var(--fury-text-muted);font-size:12px;margin-top:4px">Click on a name in the list to view details</div>' +
-        '</div>';
+      if (App.role === 'lead') {
+        self.renderTeamOverview(container);
+      } else {
+        panel.innerHTML =
+          '<div class="team-detail-empty">' +
+          '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="opacity:0.15;margin-bottom:16px">' +
+          '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>' +
+          '<path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' +
+          '</svg>' +
+          '<div style="color:var(--fury-text-secondary);font-size:14px;font-weight:500">Select an employee</div>' +
+          '<div style="color:var(--fury-text-muted);font-size:12px;margin-top:4px">Click on a name in the list to view details</div>' +
+          '</div>';
+      }
       return;
     }
 
@@ -441,7 +577,7 @@ const Team = {
       '<h2 class="td-name">' + self.escapeHtml(emp.name) + '</h2>' +
       '<div class="td-meta">' +
       '<span class="team-badge team-badge-' + ctBadge.toLowerCase() + '">' + ctBadge + '</span>' +
-      '<span class="td-rate">' + rateStr + '</span>' +
+      (isAdmin ? '<span class="td-rate">' + rateStr + '</span>' : '') +
       '</div>' +
       '</div>' +
       '</div>' +
@@ -556,7 +692,15 @@ const Team = {
             ? '<span class="td-suggest-badge" data-suggest-id="' + sug.id + '" data-suggest-hours="' + sugVal + '" ' +
               'title="Click to apply suggested hours">' +
               '\uD83D\uDCA1 ' + sugVal + 'h' +
-              '</span>'
+              '</span>' +
+              '<button class="fury-btn fury-btn-success fury-btn-xs sug-accept-btn" data-suggest-id="' + sug.id + '" data-suggest-hours="' + sugVal + '" title="Accept suggestion" style="padding:2px 6px;font-size:11px;min-width:0">&#10003;</button>' +
+              '<button class="fury-btn fury-btn-danger fury-btn-xs sug-reject-btn" data-suggest-id="' + sug.id + '" title="Reject suggestion" style="padding:2px 6px;font-size:11px;min-width:0">&#10007;</button>'
+            : '') +
+          (isAdminOrLead && sug && sug.status === 'accepted'
+            ? '<span class="td-suggest-badge" style="background:rgba(16,185,129,0.15);color:#10B981;cursor:default" title="Accepted">\u2705 ' + sugVal + 'h</span>'
+            : '') +
+          (isAdminOrLead && sug && sug.status === 'rejected'
+            ? '<span class="td-suggest-badge" style="background:rgba(239,68,68,0.15);color:#EF4444;cursor:default" title="Rejected">\u274C ' + sugVal + 'h</span>'
             : '') +
           '</div>';
       }
@@ -592,15 +736,21 @@ const Team = {
       html +=
         '<div class="td-invoice-card td-invoice-' + invStatus + '">' +
         '<div class="td-invoice-top">' +
-        '<div class="td-invoice-amount">$' + invTotal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</div>' +
+        (isAdmin
+          ? '<div class="td-invoice-amount">$' + invTotal.toLocaleString('en-US', { minimumFractionDigits: 2 }) + '</div>'
+          : '') +
         statusBadge +
         '</div>' +
         '<div class="td-invoice-detail">' +
         (invNumber ? '<span class="td-invoice-num">#' + self.escapeHtml(String(invNumber)) + '</span>' : '') +
-        '<span class="td-invoice-calc">' +
-        (totalHours % 1 === 0 ? totalHours.toFixed(0) : totalHours.toFixed(1)) + 'h' +
-        (isHourly ? ' &times; $' + rate.toFixed(2) + '/hr' : ' (monthly rate)') +
-        '</span>' +
+        (isAdmin
+          ? '<span class="td-invoice-calc">' +
+            (totalHours % 1 === 0 ? totalHours.toFixed(0) : totalHours.toFixed(1)) + 'h' +
+            (isHourly ? ' &times; $' + rate.toFixed(2) + '/hr' : ' (monthly rate)') +
+            '</span>'
+          : '<span class="td-invoice-calc">' +
+            (totalHours % 1 === 0 ? totalHours.toFixed(0) : totalHours.toFixed(1)) + 'h logged' +
+            '</span>') +
         '</div>' +
         '<div class="td-invoice-actions">' +
         '<button class="fury-btn fury-btn-secondary fury-btn-sm" id="team-btn-preview" data-fury-tooltip="Preview invoice">' +
@@ -672,6 +822,7 @@ const Team = {
   _renderDocCard(label, uploadedAt, btnId, fileId, isAdmin, genBtnId) {
     var downloadIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
     var generateIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>';
+    var isLead = App.role === 'lead';
     if (uploadedAt) {
       return (
         '<div class="td-doc-card td-doc-ok">' +
@@ -680,14 +831,15 @@ const Team = {
         '</div>' +
         '<div class="td-doc-info">' +
         '<span class="td-doc-label">' + label + '</span>' +
-        '<span class="td-doc-status">Available</span>' +
+        '<span class="td-doc-status">' + (isLead ? 'Available' : 'Available') + '</span>' +
         '</div>' +
-        '<div class="td-doc-actions">' +
-        '<button class="td-doc-action" id="' + btnId + '" data-fury-tooltip="Download ' + label + '">' + downloadIcon + '</button>' +
-        (isAdmin
-          ? '<button class="td-doc-action td-doc-action-gen" id="' + genBtnId + '" data-fury-tooltip="Re-generate ' + label + '">' + generateIcon + '</button>'
-          : '') +
-        '</div>' +
+        (isLead ? '' :
+          '<div class="td-doc-actions">' +
+          '<button class="td-doc-action" id="' + btnId + '" data-fury-tooltip="Download ' + label + '">' + downloadIcon + '</button>' +
+          (isAdmin
+            ? '<button class="td-doc-action td-doc-action-gen" id="' + genBtnId + '" data-fury-tooltip="Re-generate ' + label + '">' + generateIcon + '</button>'
+            : '') +
+          '</div>') +
         '</div>'
       );
     }
@@ -707,6 +859,20 @@ const Team = {
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' +
         '<input type="file" accept=".pdf" id="' + fileId + '" style="display:none" />' +
         '</label>' +
+        '</div>' +
+        '</div>'
+      );
+    }
+    // Lead: show status only without actions
+    if (isLead) {
+      return (
+        '<div class="td-doc-card td-doc-missing">' +
+        '<div class="td-doc-icon">' +
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>' +
+        '</div>' +
+        '<div class="td-doc-info">' +
+        '<span class="td-doc-label">' + label + '</span>' +
+        '<span class="td-doc-status td-doc-status-missing">Not uploaded</span>' +
         '</div>' +
         '</div>'
       );
@@ -1000,7 +1166,7 @@ const Team = {
       });
     }
 
-    // Suggestion badges (admin: click to apply suggested hours)
+    // Suggestion badges (admin/lead: click to apply suggested hours)
     var sugBadges = container.querySelectorAll('.td-suggest-badge');
     for (var sb = 0; sb < sugBadges.length; sb++) {
       sugBadges[sb].addEventListener('click', function () {
@@ -1012,6 +1178,56 @@ const Team = {
             input.value = hours;
             input.dispatchEvent(new Event('input', { bubbles: true }));
           }
+        }
+      });
+    }
+
+    // Suggestion accept buttons
+    var acceptBtns = container.querySelectorAll('.sug-accept-btn');
+    for (var ab = 0; ab < acceptBtns.length; ab++) {
+      acceptBtns[ab].addEventListener('click', async function (e) {
+        e.stopPropagation();
+        var sugId = this.getAttribute('data-suggest-id');
+        var hours = this.getAttribute('data-suggest-hours');
+        if (!sugId) return;
+        this.disabled = true;
+        // Apply hours to input
+        var row = this.closest('.td-hours-row');
+        if (row) {
+          var input = row.querySelector('.team-hours-input');
+          if (input) {
+            input.value = hours;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        }
+        var result = await DB.updateSuggestionStatus(sugId, 'accepted');
+        if (result && !result.error) {
+          showToast('Suggestion accepted', 'success');
+          await self.loadEmployeeDetails(self.selectedId);
+          self.renderDetail(container);
+        } else {
+          showToast('Failed to accept suggestion', 'error');
+          this.disabled = false;
+        }
+      });
+    }
+
+    // Suggestion reject buttons
+    var rejectBtns = container.querySelectorAll('.sug-reject-btn');
+    for (var rb = 0; rb < rejectBtns.length; rb++) {
+      rejectBtns[rb].addEventListener('click', async function (e) {
+        e.stopPropagation();
+        var sugId = this.getAttribute('data-suggest-id');
+        if (!sugId) return;
+        this.disabled = true;
+        var result = await DB.updateSuggestionStatus(sugId, 'rejected');
+        if (result && !result.error) {
+          showToast('Suggestion rejected', 'info');
+          await self.loadEmployeeDetails(self.selectedId);
+          self.renderDetail(container);
+        } else {
+          showToast('Failed to reject suggestion', 'error');
+          this.disabled = false;
         }
       });
     }
@@ -2276,6 +2492,7 @@ const Team = {
         return (b.invoice_date || '').localeCompare(a.invoice_date || '');
       });
 
+      var isAdm = App.role === 'admin';
       var html =
         '<table class="fury-table" style="min-width:auto;font-size:13px;">' +
         '<thead>' +
@@ -2283,7 +2500,7 @@ const Team = {
         '<th style="width:32px">#</th>' +
         '<th>Number</th>' +
         '<th>Date</th>' +
-        '<th style="text-align:right">Amount</th>' +
+        (isAdm ? '<th style="text-align:right">Amount</th>' : '') +
         '<th style="text-align:center">Status</th>' +
         '<th style="text-align:right">Actions</th>' +
         '</tr>' +
@@ -2300,7 +2517,7 @@ const Team = {
           '<td style="color:var(--fury-text-muted)">' + (i + 1) + '</td>' +
           '<td>' + self.escapeHtml(inv.invoice_number || '—') + '</td>' +
           '<td>' + self.escapeHtml(dateStr || '—') + '</td>' +
-          '<td style="text-align:right;font-weight:600">$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' +
+          (isAdm ? '<td style="text-align:right;font-weight:600">$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' : '') +
           '<td style="text-align:center">' + statusBadge + '</td>' +
           '<td style="text-align:right;white-space:nowrap">' +
           '<button class="fury-btn fury-btn-secondary fury-btn-xs td-hist-preview" data-inv-id="' + inv.id + '" title="Preview">&#128065;</button>' +
